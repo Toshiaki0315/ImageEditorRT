@@ -1,0 +1,25 @@
+[package]
+name = "imageeditorrt-core"
+description = "ImageEditorRT の画像処理・EXIF（Tauri に依存しない）"
+edition.workspace = true
+version.workspace = true
+publish = false
+
+[lib]
+name = "imageeditorrt_core"
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+rayon = "1"
+ab_glyph = "0.2"
+kamadak-exif = "0.6"
+jpeg-encoder = "0.7"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-core-foundation = "0.3"
+objc2-core-graphics = "0.3"
+objc2-image-io = "0.3"

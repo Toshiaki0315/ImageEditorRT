@@ -30,6 +30,11 @@
   box-sizing: border-box;
 }
 
+/* display を指定した要素でも、hidden 属性で隠せるようにする */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;

@@ -32,6 +32,7 @@ cargo fmt --all                               # 整形（確認だけなら --ch
 cargo clippy --workspace --all-targets -- -D warnings   # Lint
 npm run build                                 # TypeScript の型チェックと画面のビルド
 cargo run --release -p imageeditorrt-core --example bench   # 処理の速さのベンチマーク
+cargo run --release -p imageeditorrt-core --example profile # 原寸の処理の内訳
 ```
 
 ## ディレクトリ構成
@@ -41,7 +42,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
   src/
     formats.rs            # 読み込める形式・拡張子・透過の有無
     decode.rs             # ImageIO での読み込み（向きを直した sRGB の RGBA にする。macOS のみ）
-    resize.rs             # 縮小（fast_image_resize の Lanczos3）
+    resize.rs             # 縮小（プレビューは fast_image_resize、保存は Pillow と画素まで同じリサイズ）
     transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
     pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化

@@ -68,11 +68,19 @@ impl PyRandom {
     }
 
     fn generate(&mut self) {
-        let mag = |y: u32| if y & 1 == 0 { 0 } else { MATRIX_A };
-        for k in 0..N {
-            let y = (self.state[k] & UPPER_MASK) | (self.state[(k + 1) % N] & LOWER_MASK);
-            self.state[k] = self.state[(k + M) % N] ^ (y >> 1) ^ mag(y);
+        let mag = |y: u32| (y & 1).wrapping_neg() & MATRIX_A;
+        let mt = &mut self.state;
+        // 剰余を使わないよう、3 つの区間に分けて計算する（MT19937 の参照実装と同じ）
+        for k in 0..N - M {
+            let y = (mt[k] & UPPER_MASK) | (mt[k + 1] & LOWER_MASK);
+            mt[k] = mt[k + M] ^ (y >> 1) ^ mag(y);
         }
+        for k in N - M..N - 1 {
+            let y = (mt[k] & UPPER_MASK) | (mt[k + 1] & LOWER_MASK);
+            mt[k] = mt[k + M - N] ^ (y >> 1) ^ mag(y);
+        }
+        let y = (mt[N - 1] & UPPER_MASK) | (mt[0] & LOWER_MASK);
+        mt[N - 1] = mt[M - 1] ^ (y >> 1) ^ mag(y);
         self.index = 0;
     }
 
@@ -91,10 +99,12 @@ impl PyRandom {
 
     /// n バイトの乱数（Python の randbytes(n) と同じ）。
     pub fn bytes(&mut self, n: usize) -> Vec<u8> {
-        let mut out = Vec::with_capacity(n + 4);
-        for _ in 0..n / 4 {
-            out.extend_from_slice(&self.next_u32().to_le_bytes());
+        let mut out = vec![0u8; n];
+        let (words, _) = out.as_chunks_mut::<4>();
+        for word in words.iter_mut() {
+            *word = self.next_u32().to_le_bytes();
         }
+        out.truncate(n / 4 * 4);
         let rest = n % 4;
         if rest > 0 {
             // 足りない分は、乱数の上位のビットを使う

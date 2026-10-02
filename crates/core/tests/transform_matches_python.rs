@@ -142,7 +142,7 @@ fn scaled_settings() {
     }
 }
 
-/// 画素ごとの差がどれも tolerance 以下か（リサイズは計算の細かな違いで ±数の差が出る）。
+/// 画素ごとの差がどれも tolerance 以下か。
 fn assert_close(got: &RgbaImage, expected: &RgbaImage, tolerance: u8, name: &str) {
     assert_eq!(got.dimensions(), expected.dimensions(), "{name}");
     let worst = got.as_raw().iter().zip(expected.as_raw()).map(|(a, b)| a.abs_diff(*b)).max().unwrap_or(0);
@@ -151,10 +151,11 @@ fn assert_close(got: &RgbaImage, expected: &RgbaImage, tolerance: u8, name: &str
 
 #[test]
 fn lanczos_resize_matches_pillow() {
+    // Pillow の Image.resize(LANCZOS) と画素まで同じ
     let gradient = png("gradient.png");
     for (w, h) in [(17, 13), (80, 61), (40, 9)] {
         let got = imageeditorrt_core::transform::resize_to(&gradient, (w, h));
-        assert_close(&got, &png(&format!("resize_{w}x{h}.png")), 3, &format!("{w}x{h}"));
+        assert_close(&got, &png(&format!("resize_{w}x{h}.png")), 0, &format!("{w}x{h}"));
     }
 }
 
@@ -163,5 +164,5 @@ fn apply_edits_orient_crop_resize() {
     let flow: Value =
         serde_json::from_str(&std::fs::read_to_string(dir().join("apply_edits.json")).unwrap()).unwrap();
     let got = apply_edits(&png("gradient.png"), &settings(&flow)).unwrap();
-    assert_close(&got, &png("apply_edits.png"), 3, "apply_edits");
+    assert_close(&got, &png("apply_edits.png"), 0, "apply_edits");
 }

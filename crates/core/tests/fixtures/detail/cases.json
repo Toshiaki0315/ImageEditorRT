@@ -1,0 +1,54 @@
+[
+ {
+  "effect": "sharpen",
+  "amount": 15,
+  "file": "sharpen_15.png"
+ },
+ {
+  "effect": "blur",
+  "amount": 15,
+  "file": "blur_15.png"
+ },
+ {
+  "effect": "denoise",
+  "amount": 15,
+  "file": "denoise_15.png"
+ },
+ {
+  "effect": "sharpen",
+  "amount": 50,
+  "file": "sharpen_50.png"
+ },
+ {
+  "effect": "blur",
+  "amount": 50,
+  "file": "blur_50.png"
+ },
+ {
+  "effect": "denoise",
+  "amount": 50,
+  "file": "denoise_50.png"
+ },
+ {
+  "effect": "sharpen",
+  "amount": 100,
+  "file": "sharpen_100.png"
+ },
+ {
+  "effect": "blur",
+  "amount": 100,
+  "file": "blur_100.png"
+ },
+ {
+  "effect": "denoise",
+  "amount": 100,
+  "file": "denoise_100.png"
+ },
+ {
+  "effect": "sharpen",
+  "amount": 70,
+  "reference": 90,
+  "output": 600,
+  "file": "sharpen_preview.png"
+ }
+]

@@ -73,7 +73,7 @@ pub fn is_supported(path: &Path) -> bool {
 
 /// 透明・半透明の画素があるか（プレビューで市松模様を出すかに使う）。
 pub fn has_transparency(image: &RgbaImage) -> bool {
-    image.as_raw().par_chunks_exact(4).any(|p| p[3] != 255)
+    image.as_raw().par_chunks_exact(4).with_min_len(crate::PIXELS_PER_TASK).any(|p| p[3] != 255)
 }
 
 #[cfg(test)]

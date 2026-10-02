@@ -12,13 +12,12 @@ use image::RgbaImage;
 use imageeditorrt_core::decode::{self, DecodeError};
 use imageeditorrt_core::exif_info::{read_exif_info, ExifInfo};
 use imageeditorrt_core::formats::{self, Format};
-use imageeditorrt_core::{preview, resize};
+use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
+use imageeditorrt_core::sample;
 use serde::Serialize;
 use tauri::ipc::Response;
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 
-/// プレビューの長辺（旧版と同じ 1600px）。
-const PREVIEW_MAX_SIDE: u32 = 1600;
 /// 計測用の画像の大きさ（旧版のベンチマークと同じ 6000×4000）。
 const SAMPLE_SIZE: (u32, u32) = (6000, 4000);
 /// この環境変数があると、起動後に画面が受け渡しの計測をして結果を出力し、終了する。
@@ -26,11 +25,12 @@ const BENCH_ENV: &str = "IMAGEEDITORRT_BENCH";
 /// ウィンドウのタイトル（画像を開くと「ファイル名 — ImageEditorRT」）。
 const APP_NAME: &str = "ImageEditorRT";
 
-/// 読み込んだ原本（不変）と、それを縮めたプレビュー用の画像。
+/// 読み込んだ原本（不変）と、それを縮めたプレビュー用の画像・縮小率。
 #[derive(Default)]
 struct Loaded {
     original: Option<RgbaImage>,
     preview: Option<RgbaImage>,
+    factor: f64,
 }
 
 #[derive(Default)]
@@ -76,7 +76,7 @@ fn store(
 ) -> Result<OpenInfo, String> {
     let start = Instant::now();
     let original = decoded.image;
-    let small = resize::fit_long_side(&original, PREVIEW_MAX_SIDE);
+    let (small, factor) = pipeline::make_preview(&original, PREVIEW_MAX_SIDE);
     let info = OpenInfo {
         format: Some(decoded.format),
         width: original.width(),
@@ -92,8 +92,7 @@ fn store(
     };
     let _ = window.set_title(&format!("{} — {APP_NAME}", info.name));
     let mut loaded = state.0.lock().map_err(|e| e.to_string())?;
-    loaded.original = Some(original);
-    loaded.preview = Some(small);
+    *loaded = Loaded { original: Some(original), preview: Some(small), factor };
     Ok(info)
 }
 
@@ -126,7 +125,7 @@ async fn open_path(
 #[tauri::command]
 async fn open_sample(state: State<'_, AppState>, window: WebviewWindow) -> Result<OpenInfo, String> {
     let start = Instant::now();
-    let image = preview::synthetic_photo(SAMPLE_SIZE.0, SAMPLE_SIZE.1);
+    let image = sample::synthetic_photo(SAMPLE_SIZE.0, SAMPLE_SIZE.1);
     let decoded = decode::Decoded { image, format: Format::Png, frame_count: 1 };
     store(&state, &window, "計測用の画像".into(), decoded, elapsed_ms(start), ExifInfo::default())
 }
@@ -137,17 +136,21 @@ fn supported_formats() -> (Vec<&'static str>, &'static str) {
     (formats::SUPPORTED_EXTENSIONS.to_vec(), formats::FORMATS_TEXT)
 }
 
-/// プレビューに設定をかけて返す。
+/// プレビューに設定をかけて返す。trimmed なら切り抜いた範囲だけを表示する。
 ///
 /// 返すバイト列: 先頭 12 バイトが幅・高さ・処理の時間 (µs)（どれも u32 リトルエンディアン）、
 /// その後ろが RGBA の画素。JSON にしないので、1600px の画像でも受け渡しは数 ms で済む。
 #[tauri::command]
-async fn render_preview(settings: preview::Settings, state: State<'_, AppState>) -> Result<Response, String> {
+async fn render_preview(
+    settings: EditSettings,
+    trimmed: bool,
+    state: State<'_, AppState>,
+) -> Result<Response, String> {
     let (image, render_time) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let image = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
         let start = Instant::now();
-        (preview::render(image, &settings), start.elapsed())
+        (pipeline::render_preview(image, &settings, loaded.factor, trimmed), start.elapsed())
     };
     let (width, height) = image.dimensions();
     let pixels = image.into_raw();
@@ -157,6 +160,14 @@ async fn render_preview(settings: preview::Settings, state: State<'_, AppState>)
     }
     body.extend_from_slice(&pixels);
     Ok(Response::new(body))
+}
+
+/// 設定をかけたときの出力の大きさ（ステータスバーに出す）。大きさの指定が範囲外ならエラー。
+#[tauri::command]
+fn output_size(settings: EditSettings, state: State<'_, AppState>) -> Result<(u32, u32), String> {
+    let loaded = state.0.lock().map_err(|e| e.to_string())?;
+    let original = loaded.original.as_ref().ok_or("画像が読み込まれていません")?;
+    pipeline::output_size(original.dimensions(), &settings).map_err(|e| e.to_string())
 }
 
 /// 計測モードで起動したか。
@@ -202,6 +213,7 @@ pub fn run() {
             open_sample,
             supported_formats,
             render_preview,
+            output_size,
             open::take_pending_paths,
             bench_mode,
             log,

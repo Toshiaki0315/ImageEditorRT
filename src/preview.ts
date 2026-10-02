@@ -1,7 +1,7 @@
 // プレビュー: Rust に設定をかけさせた縮小版を canvas に描き、エリアに収まるよう縦横比を保って表示する。
 
 import { invoke } from "@tauri-apps/api/core";
-import type { Settings } from "./types";
+import type { EditSettings } from "./types";
 
 /** 1 回の描き直しの内訳 (ms)。 */
 export type Timing = {
@@ -26,7 +26,7 @@ const nextFrame = () =>
 export class Preview {
   private readonly context: CanvasRenderingContext2D;
   private busy = false;
-  private pending: Settings | null = null;
+  private pending: EditSettings | null = null;
 
   constructor(
     private readonly stage: HTMLElement,
@@ -60,8 +60,8 @@ export class Preview {
   }
 
   /** 設定を変えたとき。描いている途中なら、終わってから最新の設定で 1 回だけ描き直す。 */
-  request(settings: Settings) {
-    this.pending = { ...settings };
+  request(settings: EditSettings) {
+    this.pending = structuredClone(settings);
     if (!this.busy) void this.drain();
   }
 
@@ -81,9 +81,9 @@ export class Preview {
   }
 
   /** Rust にプレビューを作らせて描き、内訳を返す。 */
-  async render(settings: Settings): Promise<Timing> {
+  async render(settings: EditSettings, trimmed = false): Promise<Timing> {
     const start = performance.now();
-    const buffer = await invoke<ArrayBuffer>("render_preview", { settings });
+    const buffer = await invoke<ArrayBuffer>("render_preview", { settings, trimmed });
     const received = performance.now();
     const header = new DataView(buffer, 0, 12);
     const width = header.getUint32(0, true);

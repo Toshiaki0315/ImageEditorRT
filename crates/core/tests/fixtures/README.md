@@ -12,3 +12,4 @@
 | `makernote/*.tiff` | MakerNote の読み取りのテスト用の EXIF（TIFF の部分だけ）。ペンタックス・リコー・Samsung・不明な形式・壊れたものなど 13 通り |
 | `makernote/expected.json` | 上の EXIF を Python 版の `core/makernote.py` で読んだ結果（Rust 版と同じになるかを比べる） |
 | `formats/*` | 読み込みの変換のテスト用（CMYK の JPEG・16bit の PNG・パレットの PNG・アニメーション GIF・複数ページの TIFF・BMP・中身と拡張子が違うもの・WebP・Display P3）。`formats/make.py`（Pillow）で作ったもの |
+| `transform/*` | 回転・反転・トリミング・リサイズの期待値。旧版の `core/transform.py`・`core/pipeline.py` で作ったもの（`transform/make.py`）。`cases.json` は範囲・大きさの計算、PNG は画像 |

@@ -9,7 +9,7 @@ import { showExif } from "./exif";
 import { Panel } from "./panel";
 import { Preview } from "./preview";
 import { Tabs } from "./tabs";
-import { DEFAULT_SETTINGS, type OpenInfo, type Settings } from "./types";
+import { defaultSettings, type EditSettings, type OpenInfo } from "./types";
 
 const NO_IMAGE_MESSAGE = "画像が読み込まれていません";
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
@@ -20,7 +20,8 @@ const stage = $<HTMLElement>("stage");
 const placeholder = $<HTMLElement>("placeholder");
 const status = $<HTMLElement>("status");
 
-const settings: Settings = { ...DEFAULT_SETTINGS };
+const settings: EditSettings = defaultSettings();
+let notes: string[] = [];
 let loaded: OpenInfo | null = null;
 let opening = false;
 let extensions: string[] = [];
@@ -28,9 +29,14 @@ let formatsText = "";
 
 const preview = new Preview(stage, $<HTMLCanvasElement>("canvas"), (error) => showError("プレビューを更新できません", error));
 const tabs = new Tabs(document.querySelector(".side")!);
-const panel = new Panel($("page-adjust"), $("page-diorama"), settings, () => {
-  if (loaded) preview.request(settings);
-});
+const panel = new Panel($("page-adjust"), $("page-diorama"), settings, settingsChanged);
+
+/** 設定を変えたとき: プレビューとステータスバー（出力の大きさ）を更新する。 */
+function settingsChanged() {
+  if (!loaded) return;
+  preview.request(settings);
+  void updateStatus();
+}
 
 function extensionOf(path: string): string {
   const name = path.split("/").pop() ?? "";
@@ -46,24 +52,31 @@ async function showError(title: string, error: unknown, withFormats = false) {
   await message(text, { title, kind: "warning" });
 }
 
-/** ステータスバー: ファイル名・原寸（と、読み込みのときのお知らせ）。 */
-function updateStatus(notes: string[] = []) {
+/** ステータスバー: ファイル名・原寸・出力の大きさ（と、読み込みのときのお知らせ）。 */
+async function updateStatus() {
   if (!loaded) {
     status.textContent = notes.length ? notes.join("／") : NO_IMAGE_MESSAGE;
     return;
   }
-  let text = `${loaded.name} ｜ 原寸 ${loaded.width}×${loaded.height} px`;
+  let output = "出力 —";
+  try {
+    const [width, height] = await invoke<[number, number]>("output_size", { settings });
+    output = `出力 ${width}×${height} px`;
+  } catch {
+    // 大きさの指定が範囲外のときは「—」
+  }
+  let text = `${loaded.name} ｜ 原寸 ${loaded.width}×${loaded.height} px ｜ ${output}`;
   if (notes.length) text += `（${notes.join("／")}）`;
   status.textContent = text;
 }
 
 /** 画像を開く。読めなければダイアログで知らせ、それまでの画像はそのまま残す。 */
-async function openPath(path: string, notes: string[] = []) {
+async function openPath(path: string, openNotes: string[] = []) {
   if (opening) return;
   opening = true;
   try {
     const info = await invoke<OpenInfo>("open_path", { path });
-    showLoaded(info, notes);
+    showLoaded(info, openNotes);
   } catch (error) {
     await showError(LOAD_ERROR_TITLE, error, true);
   } finally {
@@ -74,8 +87,8 @@ async function openPath(path: string, notes: string[] = []) {
 /** ドロップ・Finder などから届いたファイル。複数なら先頭の 1 枚だけを開く（旧版 FR-UI-03）。 */
 function openPaths(paths: string[]) {
   if (paths.length === 0) return;
-  const notes = paths.length > 1 ? [`${paths.length} 件中、先頭の 1 枚のみ読み込みました`] : [];
-  void openPath(paths[0], notes);
+  const openNotes = paths.length > 1 ? [`${paths.length} 件中、先頭の 1 枚のみ読み込みました`] : [];
+  void openPath(paths[0], openNotes);
 }
 
 async function openDialog() {
@@ -88,16 +101,16 @@ async function openDialog() {
   if (typeof path === "string") await openPath(path);
 }
 
-function showLoaded(info: OpenInfo, notes: string[]) {
+function showLoaded(info: OpenInfo, openNotes: string[]) {
   loaded = info;
-  Object.assign(settings, DEFAULT_SETTINGS);
+  Object.assign(settings, defaultSettings());
   panel.show();
   placeholder.hidden = true;
   preview.show(info.previewWidth, info.previewHeight, info.hasAlpha);
   showExif($("page-exif"), info.exif);
   tabs.setEnabled("exif", info.exif.entries.length > 0);
-  if (info.frameCount > 1) notes = [...notes, MULTI_FRAME_NOTE];
-  updateStatus(notes);
+  notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
+  void updateStatus();
   preview.request(settings);
 }
 

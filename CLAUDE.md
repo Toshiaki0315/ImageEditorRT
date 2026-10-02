@@ -39,7 +39,8 @@ cargo run --release -p imageeditorrt-core --example bench   # 処理の速さの
 ```
 crates/core/              # ★ Tauri に依存しない画像処理・EXIF（imageeditorrt_core）
   src/
-    decode.rs             # ImageIO での読み込み（向きを直した RGBA にする。macOS のみ）
+    formats.rs            # 読み込める形式・拡張子・透過の有無
+    decode.rs             # ImageIO での読み込み（向きを直した sRGB の RGBA にする。macOS のみ）
     resize.rs             # 縮小（fast_image_resize の Lanczos3）
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
     blur.rs               # ガウスぼかし（箱ぼかし 3 回）・アンシャープマスク
@@ -52,13 +53,19 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
   examples/bench.rs       # ベンチマーク
   tests/                  # ファイルを使うテスト（fixtures/ はテスト用の画像・EXIF）
 src-tauri/                # Tauri のアプリ本体（コマンドで core を呼び、画面と受け渡すだけ）
-  src/lib.rs
+  src/lib.rs              # コマンド（開く・プレビュー）と起動
+  src/menu.rs             # メニューバー（選ばれた項目は "menu" のイベントで画面へ）
+  src/open.rs             # コマンドライン引数・Finder・Dock から開く
   tauri.conf.json
 src/                      # 画面（TypeScript）
-  main.ts
+  main.ts                 # 起動・開く・ドロップ・ステータスバー
+  preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
+  panel.ts / tabs.ts / exif.ts   # 設定パネルのスライダー・タブ・EXIF の一覧
+  types.ts                # Rust とやりとりする型
   styles.css
 index.html
 docs/prototype.md         # 試作の結果
+docs/decisions.md         # 作り直しの中で決めたこと（色の空間など。旧版との違いも書く）
 ```
 
 ## 設計ルール（必ず守る）

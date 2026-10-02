@@ -65,6 +65,21 @@ fn main() {
         let (first, _, _) = measure(1, || imageeditorrt_core::decode::decode(&heic).unwrap());
         let (warm, _, _) = measure(5, || imageeditorrt_core::decode::decode(&heic).unwrap());
         println!("HEIC 1500x1000 の読み込み: 初回 {} / 2 回目以降 {}", ms(first), ms(warm));
+
+        // NFR-01: 12MP (4000×3000) の JPEG を読み込んでから、プレビューを作るまで（画面への受け渡しは数 ms）
+        let jpeg = imageeditorrt_core::encode::to_jpeg(&synthetic_photo(4000, 3000), 90);
+        let (best, median, _) = measure(5, || {
+            let decoded = imageeditorrt_core::decode::decode_file(&jpeg).unwrap();
+            let small = fit_long_side(&decoded.image, PREVIEW_MAX_SIDE);
+            let exif = imageeditorrt_core::exif_info::read_exif_info(&jpeg);
+            (render(&small, &Settings::default()), exif)
+        });
+        let verdict = if median.as_secs_f64() < 1.0 { "OK" } else { "NG" };
+        println!(
+            "12MP の JPEG の読み込み → プレビュー (NFR-01, 1 秒以内): 最小 {} / 中央値 {} → {verdict}",
+            ms(best),
+            ms(median)
+        );
     }
 
     let out = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/bench_heavy_preview.png");

@@ -194,7 +194,8 @@ impl ExifBlock {
                 }
             }
             if let Some(pointer) = find(&exif, TAG_INTEROP_IFD) {
-                block.interop = read_ifd(data, pointer.pointer(order), order).map(|e| values(data, &e, order));
+                block.interop =
+                    read_ifd(data, pointer.pointer(order), order).map(|e| values(data, &e, order));
             }
         }
         if let Some(pointer) = find(&ifd0, TAG_GPS_IFD) {
@@ -266,7 +267,11 @@ impl ExifBlock {
         if let Some((note_at, note)) = maker_note {
             exif.insert(
                 TAG_MAKERNOTE,
-                Value { kind: UNDEFINED, count: note.len() as u32, data: order.put_u32(*note_at as u32).to_vec() },
+                Value {
+                    kind: UNDEFINED,
+                    count: note.len() as u32,
+                    data: order.put_u32(*note_at as u32).to_vec(),
+                },
             );
         }
 

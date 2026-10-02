@@ -154,6 +154,21 @@ pub fn render(image: &RgbaImage, settings: &Settings) -> RgbaImage {
     out
 }
 
+/// 計測用の画像（なめらかな部分と細かい模様のある、写真に近い画像）を作る。
+pub fn synthetic_photo(width: u32, height: u32) -> RgbaImage {
+    RgbaImage::from_par_fn(width, height, |x, y| {
+        let fx = x as f32 / width as f32;
+        let fy = y as f32 / height as f32;
+        let fine = if (x / 3 + y / 5) % 2 == 0 { 25 } else { 0 };
+        image::Rgba([
+            (fx * 200.0) as u8 + fine,
+            (fy * 180.0) as u8 + 30,
+            ((1.0 - fx) * 150.0) as u8 + fine,
+            255,
+        ])
+    })
+}
+
 /// 輪郭を残してざらつきをなめらかにする（Python 版の effects.denoise と同じ考え方）。
 fn denoise(image: &RgbaImage, amount: u32, reference: f32) -> RgbaImage {
     let smooth = gaussian_blur(image, reference * DENOISE_RADIUS_RATIO);
@@ -163,18 +178,15 @@ fn denoise(image: &RgbaImage, amount: u32, reference: f32) -> RgbaImage {
         (255.0 * strength * (1.0 - adjust::smoothstep(t))).round() as u16
     });
     let mut out = image.clone();
-    out.as_mut()
-        .par_chunks_exact_mut(4)
-        .zip(smooth.as_raw().par_chunks_exact(4))
-        .for_each(|(p, s)| {
-            let d: [u32; 3] = std::array::from_fn(|c| u32::from(p[c].abs_diff(s[c])));
-            let luma = ((d[0] * 299 + d[1] * 587 + d[2] * 114) / 1000) as usize;
-            let w = weights[luma];
-            for c in 0..3 {
-                let mixed = u16::from(s[c]) * w + u16::from(p[c]) * (255 - w);
-                p[c] = ((mixed + 127) / 255) as u8;
-            }
-        });
+    out.as_mut().par_chunks_exact_mut(4).zip(smooth.as_raw().par_chunks_exact(4)).for_each(|(p, s)| {
+        let d: [u32; 3] = std::array::from_fn(|c| u32::from(p[c].abs_diff(s[c])));
+        let luma = ((d[0] * 299 + d[1] * 587 + d[2] * 114) / 1000) as usize;
+        let w = weights[luma];
+        for c in 0..3 {
+            let mixed = u16::from(s[c]) * w + u16::from(p[c]) * (255 - w);
+            p[c] = ((mixed + 127) / 255) as u8;
+        }
+    });
     out
 }
 

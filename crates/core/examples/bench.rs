@@ -5,8 +5,9 @@
 
 use std::time::{Duration, Instant};
 
-use image::{imageops, Rgba, RgbaImage};
-use imageeditorrt_core::preview::{render, Settings};
+use image::imageops;
+use imageeditorrt_core::preview::{render, synthetic_photo, Settings};
+use imageeditorrt_core::resize::fit_long_side;
 
 const PREVIEW_MAX_SIDE: u32 = 1600;
 
@@ -26,32 +27,16 @@ fn ms(d: Duration) -> String {
     format!("{:7.1} ms", d.as_secs_f64() * 1000.0)
 }
 
-fn sample(width: u32, height: u32) -> RgbaImage {
-    // 写真らしく、なめらかな部分と細かい模様のある画像
-    RgbaImage::from_fn(width, height, |x, y| {
-        let fx = x as f32 / width as f32;
-        let fy = y as f32 / height as f32;
-        let fine = if (x / 3 + y / 5) % 2 == 0 { 25 } else { 0 };
-        Rgba([
-            (fx * 200.0) as u8 + fine,
-            (fy * 180.0) as u8 + 30,
-            ((1.0 - fx) * 150.0) as u8 + fine,
-            255,
-        ])
-    })
-}
-
 fn main() {
     println!("rayon のスレッド数: {}", rayon::current_num_threads());
-    let original = sample(6000, 4000);
+    let original = synthetic_photo(6000, 4000);
 
-    let (_, resize_ms, preview) = measure(3, || {
-        let scale = PREVIEW_MAX_SIDE as f32 / original.width().max(original.height()) as f32;
-        let w = (original.width() as f32 * scale).round() as u32;
-        let h = (original.height() as f32 * scale).round() as u32;
-        imageops::resize(&original, w, h, imageops::FilterType::Lanczos3)
-    });
+    let (_, resize_ms, preview) = measure(3, || fit_long_side(&original, PREVIEW_MAX_SIDE));
     println!("プレビュー用に縮小 (6000x4000 → {}x{}): {}", preview.width(), preview.height(), ms(resize_ms));
+    let (_, image_resize_ms, _) = measure(3, || {
+        imageops::resize(&original, preview.width(), preview.height(), imageops::FilterType::Lanczos3)
+    });
+    println!("  （参考: image クレートの Lanczos3 では {}）", ms(image_resize_ms));
 
     let heavy = Settings::heavy();
     let (best, median, rendered) = measure(15, || render(&preview, &heavy));
@@ -65,19 +50,18 @@ fn main() {
 
     // Rust → WebView への受け渡しのやり方の候補ごとの、変換の時間
     let raw_bytes = rendered.as_raw().len();
-    let (jpeg_ms, _, jpeg) = measure(5, || {
-        let mut out = Vec::new();
-        let encoder = jpeg_encoder::Encoder::new(&mut out, 85);
-        encoder
-            .encode(rendered.as_raw(), rendered.width() as u16, rendered.height() as u16, jpeg_encoder::ColorType::Rgba)
-            .unwrap();
-        out
-    });
-    println!("受け渡し: RGBA のまま {:.1} MB / JPEG (q85) に変換 {}（{:.0} KB）", raw_bytes as f64 / 1e6, ms(jpeg_ms), jpeg.len() as f64 / 1e3);
+    let (jpeg_ms, _, jpeg) = measure(5, || imageeditorrt_core::encode::to_jpeg(&rendered, 85));
+    println!(
+        "受け渡し: RGBA のまま {:.1} MB / JPEG (q85) に変換 {}（{:.0} KB）",
+        raw_bytes as f64 / 1e6,
+        ms(jpeg_ms),
+        jpeg.len() as f64 / 1e3
+    );
 
     #[cfg(target_os = "macos")]
     {
-        let heic = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/rotated.heic")).unwrap();
+        let heic =
+            std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/rotated.heic")).unwrap();
         let (first, _, _) = measure(1, || imageeditorrt_core::decode::decode(&heic).unwrap());
         let (warm, _, _) = measure(5, || imageeditorrt_core::decode::decode(&heic).unwrap());
         println!("HEIC 1500x1000 の読み込み: 初回 {} / 2 回目以降 {}", ms(first), ms(warm));

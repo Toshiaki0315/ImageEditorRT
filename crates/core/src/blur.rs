@@ -31,10 +31,8 @@ pub fn unsharp_mask(image: &RgbaImage, sigma: f32, percent: u32, threshold: u8) 
     let blurred = gaussian_blur(image, sigma);
     let amount = percent as i32;
     let mut out = image.clone();
-    out.as_mut()
-        .par_chunks_exact_mut(4)
-        .zip(blurred.as_raw().par_chunks_exact(4))
-        .for_each(|(pixel, soft)| {
+    out.as_mut().par_chunks_exact_mut(4).zip(blurred.as_raw().par_chunks_exact(4)).for_each(
+        |(pixel, soft)| {
             for c in 0..3 {
                 let original = i32::from(pixel[c]);
                 let diff = original - i32::from(soft[c]);
@@ -42,7 +40,8 @@ pub fn unsharp_mask(image: &RgbaImage, sigma: f32, percent: u32, threshold: u8) 
                     pixel[c] = (original + diff * amount / 100).clamp(0, 255) as u8;
                 }
             }
-        });
+        },
+    );
     out
 }
 
@@ -51,7 +50,7 @@ fn box_sizes(sigma: f32) -> [usize; 3] {
     let n = 3.0_f32;
     let ideal = (12.0 * sigma * sigma / n + 1.0).sqrt();
     let mut lower = ideal.floor() as usize;
-    if lower % 2 == 0 {
+    if lower.is_multiple_of(2) {
         lower = lower.saturating_sub(1).max(1);
     }
     let upper = lower + 2;
@@ -86,33 +85,30 @@ impl Average {
 fn blur_rows(src: &[u8], dst: &mut [u8], width: usize, height: usize, radius: usize) {
     let stride = width * 4;
     let average = Average::new((2 * radius + 1) as u32);
-    dst.par_chunks_exact_mut(stride)
-        .zip(src.par_chunks_exact(stride))
-        .take(height)
-        .for_each(|(out, row)| {
-            let last = width - 1;
-            let pixel = |x: usize| -> &[u8] { &row[x * 4..x * 4 + 4] };
-            let mut sums = [0u32; 4];
-            for x in 0..=2 * radius {
-                // 窓の最初の位置: -radius..=radius（左端より外は左端の画素）
-                let p = pixel(x.saturating_sub(radius).min(last));
-                for c in 0..4 {
-                    sums[c] += u32::from(p[c]);
-                }
+    dst.par_chunks_exact_mut(stride).zip(src.par_chunks_exact(stride)).take(height).for_each(|(out, row)| {
+        let last = width - 1;
+        let pixel = |x: usize| -> &[u8] { &row[x * 4..x * 4 + 4] };
+        let mut sums = [0u32; 4];
+        for x in 0..=2 * radius {
+            // 窓の最初の位置: -radius..=radius（左端より外は左端の画素）
+            let p = pixel(x.saturating_sub(radius).min(last));
+            for c in 0..4 {
+                sums[c] += u32::from(p[c]);
             }
-            for x in 0..width {
-                let o = x * 4;
-                for c in 0..4 {
-                    out[o + c] = average.of(sums[c]);
-                }
-                // 窓を 1 つ右へ: x + radius + 1 を足し、x - radius を引く（端は伸ばす）
-                let add = pixel((x + radius + 1).min(last));
-                let remove = pixel(x.saturating_sub(radius));
-                for c in 0..4 {
-                    sums[c] = sums[c] + u32::from(add[c]) - u32::from(remove[c]);
-                }
+        }
+        for x in 0..width {
+            let o = x * 4;
+            for c in 0..4 {
+                out[o + c] = average.of(sums[c]);
             }
-        });
+            // 窓を 1 つ右へ: x + radius + 1 を足し、x - radius を引く（端は伸ばす）
+            let add = pixel((x + radius + 1).min(last));
+            let remove = pixel(x.saturating_sub(radius));
+            for c in 0..4 {
+                sums[c] = sums[c] + u32::from(add[c]) - u32::from(remove[c]);
+            }
+        }
+    });
 }
 
 /// 各列を半径 radius の箱でぼかす（端は端の画素を伸ばす）。

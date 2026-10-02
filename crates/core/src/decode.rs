@@ -8,16 +8,14 @@ use std::ptr::NonNull;
 
 use image::RgbaImage;
 use objc2_core_foundation::{
-    CFBoolean, CFData, CFDictionary, CFNumber, CFRetained, CFString, CFType, CGPoint, CGRect,
-    CGSize,
+    CFBoolean, CFData, CFDictionary, CFNumber, CFRetained, CFString, CFType, CGPoint, CGRect, CGSize,
 };
 use objc2_core_graphics::{
     kCGColorSpaceSRGB, CGBitmapContextCreate, CGColorSpace, CGContext, CGImage, CGImageAlphaInfo,
 };
 use objc2_image_io::{
-    kCGImagePropertyPixelHeight, kCGImagePropertyPixelWidth,
-    kCGImageSourceCreateThumbnailFromImageAlways, kCGImageSourceCreateThumbnailWithTransform,
-    kCGImageSourceThumbnailMaxPixelSize, CGImageSource,
+    kCGImagePropertyPixelHeight, kCGImagePropertyPixelWidth, kCGImageSourceCreateThumbnailFromImageAlways,
+    kCGImageSourceCreateThumbnailWithTransform, kCGImageSourceThumbnailMaxPixelSize, CGImageSource,
 };
 
 /// 画像を読めなかった理由。
@@ -32,7 +30,9 @@ pub enum DecodeError {
 impl std::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DecodeError::Unsupported => write!(f, "画像を読み込めません（対応していない形式か、壊れています）"),
+            DecodeError::Unsupported => {
+                write!(f, "画像を読み込めません（対応していない形式か、壊れています）")
+            }
             DecodeError::Render => write!(f, "画像の画素を取り出せません"),
         }
     }
@@ -44,8 +44,7 @@ impl std::error::Error for DecodeError {}
 pub fn decode(bytes: &[u8]) -> Result<RgbaImage, DecodeError> {
     let data = CFData::from_bytes(bytes);
     // SAFETY: data は有効な CFData。オプションは渡さない
-    let source =
-        unsafe { CGImageSource::with_data(&data, None) }.ok_or(DecodeError::Unsupported)?;
+    let source = unsafe { CGImageSource::with_data(&data, None) }.ok_or(DecodeError::Unsupported)?;
     let (width, height) = pixel_size(&source).ok_or(DecodeError::Unsupported)?;
     // 縮小しない（最大辺 = 元の長辺）サムネイルを、向きを直して作らせると、向きを直した原寸の画像になる
     let image = oriented_image(&source, width.max(height)).ok_or(DecodeError::Unsupported)?;
@@ -85,7 +84,7 @@ fn oriented_image(source: &CGImageSource, max_side: usize) -> Option<CFRetained<
             kCGImageSourceThumbnailMaxPixelSize,
         ]
     };
-    let values: [&CFType; 3] = [&yes, &yes, &size];
+    let values: [&CFType; 3] = [yes, yes, &size];
     let options = CFDictionary::<CFString, CFType>::from_slices(&keys, &values);
     // SAFETY: オプションの辞書は CFString → CFType
     unsafe { source.thumbnail_at_index(0, Some(options.as_opaque())) }
@@ -128,8 +127,7 @@ fn unpremultiply(pixels: &mut [u8]) {
             continue;
         }
         for channel in &mut pixel[..3] {
-            *channel = ((u32::from(*channel) * 255 + u32::from(alpha) / 2) / u32::from(alpha))
-                .min(255) as u8;
+            *channel = ((u32::from(*channel) * 255 + u32::from(alpha) / 2) / u32::from(alpha)).min(255) as u8;
         }
     }
 }

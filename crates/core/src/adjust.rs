@@ -66,8 +66,7 @@ pub fn temperature_lut(kelvin: u32) -> Lut {
 pub fn temperature_multipliers(kelvin: u32) -> [f64; 3] {
     let reference = kelvin_to_rgb(f64::from(TEMPERATURE_NEUTRAL));
     let color = kelvin_to_rgb(f64::from(kelvin));
-    let raw: [f64; 3] =
-        std::array::from_fn(|c| 1.0 + (color[c] / reference[c] - 1.0) * TEMPERATURE_STRENGTH);
+    let raw: [f64; 3] = std::array::from_fn(|c| 1.0 + (color[c] / reference[c] - 1.0) * TEMPERATURE_STRENGTH);
     let luma: f64 = (0..3).map(|c| LUMA[c] * raw[c]).sum();
     raw.map(|m| m / luma)
 }
@@ -111,8 +110,8 @@ pub fn enhance_color(image: &mut RgbaImage, factor: f64) {
         // Pillow の L 変換（ITU-R 601、整数）
         let gray = (u32::from(p[0]) * 299 + u32::from(p[1]) * 587 + u32::from(p[2]) * 114) / 1000;
         let g = gray as f32;
-        for c in 0..3 {
-            p[c] = (g + (f32::from(p[c]) - g) * f).round().clamp(0.0, 255.0) as u8;
+        for v in &mut p[..3] {
+            *v = (g + (f32::from(*v) - g) * f).round().clamp(0.0, 255.0) as u8;
         }
     });
 }
@@ -142,8 +141,8 @@ pub fn vignette(image: &mut RgbaImage, amount: u32, area: Option<[u32; 4]>) {
             let distance = (dx2[x] + dy * dy).sqrt();
             let t = ((distance - VIGNETTE_START) / (corner - VIGNETTE_START)).clamp(0.0, 1.0);
             let k = 1.0 - strength * smoothstep(t);
-            for c in 0..3 {
-                p[c] = (f64::from(p[c]) * k).round() as u8;
+            for v in &mut p[..3] {
+                *v = (f64::from(*v) * k).round() as u8;
             }
         }
     });
@@ -182,8 +181,8 @@ pub fn add_grain(image: &mut RgbaImage, strength: i32, seed: u64) {
             let a = (state & 0xFF) as i32;
             let b = ((state >> 8) & 0xFF) as i32;
             let noise = ((a + b) / 2 - 128) * strength / 128;
-            for c in 0..3 {
-                p[c] = (i32::from(p[c]) + noise).clamp(0, 255) as u8;
+            for v in &mut p[..3] {
+                *v = (i32::from(*v) + noise).clamp(0, 255) as u8;
             }
         }
     });

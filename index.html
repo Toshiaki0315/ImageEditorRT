@@ -1,43 +1,33 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="/src/styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <title>ImageEditorRT</title>
     <script type="module" src="/src/main.ts" defer></script>
   </head>
-
   <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
-
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/src/assets/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img
-            src="/src/assets/tauri.svg"
-            class="logo tauri"
-            alt="Tauri logo"
-          />
-        </a>
-        <a href="https://www.typescriptlang.org/docs" target="_blank">
-          <img
-            src="/src/assets/typescript.svg"
-            class="logo typescript"
-            alt="typescript logo"
-          />
-        </a>
-      </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
-
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
+    <header class="toolbar">
+      <label class="button">開く…<input id="file" type="file" accept="image/*,.heic,.heif" hidden /></label>
+      <button id="sample" type="button">計測用の画像（6000×4000）</button>
+      <label>受け渡し
+        <select id="format">
+          <option value="jpeg">JPEG</option>
+          <option value="rgba">RGBA のまま</option>
+        </select>
+      </label>
+      <button id="bench" type="button">受け渡しを計測</button>
+      <button id="reset" type="button">加工をリセット</button>
+      <span id="timing" class="timing"></span>
+    </header>
+    <main class="layout">
+      <section id="stage" class="stage">
+        <canvas id="canvas" hidden></canvas>
+        <p id="hint" class="hint">画像をドロップするか「開く…」で選んでください</p>
+      </section>
+      <aside id="panel" class="panel"></aside>
     </main>
+    <footer id="status" class="status"></footer>
   </body>
 </html>

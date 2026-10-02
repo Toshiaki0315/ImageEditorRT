@@ -11,9 +11,12 @@ pub const HIRAGINO_W3: &str = "/System/Library/Fonts/ヒラギノ角ゴシック
 const LINE_SPACING_RATIO: f32 = 0.25;
 const MARGIN_RATIO: f32 = 0.03;
 
+/// 読み込んだフォント（パス・.ttc の何番目か・フォント）。
+type FontCache = Vec<(String, u32, &'static FontVec)>;
+
 /// フォントを読む（.ttc は index 番目）。同じフォントは 2 回目から読み直さない。
 pub fn load_font(path: &Path, index: u32) -> Option<&'static FontVec> {
-    static CACHE: OnceLock<Mutex<Vec<(String, u32, &'static FontVec)>>> = OnceLock::new();
+    static CACHE: OnceLock<Mutex<FontCache>> = OnceLock::new();
     let key = path.to_string_lossy().into_owned();
     let mut cache = CACHE.get_or_init(Default::default).lock().ok()?;
     if let Some((_, _, font)) = cache.iter().find(|(p, i, _)| *p == key && *i == index) {

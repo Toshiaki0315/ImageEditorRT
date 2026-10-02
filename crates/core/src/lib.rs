@@ -8,6 +8,7 @@ pub mod adjust;
 pub mod blur;
 #[cfg(target_os = "macos")]
 pub mod decode;
+pub mod diorama;
 pub mod effects;
 pub mod encode;
 pub mod exif_info;

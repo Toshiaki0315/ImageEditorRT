@@ -42,18 +42,26 @@ const DETAIL: Slider[] = [
   { key: "denoise", label: "ノイズ除去", min: 0, max: 100, initial: 0 },
 ];
 
-/** 「ジオラマ」タブのスライダー（#11 で旧版に合わせる）。 */
-const DIORAMA: Slider[] = [
-  { key: "dioramaBlur", label: "ぼかし", min: 0, max: 100, initial: 0 },
-  { key: "dioramaPosition", label: "ピントの位置", min: 0, max: 100, initial: 50 },
-  { key: "dioramaWidth", label: "ピントの幅", min: 0, max: 100, initial: 20 },
+/** 割合を「50%」のように表示する。 */
+export const percentText = (value: number) => `${value}%`;
+
+/** 「ジオラマ」タブのスライダー（旧版 FR-UI-62）。ぼかしの次に「帯の向き」を置く。 */
+const DIORAMA_BLUR: Slider[] = [{ key: "dioramaBlur", label: "ぼかし", min: 0, max: 100, initial: 0 }];
+const DIORAMA_BAND: Slider[] = [
+  { key: "dioramaPosition", label: "ピントの位置", min: 0, max: 100, initial: 50, text: percentText },
+  { key: "dioramaWidth", label: "ピントの幅", min: 0, max: 100, initial: 20, text: percentText },
   { key: "dioramaVivid", label: "鮮やかさ", min: 0, max: 100, initial: 30 },
 ];
+
+const DIORAMA_NOTE =
+  "ぼかしを 0 より大きくすると、ピントの帯（プレビューの実線の間）だけをくっきり残し、" +
+  "外側に向かってぼかします（点線でぼけきります）。街並みを見下ろした写真に向いています。";
 
 /** スライダーを作り、値を変えるたびに onChange を呼ぶ。 */
 export class Panel {
   private readonly rows = new Map<NumberKey, { slider: Slider; input: HTMLInputElement; output: HTMLOutputElement }>();
   private readonly filter = document.createElement("select");
+  private readonly direction = document.createElement("select");
 
   constructor(
     adjustPage: HTMLElement,
@@ -72,8 +80,10 @@ export class Panel {
       this.onChange();
     });
     adjustPage.append(heading, this.filter);
-    this.build(adjustPage, "加工", COLOR);
-    this.build(adjustPage, "ディテール", DETAIL);
+    this.heading(adjustPage, "加工");
+    this.build(adjustPage, COLOR);
+    this.heading(adjustPage, "ディテール");
+    this.build(adjustPage, DETAIL);
     const reset = document.createElement("button");
     reset.type = "button";
     reset.className = "reset-adjustments";
@@ -81,14 +91,33 @@ export class Panel {
     reset.title = "テイスト・色の調整・ディテールを既定値に戻します（切り抜き・サイズ・ジオラマはそのまま）";
     reset.addEventListener("click", () => this.resetAdjustments());
     adjustPage.append(reset);
-    this.build(dioramaPage, "ジオラマ", DIORAMA);
+    this.heading(dioramaPage, "ジオラマ（ミニチュア風）");
+    this.build(dioramaPage, DIORAMA_BLUR);
+    const directionRow = document.createElement("label");
+    directionRow.className = "row";
+    this.direction.add(new Option("横の帯", "horizontal"));
+    this.direction.add(new Option("縦の帯", "vertical"));
+    this.direction.addEventListener("change", () => {
+      this.settings.dioramaDirection = this.direction.value as EditSettings["dioramaDirection"];
+      this.onChange();
+    });
+    directionRow.append("帯の向き", this.direction);
+    dioramaPage.append(directionRow);
+    this.build(dioramaPage, DIORAMA_BAND);
+    const note = document.createElement("p");
+    note.className = "note";
+    note.textContent = DIORAMA_NOTE;
+    dioramaPage.append(note);
     this.show();
   }
 
-  private build(page: HTMLElement, title: string, sliders: Slider[]) {
+  private heading(page: HTMLElement, title: string) {
     const heading = document.createElement("h2");
     heading.textContent = title;
     page.append(heading);
+  }
+
+  private build(page: HTMLElement, sliders: Slider[]) {
     for (const slider of sliders) {
       const row = document.createElement("label");
       row.className = "row";
@@ -133,6 +162,7 @@ export class Panel {
   /** settings の値をスライダーに反映する。 */
   show() {
     this.filter.value = this.settings.filter;
+    this.direction.value = this.settings.dioramaDirection;
     for (const key of this.rows.keys()) this.showRow(key);
   }
 

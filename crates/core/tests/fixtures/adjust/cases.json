@@ -1,0 +1,194 @@
+[
+ {
+  "file": "exposure_-5.0.png",
+  "source": "source.png",
+  "effect": "exposure",
+  "amount": -5.0
+ },
+ {
+  "file": "exposure_-1.3.png",
+  "source": "source.png",
+  "effect": "exposure",
+  "amount": -1.3
+ },
+ {
+  "file": "exposure_0.7.png",
+  "source": "source.png",
+  "effect": "exposure",
+  "amount": 0.7
+ },
+ {
+  "file": "exposure_2.5.png",
+  "source": "source.png",
+  "effect": "exposure",
+  "amount": 2.5
+ },
+ {
+  "file": "exposure_5.0.png",
+  "source": "source.png",
+  "effect": "exposure",
+  "amount": 5.0
+ },
+ {
+  "file": "brightness_-100.png",
+  "source": "source.png",
+  "effect": "brightness",
+  "amount": -100
+ },
+ {
+  "file": "brightness_-37.png",
+  "source": "source.png",
+  "effect": "brightness",
+  "amount": -37
+ },
+ {
+  "file": "brightness_50.png",
+  "source": "source.png",
+  "effect": "brightness",
+  "amount": 50
+ },
+ {
+  "file": "brightness_100.png",
+  "source": "source.png",
+  "effect": "brightness",
+  "amount": 100
+ },
+ {
+  "file": "contrast_-100.png",
+  "source": "source.png",
+  "effect": "contrast",
+  "amount": -100
+ },
+ {
+  "file": "contrast_-40.png",
+  "source": "source.png",
+  "effect": "contrast",
+  "amount": -40
+ },
+ {
+  "file": "contrast_30.png",
+  "source": "source.png",
+  "effect": "contrast",
+  "amount": 30
+ },
+ {
+  "file": "contrast_100.png",
+  "source": "source.png",
+  "effect": "contrast",
+  "amount": 100
+ },
+ {
+  "file": "temperature_2000.png",
+  "source": "source.png",
+  "effect": "temperature",
+  "amount": 2000
+ },
+ {
+  "file": "temperature_3300.png",
+  "source": "source.png",
+  "effect": "temperature",
+  "amount": 3300
+ },
+ {
+  "file": "temperature_5000.png",
+  "source": "source.png",
+  "effect": "temperature",
+  "amount": 5000
+ },
+ {
+  "file": "temperature_7700.png",
+  "source": "source.png",
+  "effect": "temperature",
+  "amount": 7700
+ },
+ {
+  "file": "temperature_10000.png",
+  "source": "source.png",
+  "effect": "temperature",
+  "amount": 10000
+ },
+ {
+  "file": "saturation_-100.png",
+  "source": "source.png",
+  "effect": "saturation",
+  "amount": -100
+ },
+ {
+  "file": "saturation_-50.png",
+  "source": "source.png",
+  "effect": "saturation",
+  "amount": -50
+ },
+ {
+  "file": "saturation_40.png",
+  "source": "source.png",
+  "effect": "saturation",
+  "amount": 40
+ },
+ {
+  "file": "saturation_100.png",
+  "source": "source.png",
+  "effect": "saturation",
+  "amount": 100
+ },
+ {
+  "file": "vignette_30.png",
+  "source": "source.png",
+  "effect": "vignette",
+  "amount": 30
+ },
+ {
+  "file": "vignette_tall_30.png",
+  "source": "tall.png",
+  "effect": "vignette",
+  "amount": 30
+ },
+ {
+  "file": "vignette_100.png",
+  "source": "source.png",
+  "effect": "vignette",
+  "amount": 100
+ },
+ {
+  "file": "vignette_tall_100.png",
+  "source": "tall.png",
+  "effect": "vignette",
+  "amount": 100
+ },
+ {
+  "file": "aging_25.png",
+  "source": "source.png",
+  "effect": "aging",
+  "amount": 25
+ },
+ {
+  "file": "aging_tall_25.png",
+  "source": "tall.png",
+  "effect": "aging",
+  "amount": 25
+ },
+ {
+  "file": "aging_60.png",
+  "source": "source.png",
+  "effect": "aging",
+  "amount": 60
+ },
+ {
+  "file": "aging_tall_60.png",
+  "source": "tall.png",
+  "effect": "aging",
+  "amount": 60
+ },
+ {
+  "file": "aging_100.png",
+  "source": "source.png",
+  "effect": "aging",
+  "amount": 100
+ },
+ {
+  "file": "aging_tall_100.png",
+  "source": "tall.png",
+  "effect": "aging",
+  "amount": 100
+ }
+]

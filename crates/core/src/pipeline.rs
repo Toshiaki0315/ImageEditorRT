@@ -159,7 +159,7 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
     let image = apply_detail(apply_basic_adjustments(image, settings), settings, reference);
     let image = apply_diorama_and_filter(image, settings, reference, None);
     let mut image = image;
-    adjust::vignette(&mut image, settings.vignette, None);
+    adjust::vignette(&mut image, settings.vignette);
     adjust::aging(&mut image, settings.aging);
     draw_text(&mut image, &settings.text, None);
     Ok(image)
@@ -190,10 +190,10 @@ pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, t
         // トリミング範囲の中心を基準に暗くし、元の位置に戻す
         Some(r) if settings.vignette > 0 => {
             let mut region = transform::crop(&rendered, r);
-            adjust::vignette(&mut region, settings.vignette, None);
+            adjust::vignette(&mut region, settings.vignette);
             imageops::replace(&mut rendered, &region, r.x, r.y);
         }
-        _ => adjust::vignette(&mut rendered, settings.vignette, None),
+        _ => adjust::vignette(&mut rendered, settings.vignette),
     }
     // 経年劣化は画素ごとの色の変化と固定模様の粒子なので、表示範囲全体にかける
     adjust::aging(&mut rendered, settings.aging);

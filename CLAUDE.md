@@ -48,6 +48,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     blur.rs               # ガウスぼかし（箱ぼかし 3 回）・アンシャープマスク
     effects.rs            # ぼかしを使う加工（ディテール・ジオラマ・HDR 風）
     sample.rs             # 計測用の画像
+    pyrandom.rs           # Python の random.Random と同じ乱数（経年劣化の粒子を旧版とそろえる）
     text.rs               # 文字・透かし（ヒラギノなどを ab_glyph で描く）
     encode.rs             # JPEG への書き出し（プレビューの計測用）
     save.rs               # 保存（形式・名前の決め方・元の画像への上書きの防止・EXIF を残す）
@@ -122,4 +123,5 @@ docs/decisions.md         # 作り直しの中で決めたこと（色の空間�
 - **ImageIO は macOS 専用。** `decode.rs` は `#[cfg(target_os = "macos")]` で囲む。CI も macOS で動かす。
 - **フォントのパスは日本語を含む。**（`/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc`）
 - **release ビルドは遅い。** LTO と `codegen-units = 1` のため、`npx tauri build` は数分かかる。開発中は `npx tauri dev` や `cargo test` を使う。
+- **旧版と画素まで同じにするには、Pillow の丸め方まで合わせる。** 例: `Image.blend` は float（32bit）と切り捨て、Apple Silicon では掛け算と足し算をまとめる（FMA、Rust では `mul_add`）。`ImageChops.multiply` は切り捨て。Python の `round()` は偶数への丸め（`transform::round_half_even`）。
 - **画素ごとの処理は rayon で行・帯に分けて並列にする。** 1 画素ずつ `get_pixel` / `put_pixel` を呼ぶのは遅いので、生のバイト列（`as_raw` / `as_mut`）を使う。

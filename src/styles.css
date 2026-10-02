@@ -161,7 +161,8 @@ button:disabled {
 
 .row {
   display: grid;
-  grid-template-columns: 7.5em 1fr 4em;
+  /* 旧版と同じく、スライダーの長さが 225px 以上になるようにする（パネルの幅 420px） */
+  grid-template-columns: 6.5em 1fr 4.5em;
   gap: 8px;
   align-items: center;
   margin: 3px 0;
@@ -185,6 +186,10 @@ button:disabled {
 
 .check:has(input:disabled) {
   color: var(--muted);
+}
+
+.reset-adjustments {
+  margin-top: 12px;
 }
 
 .actions {

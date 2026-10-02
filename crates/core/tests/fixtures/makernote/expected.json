@@ -1,0 +1,140 @@
+{
+ "none": null,
+ "pentax_ii": {
+  "format": "Pentax",
+  "size": 66,
+  "tags": [
+   [
+    "ISO",
+    "100"
+   ],
+   [
+    "SerialNumber",
+    "1234567"
+   ],
+   [
+    "FirmwareVersion",
+    "1.40"
+   ]
+  ]
+ },
+ "pentax_mm": {
+  "format": "Pentax",
+  "size": 66,
+  "tags": [
+   [
+    "ISO",
+    "100"
+   ],
+   [
+    "SerialNumber",
+    "1234567"
+   ],
+   [
+    "FirmwareVersion",
+    "1.40"
+   ]
+  ]
+ },
+ "pentax_aoc": {
+  "format": "Pentax",
+  "size": 36,
+  "tags": [
+   [
+    "Date",
+    "07 e6 0a 02"
+   ],
+   [
+    "Quality",
+    "2"
+   ]
+  ]
+ },
+ "ricoh_pentax": {
+  "format": "Ricoh（Pentax 形式）",
+  "size": 36,
+  "tags": [
+   [
+    "SerialNumber",
+    "GR3SERIAL"
+   ]
+  ]
+ },
+ "ricoh_old": {
+  "format": "Ricoh",
+  "size": 46,
+  "tags": [
+   [
+    "MakerNoteType",
+    "Rev0101"
+   ],
+   [
+    "Sharpness",
+    "1"
+   ]
+  ]
+ },
+ "samsung": {
+  "format": "Samsung",
+  "size": 52,
+  "tags": [
+   [
+    "MakerNoteVersion",
+    "0100"
+   ],
+   [
+    "DeviceType",
+    "73728"
+   ],
+   [
+    "SerialNumber",
+    "R3CW12345"
+   ]
+  ]
+ },
+ "unknown_tag": {
+  "format": "Pentax",
+  "size": 28,
+  "tags": [
+   [
+    "Tag 0x7777",
+    "5"
+   ]
+  ]
+ },
+ "unknown_maker": {
+  "format": "不明な形式",
+  "size": 24,
+  "tags": [
+   [
+    "Tag 0x0010",
+    "hello"
+   ]
+  ]
+ },
+ "google_hdrp": {
+  "format": "Google HDR+",
+  "size": 45,
+  "tags": []
+ },
+ "xiaomi_garbage": {
+  "format": "不明な形式",
+  "size": 50,
+  "tags": []
+ },
+ "pentax_broken": {
+  "format": "Pentax",
+  "size": 40,
+  "tags": []
+ },
+ "pentax_outside": {
+  "format": "Pentax",
+  "size": 48,
+  "tags": [
+   [
+    "ISO",
+    "100"
+   ]
+  ]
+ }
+}

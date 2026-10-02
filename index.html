@@ -26,7 +26,14 @@
         <canvas id="canvas" hidden></canvas>
         <p id="hint" class="hint">画像をドロップするか「開く…」で選んでください</p>
       </section>
-      <aside id="panel" class="panel"></aside>
+      <aside class="side">
+        <nav class="tabs">
+          <button type="button" class="tab active" data-tab="panel">加工</button>
+          <button type="button" class="tab" data-tab="exif">EXIF</button>
+        </nav>
+        <div id="panel" class="panel"></div>
+        <div id="exif" class="panel exif" hidden><p class="empty">画像を開くと EXIF を表示します</p></div>
+      </aside>
     </main>
     <footer id="status" class="status"></footer>
   </body>

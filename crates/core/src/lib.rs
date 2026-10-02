@@ -5,6 +5,8 @@ pub mod blur;
 #[cfg(target_os = "macos")]
 pub mod decode;
 pub mod encode;
+pub mod exif_info;
+pub mod makernote;
 pub mod preview;
 pub mod resize;
 pub mod text;

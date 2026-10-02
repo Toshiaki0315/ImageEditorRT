@@ -5,10 +5,11 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use image::RgbaImage;
+use imageeditorrt_core::exif_info::{read_exif_info, ExifInfo};
 use imageeditorrt_core::{decode, encode, preview, resize};
 use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request, Response};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 /// プレビューの長辺（Python 版と同じ 1600px）。
 const PREVIEW_MAX_SIDE: u32 = 1600;
@@ -39,13 +40,18 @@ struct OpenInfo {
     preview_height: u32,
     decode_ms: f64,
     resize_ms: f64,
+    exif_ms: f64,
+    exif: ExifInfo,
 }
 
 fn elapsed_ms(start: Instant) -> f64 {
     start.elapsed().as_secs_f64() * 1000.0
 }
 
-fn store(state: &AppState, original: RgbaImage, decode_ms: f64) -> Result<OpenInfo, String> {
+fn store(state: &AppState, original: RgbaImage, decode_ms: f64, file: &[u8]) -> Result<OpenInfo, String> {
+    let start = Instant::now();
+    let exif = read_exif_info(file);
+    let exif_ms = elapsed_ms(start);
     let start = Instant::now();
     let small = resize::fit_long_side(&original, PREVIEW_MAX_SIDE);
     let info = OpenInfo {
@@ -55,6 +61,8 @@ fn store(state: &AppState, original: RgbaImage, decode_ms: f64) -> Result<OpenIn
         preview_height: small.height(),
         decode_ms,
         resize_ms: elapsed_ms(start),
+        exif_ms,
+        exif,
     };
     let mut loaded = state.0.lock().map_err(|e| e.to_string())?;
     loaded.original = Some(original);
@@ -74,7 +82,7 @@ async fn open_bytes(request: Request<'_>, state: State<'_, AppState>) -> Result<
     };
     let start = Instant::now();
     let image = decode_bytes(bytes)?;
-    store(&state, image, elapsed_ms(start))
+    store(&state, image, elapsed_ms(start), bytes)
 }
 
 /// ドロップされたファイルを読み込む。
@@ -83,7 +91,7 @@ async fn open_path(path: String, state: State<'_, AppState>) -> Result<OpenInfo,
     let start = Instant::now();
     let bytes = std::fs::read(&path).map_err(|e| format!("{path} を読めません: {e}"))?;
     let image = decode_bytes(&bytes)?;
-    store(&state, image, elapsed_ms(start))
+    store(&state, image, elapsed_ms(start), &bytes)
 }
 
 /// 計測用の画像（6000×4000）を作って読み込んだことにする。
@@ -91,7 +99,7 @@ async fn open_path(path: String, state: State<'_, AppState>) -> Result<OpenInfo,
 async fn open_sample(state: State<'_, AppState>) -> Result<OpenInfo, String> {
     let start = Instant::now();
     let image = preview::synthetic_photo(SAMPLE_SIZE.0, SAMPLE_SIZE.1);
-    store(&state, image, elapsed_ms(start))
+    store(&state, image, elapsed_ms(start), &[])
 }
 
 /// プレビューに設定をかけて返す。
@@ -142,16 +150,32 @@ fn report(text: String, app: AppHandle) {
     }
 }
 
+/// 画面での途中経過・エラーを標準出力に書く（計測モードの確認用）。
+#[tauri::command]
+fn log(text: String) {
+    eprintln!("[画面] {text}");
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
+        .setup(|app| {
+            // 計測ではウィンドウが隠れていると描画が止まるので、前に出す
+            if bench_mode() {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_focus();
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             open_bytes,
             open_path,
             open_sample,
             render_preview,
             bench_mode,
+            log,
             report
         ])
         .run(tauri::generate_context!())

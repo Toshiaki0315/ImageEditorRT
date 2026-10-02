@@ -26,6 +26,14 @@ type Settings = {
   textSize: number;
 };
 
+type ExifEntry = { group: string; tag: string; label: string; value: string };
+
+type ExifInfo = {
+  entries: ExifEntry[];
+  makerNote: string | null;
+  gps: { latitude: number; longitude: number } | null;
+};
+
 type OpenInfo = {
   width: number;
   height: number;
@@ -33,6 +41,8 @@ type OpenInfo = {
   previewHeight: number;
   decodeMs: number;
   resizeMs: number;
+  exifMs: number;
+  exif: ExifInfo;
 };
 
 /** 1 回のプレビュー更新の内訳 (ms)。 */
@@ -133,6 +143,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const canvas = $<HTMLCanvasElement>("canvas");
 const context = canvas.getContext("2d")!;
 const panel = $<HTMLElement>("panel");
+const exifPanel = $<HTMLElement>("exif");
 const stage = $<HTMLElement>("stage");
 const hint = $<HTMLElement>("hint");
 const status = $<HTMLElement>("status");
@@ -145,7 +156,20 @@ let busy = false;
 let pending = false;
 const inputs = new Map<keyof Settings, HTMLInputElement>();
 
-const nextFrame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve));
+/** 描画の待ちの上限。ウィンドウが隠れていると requestAnimationFrame が呼ばれないため。 */
+const FRAME_TIMEOUT_MS = 200;
+let frameTimeouts = 0;
+const nextFrame = () =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
+      frameTimeouts++;
+      resolve();
+    }, FRAME_TIMEOUT_MS);
+    requestAnimationFrame(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
 const fmt = (ms: number) => `${ms.toFixed(1)}ms`;
 const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
@@ -269,13 +293,48 @@ async function requestRender() {
   }
 }
 
+/** 「EXIF」タブに、グループごとの一覧を出す。 */
+function showExif(exif: ExifInfo) {
+  exifPanel.replaceChildren();
+  if (exif.entries.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "EXIF はありません";
+    exifPanel.append(empty);
+    return;
+  }
+  if (exif.makerNote) {
+    const note = document.createElement("p");
+    note.textContent = `MakerNote の形式: ${exif.makerNote}`;
+    exifPanel.append(note);
+  }
+  let group = "";
+  let table: HTMLTableElement | null = null;
+  for (const entry of exif.entries) {
+    if (entry.group !== group || !table) {
+      group = entry.group;
+      const heading = document.createElement("h2");
+      heading.textContent = group;
+      table = document.createElement("table");
+      exifPanel.append(heading, table);
+    }
+    const row = table.insertRow();
+    const name = document.createElement("th");
+    name.textContent = entry.label;
+    const value = row.insertCell();
+    value.textContent = entry.value;
+    row.prepend(name);
+  }
+}
+
 function showLoaded(info: OpenInfo, name: string) {
+  showExif(info.exif);
   loaded = true;
   canvas.hidden = false;
   hint.hidden = true;
   status.textContent =
     `${name}  ${info.width}×${info.height}（プレビュー ${info.previewWidth}×${info.previewHeight}）` +
-    `  読み込み ${fmt(info.decodeMs)}・縮小 ${fmt(info.resizeMs)}`;
+    `  読み込み ${fmt(info.decodeMs)}・縮小 ${fmt(info.resizeMs)}・EXIF ${fmt(info.exifMs)}`;
   requestRender();
 }
 
@@ -290,7 +349,10 @@ async function open(command: string, args: Record<string, unknown> | Uint8Array,
 
 /** JPEG・RGBA それぞれで、重い設定と軽い設定のプレビュー更新を繰り返して中央値を出す。 */
 async function bench(): Promise<string> {
+  const log = (text: string) => invoke("log", { text });
+  await log("計測を始めます");
   if (!loaded) await open("open_sample", {}, "計測用の画像");
+  await log(`読み込み: ${status.textContent}`);
   const light: Settings = { ...DEFAULTS, exposure: 0.7, saturation: 20 };
   await renderOnce({ ...settings }, "jpeg"); // canvas の大きさを決める
   const lines = [`プレビュー ${canvas.width}×${canvas.height}・各 20 回の中央値`];
@@ -313,11 +375,20 @@ async function bench(): Promise<string> {
       );
     }
   }
+  if (frameTimeouts > 0) lines.push(`注意: 画面の更新を ${frameTimeouts} 回待てませんでした（ウィンドウが隠れていた）`);
   return lines.join("\n");
 }
 
 function setup() {
   buildPanel();
+  for (const tab of document.querySelectorAll<HTMLButtonElement>(".tab")) {
+    tab.addEventListener("click", () => {
+      for (const other of document.querySelectorAll<HTMLButtonElement>(".tab")) {
+        other.classList.toggle("active", other === tab);
+        $<HTMLElement>(other.dataset.tab!).hidden = other !== tab;
+      }
+    });
+  }
   $<HTMLInputElement>("file").addEventListener("change", async (event) => {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (file) await open("open_bytes", new Uint8Array(await file.arrayBuffer()), file.name);
@@ -348,9 +419,15 @@ function setup() {
   // IMAGEEDITORRT_BENCH を付けて起動したときは、計測して結果を出力して終わる
   invoke<boolean>("bench_mode").then(async (on) => {
     if (!on) return;
-    const result = await bench();
-    await invoke("report", { text: result });
+    try {
+      const result = await bench();
+      await invoke("report", { text: result });
+    } catch (error) {
+      await invoke("report", { text: `計測に失敗しました: ${error}` });
+    }
   });
 }
 
+window.addEventListener("error", (event) => invoke("log", { text: `エラー: ${event.message}` }));
+window.addEventListener("unhandledrejection", (event) => invoke("log", { text: `エラー: ${event.reason}` }));
 window.addEventListener("DOMContentLoaded", setup);

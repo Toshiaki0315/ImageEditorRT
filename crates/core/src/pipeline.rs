@@ -12,21 +12,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::adjust::{self, Lut};
 use crate::effects::{self, Diorama};
+use crate::filters;
+pub use crate::filters::FilterType;
 use crate::text;
 use crate::transform::{self, round_half_even, CropRect, Orientation, SizeError};
 
 /// プレビューの長辺（px）。
 pub const PREVIEW_MAX_SIDE: u32 = 1600;
-
-/// テイスト（フィルター）。残りの 21 種は #9 で足す。
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum FilterType {
-    #[default]
-    None,
-    /// HDR 風
-    Hdr,
-}
 
 /// 文字・透かし（空なら描かない）。フォント・位置・色などは #15 で足す。
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -306,10 +298,9 @@ fn apply_diorama_and_filter(
     if settings.diorama_blur > 0 {
         image = effects::diorama(&image, settings.diorama(), reference, area);
     }
-    match settings.filter {
-        FilterType::None => image,
-        FilterType::Hdr => effects::hdr(&image, reference),
-    }
+    // テイストのぼかしの半径は、旧版と同じく画像そのもの（プレビューでは表示している全体）の短辺に比例させる
+    filters::apply_filter(&mut image, settings.filter);
+    image
 }
 
 /// 文字を描く（area があればその範囲の右下。省略時は画像全体）。

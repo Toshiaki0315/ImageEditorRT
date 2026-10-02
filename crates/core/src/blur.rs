@@ -1,34 +1,39 @@
-//! ガウスぼかし（箱ぼかし 3 回で近似。Pillow と同じ考え方）とアンシャープマスク。
+//! ガウスぼかしとアンシャープマスク。旧版（Pillow の GaussianBlur・UnsharpMask）と画素まで同じ。
 //!
-//! RGB にだけかけ、アルファはそのまま残す。行ごと・列ごとの処理を rayon で並列にする。
+//! Pillow のガウスぼかしは「端数のある半径の箱ぼかし」を横・縦それぞれ 3 回かける
+//! （libImaging/BoxBlur.c）。その計算（固定小数点の重み・端の画素の伸ばし方）をそのまま移し、
+//! 行ごとの処理を rayon で並列にする。R・G・B にだけかけ、アルファは元のまま残す。
 
 use image::RgbaImage;
 use rayon::prelude::*;
 
-/// 標準偏差 sigma（px）のガウスぼかしをかけた新しい画像を返す。
-pub fn gaussian_blur(image: &RgbaImage, sigma: f32) -> RgbaImage {
-    if sigma <= 0.0 {
+/// Pillow の GaussianBlur の箱ぼかしの回数。
+const PASSES: u32 = 3;
+
+/// 半径 radius（Pillow の GaussianBlur(radius) と同じ意味）のガウスぼかしをかけた新しい画像を返す。
+pub fn gaussian_blur(image: &RgbaImage, radius: f32) -> RgbaImage {
+    let (width, height) = (image.width() as usize, image.height() as usize);
+    if radius <= 0.0 || width == 0 || height == 0 {
         return image.clone();
     }
-    let (width, height) = image.dimensions();
-    let mut data = image.as_raw().clone();
-    let mut scratch = vec![0u8; data.len()];
-    for size in box_sizes(sigma) {
-        let radius = (size - 1) / 2;
-        // 横にぼかしてから縦にぼかす（どちらも行の並びのまま読むので、メモリを順に読める）
-        blur_rows(&data, &mut scratch, width as usize, height as usize, radius);
-        blur_columns(&scratch, &mut data, width as usize, height as usize, radius);
+    let box_radius = box_radius(radius);
+    let mut rgb: Vec<[u8; 3]> =
+        image.as_raw().as_chunks::<4>().0.iter().map(|p| [p[0], p[1], p[2]]).collect();
+    blur_rows(&mut rgb, width, box_radius);
+    // 縦は、並べ替えて（転置して）横と同じ計算をし、元に戻す（Pillow と同じ）
+    let mut transposed = transpose(&rgb, width, height);
+    blur_rows(&mut transposed, height, box_radius);
+    let rgb = transpose(&transposed, height, width);
+    let mut out = image.clone();
+    for (p, c) in out.as_mut().as_chunks_mut::<4>().0.iter_mut().zip(&rgb) {
+        p[..3].copy_from_slice(c);
     }
-    // アルファは元のまま
-    for (out, src) in data.as_chunks_mut::<4>().0.iter_mut().zip(image.as_raw().as_chunks::<4>().0) {
-        out[3] = src[3];
-    }
-    RgbaImage::from_raw(width, height, data).expect("大きさは元と同じ")
+    out
 }
 
-/// アンシャープマスク: 元 + (元 - ぼかし) × percent / 100。差が threshold 以下なら変えない。
-pub fn unsharp_mask(image: &RgbaImage, sigma: f32, percent: u32, threshold: u8) -> RgbaImage {
-    let blurred = gaussian_blur(image, sigma);
+/// アンシャープマスク: 元 + (元 − ぼかし) × percent / 100（整数で切り捨て）。差が threshold 以下なら変えない。
+pub fn unsharp_mask(image: &RgbaImage, radius: f32, percent: u32, threshold: u8) -> RgbaImage {
+    let blurred = gaussian_blur(image, radius);
     let amount = percent as i32;
     let mut out = image.clone();
     out.as_mut().par_chunks_exact_mut(4).zip(blurred.as_raw().par_chunks_exact(4)).for_each(
@@ -45,105 +50,63 @@ pub fn unsharp_mask(image: &RgbaImage, sigma: f32, percent: u32, threshold: u8) 
     out
 }
 
-/// sigma のガウスぼかしに近い、3 回の箱ぼかしの大きさ（奇数）を返す。
-fn box_sizes(sigma: f32) -> [usize; 3] {
-    let n = 3.0_f32;
-    let ideal = (12.0 * sigma * sigma / n + 1.0).sqrt();
-    let mut lower = ideal.floor() as usize;
-    if lower.is_multiple_of(2) {
-        lower = lower.saturating_sub(1).max(1);
-    }
-    let upper = lower + 2;
-    let lf = lower as f32;
-    let m = ((12.0 * sigma * sigma - n * lf * lf - 4.0 * n * lf - 3.0 * n) / (-4.0 * lf - 4.0))
-        .round()
-        .clamp(0.0, 3.0) as usize;
-    std::array::from_fn(|i| if i < m { lower } else { upper })
+/// ガウスぼかしの半径を、箱ぼかしの（端数のある）半径にする（Pillow の _gaussian_blur_radius）。
+fn box_radius(radius: f32) -> f32 {
+    let sigma2 = radius * radius / PASSES as f32;
+    let length = (12.0 * f64::from(sigma2) + 1.0).sqrt() as f32;
+    let l = ((f64::from(length) - 1.0) / 2.0).floor() as f32;
+    let a = (2.0 * l + 1.0) * (l * (l + 1.0) - 3.0 * sigma2);
+    let a = a / (6.0 * (sigma2 - (l + 1.0) * (l + 1.0)));
+    l + a
 }
 
-/// 箱の合計を平均にする割り算を、掛け算とシフトで行う（四捨五入）。
-#[derive(Clone, Copy)]
-struct Average {
-    inverse: u64,
-    half: u64,
-}
-
-impl Average {
-    const SHIFT: u32 = 32;
-
-    fn new(window: u32) -> Self {
-        Self { inverse: (1u64 << Self::SHIFT).div_ceil(u64::from(window)), half: u64::from(window / 2) }
-    }
-
-    #[inline(always)]
-    fn of(self, sum: u32) -> u8 {
-        (((u64::from(sum) + self.half) * self.inverse) >> Self::SHIFT) as u8
-    }
-}
-
-/// 各行を半径 radius の箱でぼかす（端は端の画素を伸ばす）。RGBA の 4 チャンネルをまとめて扱う。
-fn blur_rows(src: &[u8], dst: &mut [u8], width: usize, height: usize, radius: usize) {
-    let stride = width * 4;
-    let average = Average::new((2 * radius + 1) as u32);
-    dst.par_chunks_exact_mut(stride).zip(src.par_chunks_exact(stride)).take(height).for_each(|(out, row)| {
-        let last = width - 1;
-        let pixel = |x: usize| -> &[u8] { &row[x * 4..x * 4 + 4] };
-        let mut sums = [0u32; 4];
-        for x in 0..=2 * radius {
-            // 窓の最初の位置: -radius..=radius（左端より外は左端の画素）
-            let p = pixel(x.saturating_sub(radius).min(last));
-            for c in 0..4 {
-                sums[c] += u32::from(p[c]);
-            }
+fn transpose(pixels: &[[u8; 3]], width: usize, height: usize) -> Vec<[u8; 3]> {
+    let mut out = vec![[0u8; 3]; pixels.len()];
+    out.par_chunks_exact_mut(height).enumerate().for_each(|(x, column)| {
+        for (y, value) in column.iter_mut().enumerate() {
+            *value = pixels[y * width + x];
         }
-        for x in 0..width {
-            let o = x * 4;
-            for c in 0..4 {
-                out[o + c] = average.of(sums[c]);
-            }
-            // 窓を 1 つ右へ: x + radius + 1 を足し、x - radius を引く（端は伸ばす）
-            let add = pixel((x + radius + 1).min(last));
-            let remove = pixel(x.saturating_sub(radius));
-            for c in 0..4 {
-                sums[c] = sums[c] + u32::from(add[c]) - u32::from(remove[c]);
-            }
+    });
+    out
+}
+
+/// 各行に箱ぼかしを 3 回かける。
+fn blur_rows(pixels: &mut [[u8; 3]], width: usize, radius: f32) {
+    let whole = radius as usize;
+    // 端数のある半径の重み（固定小数点、合計で 1 << 24）: 内側の画素は ww、両端の 1 つずつは fw
+    let ww = (16_777_216f32 / (radius * 2.0 + 1.0)) as u32;
+    let fw = (16_777_216 - (whole as u32 * 2 + 1) * ww) / 2;
+    pixels.par_chunks_exact_mut(width).for_each(|row| {
+        let mut line = vec![[0u8; 3]; width];
+        for _ in 0..PASSES {
+            blur_line(row, &mut line, whole, ww, fw);
+            row.copy_from_slice(&line);
         }
     });
 }
 
-/// 各列を半径 radius の箱でぼかす（端は端の画素を伸ばす）。
-///
-/// 画像を横長の帯に分けて並列に処理する。帯の中では、窓の合計を 1 行ずつ下にずらしながら
-/// 行全体を一度に足し引きするので、メモリは行の並びのまま順に読める。
-fn blur_columns(src: &[u8], dst: &mut [u8], width: usize, height: usize, radius: usize) {
-    let stride = width * 4;
-    let average = Average::new((2 * radius + 1) as u32);
-    let bands = (rayon::current_num_threads() * 4).max(1);
-    let band_rows = height.div_ceil(bands).max(1);
-    let row = |y: isize| -> &[u8] {
-        let y = y.clamp(0, height as isize - 1) as usize;
-        &src[y * stride..(y + 1) * stride]
-    };
-    dst.par_chunks_mut(band_rows * stride).enumerate().for_each(|(band, out)| {
-        let first = (band * band_rows) as isize;
-        let mut sums = vec![0u32; stride];
-        for y in first - radius as isize..=first + radius as isize {
-            for (sum, &v) in sums.iter_mut().zip(row(y)) {
-                *sum += u32::from(v);
-            }
+/// 1 行の箱ぼかし（Pillow の ImagingLineBoxBlur）。画像の外は端の画素を伸ばす。
+fn blur_line(input: &[[u8; 3]], output: &mut [[u8; 3]], radius: usize, ww: u32, fw: u32) {
+    let last = input.len() as isize - 1;
+    let at = |i: isize| &input[i.clamp(0, last) as usize];
+    let r = radius as isize;
+    // x = -1 のときの窓（-1-r 〜 -1+r）の合計
+    let mut acc = [0u32; 3];
+    for i in -1 - r..r {
+        for (sum, &v) in acc.iter_mut().zip(at(i)) {
+            *sum += u32::from(v);
         }
-        for (i, out_row) in out.chunks_exact_mut(stride).enumerate() {
-            let y = first + i as isize;
-            for (o, &sum) in out_row.iter_mut().zip(&sums) {
-                *o = average.of(sum);
-            }
-            let add = row(y + radius as isize + 1);
-            let remove = row(y - radius as isize);
-            for ((sum, &a), &r) in sums.iter_mut().zip(add).zip(remove) {
-                *sum = *sum + u32::from(a) - u32::from(r);
-            }
+    }
+    for (x, out) in output.iter_mut().enumerate() {
+        let x = x as isize;
+        let (remove, add) = (at(x - r - 1), at(x + r));
+        let right = at(x + r + 1);
+        for c in 0..3 {
+            acc[c] = acc[c] + u32::from(add[c]) - u32::from(remove[c]);
+            let bulk = acc[c] * ww + (u32::from(remove[c]) + u32::from(right[c])) * fw;
+            out[c] = ((bulk + (1 << 23)) >> 24) as u8;
         }
-    });
+    }
 }
 
 #[cfg(test)]
@@ -165,8 +128,8 @@ mod tests {
         }
         let blurred = gaussian_blur(&image, 2.0);
         let center = blurred.get_pixel(20, 2)[0];
-        // σ = 2 のガウス分布の山の高さは 255 / (√(2π) × 2) ≈ 51
-        assert!((48..=54).contains(&center), "{center}");
+        // 半径 2 のガウス分布の山の高さは 255 / (√(2π) × 2) ≈ 51
+        assert!((45..=57).contains(&center), "{center}");
         assert_eq!(blurred.get_pixel(18, 2), blurred.get_pixel(22, 2));
         assert!(blurred.get_pixel(18, 2)[0] > 0);
         assert_eq!(blurred.get_pixel(5, 2)[0], 0);
@@ -182,19 +145,14 @@ mod tests {
     }
 
     #[test]
-    fn average_matches_division() {
-        for window in [1u32, 3, 5, 7, 41, 255, 1001] {
-            let average = Average::new(window);
-            for sum in (0..=255 * window).step_by(7) {
-                assert_eq!(u32::from(average.of(sum)), (sum + window / 2) / window, "{window} {sum}");
-            }
+    fn weights_sum_to_one() {
+        for radius in [0.5f32, 1.0, 1.7, 3.2, 10.0] {
+            let r = box_radius(radius);
+            let ww = (16_777_216f32 / (r * 2.0 + 1.0)) as u32;
+            let fw = (16_777_216 - (r as u32 * 2 + 1) * ww) / 2;
+            let total = (r as u32 * 2 + 1) * ww + 2 * fw;
+            assert!(16_777_216 - total <= 1, "{radius}: {total}");
         }
-    }
-
-    #[test]
-    fn box_sizes_grow_with_sigma() {
-        assert_eq!(box_sizes(1.0).iter().sum::<usize>() % 2, 1);
-        assert!(box_sizes(10.0)[0] > box_sizes(2.0)[0]);
     }
 
     #[test]

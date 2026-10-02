@@ -188,6 +188,10 @@ button:disabled {
   color: var(--muted);
 }
 
+.filter {
+  width: 100%;
+}
+
 .reset-adjustments {
   margin-top: 12px;
 }

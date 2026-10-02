@@ -6,8 +6,31 @@ export type Orientation = { rotation: 0 | 90 | 180 | 270; mirror: boolean };
 /** トリミング範囲（回転・反転した後の原寸画像の座標、px）。 */
 export type CropRect = { x: number; y: number; width: number; height: number };
 
-/** テイスト（残りは #9 で足す）。 */
-export type FilterType = "none" | "hdr";
+/** テイスト（Rust の filters::FilterType。旧版と同じ名前）。 */
+export type FilterType =
+  | "none"
+  | "sepia"
+  | "monotone"
+  | "high_tone"
+  | "polaroid"
+  | "positive_film"
+  | "retro_camera"
+  | "high_key"
+  | "low_key"
+  | "dramatic"
+  | "modern"
+  | "natural"
+  | "cinematic"
+  | "noir"
+  | "bleach_bypass"
+  | "pastel"
+  | "cross_process"
+  | "cyanotype"
+  | "summer"
+  | "autumn"
+  | "soft_focus"
+  | "hdr"
+  | "infrared";
 
 /** Rust の pipeline::EditSettings。 */
 export type EditSettings = {

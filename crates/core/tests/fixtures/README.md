@@ -14,3 +14,4 @@
 | `formats/*` | 読み込みの変換のテスト用（CMYK の JPEG・16bit の PNG・パレットの PNG・アニメーション GIF・複数ページの TIFF・BMP・中身と拡張子が違うもの・WebP・Display P3）。`formats/make.py`（Pillow）で作ったもの |
 | `transform/*` | 回転・反転・トリミング・リサイズの期待値。旧版の `core/transform.py`・`core/pipeline.py` で作ったもの（`transform/make.py`）。`cases.json` は範囲・大きさの計算、PNG は画像 |
 | `adjust/*` | 色の調整（露出〜経年劣化）の期待値。旧版の `core/effects.py`・`core/pipeline.py` で作ったもの（`adjust/make.py`）。画素まで一致することを確かめる |
+| `filters/*` | テイスト（フィルター 23 種）の期待値。旧版の `core/filters.py` で作ったもの（`filters/make.py`）。画素まで一致することを確かめる |

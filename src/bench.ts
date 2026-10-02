@@ -1,5 +1,6 @@
 // 計測モード（IMAGEEDITORRT_BENCH=1 で起動）: 受け渡しを含めたプレビューの更新の時間を測る。
 
+import { invoke } from "@tauri-apps/api/core";
 import type { Preview, Timing } from "./preview";
 import { defaultSettings, type EditSettings } from "./types";
 
@@ -45,4 +46,23 @@ export async function bench(preview: Preview, size: string): Promise<string> {
     );
   }
   return lines.join("\n");
+}
+
+/** 保存（原寸 6000×4000・重い設定）をしている間も、プレビューを描き直せるか（画面が固まらないか）。 */
+export async function benchSave(preview: Preview): Promise<string> {
+  const path = await invoke<string>("bench_save_path");
+  const options = { quality: 90, keepExif: true, keepGps: false };
+  const start = performance.now();
+  let done = false;
+  const saving = invoke("save_image", { path, settings: HEAVY, options }).finally(() => (done = true));
+  const runs: number[] = [];
+  while (!done) {
+    runs.push((await preview.render({ ...HEAVY, exposure: (runs.length % 2) * 0.1 })).total);
+  }
+  await saving;
+  const saveMs = performance.now() - start;
+  return (
+    `保存（原寸・重い設定）: ${fmt(saveMs)}。その間のプレビュー更新 ${runs.length} 回、` +
+    `中央値 ${fmt(median(runs))}・最大 ${fmt(Math.max(...runs))}`
+  );
 }

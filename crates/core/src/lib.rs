@@ -12,6 +12,7 @@ pub mod makernote;
 pub mod pipeline;
 pub mod resize;
 pub mod sample;
+pub mod save;
 pub mod text;
 pub mod tiff;
 pub mod transform;

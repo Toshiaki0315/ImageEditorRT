@@ -1,24 +1,30 @@
-//! ImageEditorRT のアプリ本体（試作）。画像処理は imageeditorrt-core に任せ、
-//! ここでは画面（TypeScript）との受け渡しだけを行う。
+//! ImageEditorRT のアプリ本体。画像処理は imageeditorrt-core に任せ、
+//! ここでは画面（TypeScript）との受け渡し・メニュー・ファイルを開く経路だけを扱う。
 
+mod menu;
+mod open;
+
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Instant;
 
 use image::RgbaImage;
+use imageeditorrt_core::decode::{self, DecodeError};
 use imageeditorrt_core::exif_info::{read_exif_info, ExifInfo};
-use imageeditorrt_core::{decode, encode, preview, resize};
+use imageeditorrt_core::formats::{self, Format};
+use imageeditorrt_core::{preview, resize};
 use serde::Serialize;
-use tauri::ipc::{InvokeBody, Request, Response};
-use tauri::{AppHandle, Manager, State};
+use tauri::ipc::Response;
+use tauri::{AppHandle, Manager, State, WebviewWindow};
 
-/// プレビューの長辺（Python 版と同じ 1600px）。
+/// プレビューの長辺（旧版と同じ 1600px）。
 const PREVIEW_MAX_SIDE: u32 = 1600;
-/// プレビューを JPEG で渡すときの画質。
-const PREVIEW_JPEG_QUALITY: u8 = 85;
-/// 計測用の画像の大きさ（Python 版のベンチマークと同じ 6000×4000）。
+/// 計測用の画像の大きさ（旧版のベンチマークと同じ 6000×4000）。
 const SAMPLE_SIZE: (u32, u32) = (6000, 4000);
 /// この環境変数があると、起動後に画面が受け渡しの計測をして結果を出力し、終了する。
 const BENCH_ENV: &str = "IMAGEEDITORRT_BENCH";
+/// ウィンドウのタイトル（画像を開くと「ファイル名 — ImageEditorRT」）。
+const APP_NAME: &str = "ImageEditorRT";
 
 /// 読み込んだ原本（不変）と、それを縮めたプレビュー用の画像。
 #[derive(Default)]
@@ -34,13 +40,20 @@ struct AppState(Mutex<Loaded>);
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct OpenInfo {
+    /// ファイル名（パスなし）
+    name: String,
+    format: Option<Format>,
     width: u32,
     height: u32,
     preview_width: u32,
     preview_height: u32,
+    /// 透明・半透明の画素があるか（プレビューで市松模様を出す）
+    has_alpha: bool,
+    /// 1 より大きければ先頭のフレーム（ページ）だけを扱っている
+    frame_count: usize,
+    /// 読み込み（ファイルの読み込み＋画素にする）・縮小にかかった時間 (ms)
     decode_ms: f64,
     resize_ms: f64,
-    exif_ms: f64,
     exif: ExifInfo,
 }
 
@@ -48,87 +61,98 @@ fn elapsed_ms(start: Instant) -> f64 {
     start.elapsed().as_secs_f64() * 1000.0
 }
 
-fn store(state: &AppState, original: RgbaImage, decode_ms: f64, file: &[u8]) -> Result<OpenInfo, String> {
+fn file_name(path: &Path) -> String {
+    path.file_name().map_or_else(|| path.display().to_string(), |n| n.to_string_lossy().into_owned())
+}
+
+/// 読み込んだ画像を状態に置き、ウィンドウのタイトルを変える。
+fn store(
+    state: &AppState,
+    window: &WebviewWindow,
+    name: String,
+    decoded: decode::Decoded,
+    decode_ms: f64,
+    exif: ExifInfo,
+) -> Result<OpenInfo, String> {
     let start = Instant::now();
-    let exif = read_exif_info(file);
-    let exif_ms = elapsed_ms(start);
-    let start = Instant::now();
+    let original = decoded.image;
     let small = resize::fit_long_side(&original, PREVIEW_MAX_SIDE);
     let info = OpenInfo {
+        format: Some(decoded.format),
         width: original.width(),
         height: original.height(),
         preview_width: small.width(),
         preview_height: small.height(),
+        has_alpha: formats::has_transparency(&small),
+        frame_count: decoded.frame_count,
         decode_ms,
         resize_ms: elapsed_ms(start),
-        exif_ms,
         exif,
+        name,
     };
+    let _ = window.set_title(&format!("{} — {APP_NAME}", info.name));
     let mut loaded = state.0.lock().map_err(|e| e.to_string())?;
     loaded.original = Some(original);
     loaded.preview = Some(small);
     Ok(info)
 }
 
-fn decode_bytes(bytes: &[u8]) -> Result<RgbaImage, String> {
-    decode::decode(bytes).map_err(|e| format!("画像を読み込めません: {e:?}"))
-}
-
-/// 画面から渡されたファイルの中身（バイト列のまま）を読み込む。
+/// 画像のファイルを読み込む。読めなければ、ダイアログに出す説明を返す（旧版 FR-IO-10）。
 #[tauri::command]
-async fn open_bytes(request: Request<'_>, state: State<'_, AppState>) -> Result<OpenInfo, String> {
-    let InvokeBody::Raw(bytes) = request.body() else {
-        return Err("ファイルの中身がバイト列で渡されていません".into());
-    };
+async fn open_path(
+    path: String,
+    state: State<'_, AppState>,
+    window: WebviewWindow,
+) -> Result<OpenInfo, String> {
+    let path = PathBuf::from(path);
+    let name = file_name(&path);
+    if !formats::is_supported(&path) {
+        let ext = path.extension().map_or("(なし)".into(), |e| format!(".{}", e.to_string_lossy()));
+        return Err(format!("対応していない拡張子です: {ext}"));
+    }
     let start = Instant::now();
-    let image = decode_bytes(bytes)?;
-    store(&state, image, elapsed_ms(start), bytes)
-}
-
-/// ドロップされたファイルを読み込む。
-#[tauri::command]
-async fn open_path(path: String, state: State<'_, AppState>) -> Result<OpenInfo, String> {
-    let start = Instant::now();
-    let bytes = std::fs::read(&path).map_err(|e| format!("{path} を読めません: {e}"))?;
-    let image = decode_bytes(&bytes)?;
-    store(&state, image, elapsed_ms(start), &bytes)
+    let bytes = std::fs::read(&path).map_err(|e| format!("画像を読み込めません: {name}\n({e})"))?;
+    let decoded = decode::decode_file(&bytes).map_err(|e| match e {
+        DecodeError::UnsupportedFormat(_) => e.to_string(),
+        _ => format!("画像を読み込めません: {name}\n({e})"),
+    })?;
+    let decode_ms = elapsed_ms(start);
+    // EXIF が壊れていても画像は開く（EXIF なしとして扱う）
+    let exif = read_exif_info(&bytes);
+    store(&state, &window, name, decoded, decode_ms, exif)
 }
 
 /// 計測用の画像（6000×4000）を作って読み込んだことにする。
 #[tauri::command]
-async fn open_sample(state: State<'_, AppState>) -> Result<OpenInfo, String> {
+async fn open_sample(state: State<'_, AppState>, window: WebviewWindow) -> Result<OpenInfo, String> {
     let start = Instant::now();
     let image = preview::synthetic_photo(SAMPLE_SIZE.0, SAMPLE_SIZE.1);
-    store(&state, image, elapsed_ms(start), &[])
+    let decoded = decode::Decoded { image, format: Format::Png, frame_count: 1 };
+    store(&state, &window, "計測用の画像".into(), decoded, elapsed_ms(start), ExifInfo::default())
+}
+
+/// 読み込める拡張子（ファイルを選ぶダイアログ・ドロップの判定に使う）と、その説明。
+#[tauri::command]
+fn supported_formats() -> (Vec<&'static str>, &'static str) {
+    (formats::SUPPORTED_EXTENSIONS.to_vec(), formats::FORMATS_TEXT)
 }
 
 /// プレビューに設定をかけて返す。
 ///
-/// 返すバイト列: 先頭 16 バイトが幅・高さ・処理の時間 (µs)・変換の時間 (µs)（どれも u32 リトルエンディアン）、
-/// その後ろが画素（format が "rgba" なら RGBA のまま、"jpeg" なら JPEG）。
+/// 返すバイト列: 先頭 12 バイトが幅・高さ・処理の時間 (µs)（どれも u32 リトルエンディアン）、
+/// その後ろが RGBA の画素。JSON にしないので、1600px の画像でも受け渡しは数 ms で済む。
 #[tauri::command]
-async fn render_preview(
-    settings: preview::Settings,
-    format: String,
-    state: State<'_, AppState>,
-) -> Result<Response, String> {
-    let rendered = {
+async fn render_preview(settings: preview::Settings, state: State<'_, AppState>) -> Result<Response, String> {
+    let (image, render_time) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let image = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
         let start = Instant::now();
         (preview::render(image, &settings), start.elapsed())
     };
-    let (image, render_time) = rendered;
     let (width, height) = image.dimensions();
-    let start = Instant::now();
-    let pixels = match format.as_str() {
-        "jpeg" => encode::to_jpeg(&image, PREVIEW_JPEG_QUALITY),
-        "rgba" => image.into_raw(),
-        other => return Err(format!("知らない形式です: {other}")),
-    };
-    let encode_time = start.elapsed();
-    let mut body = Vec::with_capacity(16 + pixels.len());
-    for v in [width, height, render_time.as_micros() as u32, encode_time.as_micros() as u32] {
+    let pixels = image.into_raw();
+    let mut body = Vec::with_capacity(12 + pixels.len());
+    for v in [width, height, render_time.as_micros() as u32] {
         body.extend_from_slice(&v.to_le_bytes());
     }
     body.extend_from_slice(&pixels);
@@ -150,7 +174,7 @@ fn report(text: String, app: AppHandle) {
     }
 }
 
-/// 画面での途中経過・エラーを標準出力に書く（計測モードの確認用）。
+/// 画面での途中経過・エラーを標準エラー出力に書く（計測モードの確認用）。
 #[tauri::command]
 fn log(text: String) {
     eprintln!("[画面] {text}");
@@ -158,8 +182,12 @@ fn log(text: String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .manage(open::Pending::from_args(std::env::args_os().skip(1)))
+        .menu(menu::build)
+        .on_menu_event(menu::on_event)
         .setup(|app| {
             // 計測ではウィンドウが隠れていると描画が止まるので、前に出す
             if bench_mode() {
@@ -170,14 +198,24 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            open_bytes,
             open_path,
             open_sample,
+            supported_formats,
             render_preview,
+            open::take_pending_paths,
             bench_mode,
             log,
             report
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("ImageEditorRT を起動できませんでした");
+    app.run(|handle, event| {
+        // Finder の「このアプリケーションで開く」・Dock のアイコンへのドロップ
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Opened { urls } = event {
+            open::opened(handle, urls);
+        }
+        #[cfg(not(target_os = "macos"))]
+        let _ = (handle, event);
+    });
 }

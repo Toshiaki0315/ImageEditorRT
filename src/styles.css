@@ -4,8 +4,9 @@
   --text: #1c1c1e;
   --muted: #6b6b70;
   --line: #d9d9de;
-  --stage: #2a2a2d;
+  --stage: #e9e9ec;
   --accent: #0a64d8;
+  --accent-soft: rgba(10, 100, 216, 0.12);
   font-family: -apple-system, "Hiragino Sans", sans-serif;
   font-size: 13px;
   color: var(--text);
@@ -19,8 +20,9 @@
     --text: #ececef;
     --muted: #a0a0a6;
     --line: #3b3b40;
-    --stage: #121214;
+    --stage: #18181a;
     --accent: #4b9bff;
+    --accent-soft: rgba(75, 155, 255, 0.16);
   }
 }
 
@@ -32,24 +34,15 @@ html,
 body {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
   display: grid;
-  grid-template-rows: auto 1fr auto;
-}
-
-.toolbar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
+  grid-template-rows: 1fr auto;
 }
 
 button,
-.button,
 select {
   font: inherit;
   color: var(--text);
@@ -57,47 +50,68 @@ select {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 4px 10px;
-  cursor: pointer;
 }
 
-.timing {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
+button:disabled {
   color: var(--muted);
+  opacity: 0.6;
 }
 
 .layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  /* 旧版と同じく、設定パネルは 420px 程度（スライダーを長くするため） */
+  grid-template-columns: 1fr 420px;
   min-height: 0;
 }
 
+/* --- 左: ドロップ・プレビュー ------------------------------------------- */
+
 .stage {
+  position: relative;
   display: grid;
   place-items: center;
   background: var(--stage);
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
+.placeholder {
+  position: absolute;
+  inset: 16px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 15px;
+  text-align: center;
+  white-space: pre-line;
+}
+
 .stage.dragging {
-  outline: 3px dashed var(--accent);
-  outline-offset: -6px;
+  box-shadow: inset 0 0 0 3px var(--accent);
+  background: var(--accent-soft);
 }
 
-.stage canvas {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+.stage.dragging .placeholder {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
-.hint {
-  color: #b8b8be;
+/* 大きさは main.ts でエリアに収まるよう決める */
+.preview.transparent {
+  /* 透過部分は市松模様（白と薄い灰色、1 マス 8px）の上に重ねる */
+  background-color: #ffffff;
+  background-image: conic-gradient(#dcdcdc 25%, transparent 0 50%, #dcdcdc 0 75%, transparent 0);
+  background-size: 16px 16px;
 }
+
+/* --- 右: 設定パネル ---------------------------------------------------- */
 
 .side {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   min-height: 0;
   border-left: 1px solid var(--line);
   background: var(--panel);
@@ -105,27 +119,67 @@ select {
 
 .tabs {
   display: flex;
-  gap: 4px;
-  padding: 8px 12px 0;
+  gap: 2px;
+  padding: 8px 8px 0;
   border-bottom: 1px solid var(--line);
 }
 
 .tab {
+  flex: 1;
   border-bottom: none;
   border-radius: 6px 6px 0 0;
   background: transparent;
+  padding: 5px 4px;
 }
 
-.tab.active {
+.tab[aria-selected="true"] {
   background: var(--bg);
   font-weight: 600;
 }
 
-.panel {
+.page {
   overflow-y: auto;
-  padding: 8px 12px 16px;
+  overflow-x: hidden;
+  padding: 4px 14px 12px;
   min-height: 0;
 }
+
+.page h2 {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 12px 0 4px;
+}
+
+.todo {
+  color: var(--muted);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 7.5em 1fr 4em;
+  gap: 8px;
+  align-items: center;
+  margin: 3px 0;
+}
+
+.row input[type="range"] {
+  width: 100%;
+}
+
+.row output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* --- EXIF ------------------------------------------------------------- */
 
 .exif table {
   width: 100%;
@@ -148,39 +202,15 @@ select {
   color: var(--muted);
 }
 
-.exif .empty {
-  color: var(--muted);
-}
-
-.panel h2 {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 14px 0 4px;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: 7em 1fr 3.5em;
-  gap: 6px;
-  align-items: center;
-  margin: 4px 0;
-}
-
-.row output {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.row input[type="text"] {
-  grid-column: 2 / 4;
-  font: inherit;
-}
+/* --- 下: ステータスバー --------------------------------------------------- */
 
 .status {
   padding: 4px 12px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   background: var(--panel);
-  white-space: pre;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
 }

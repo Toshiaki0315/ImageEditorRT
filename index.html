@@ -8,33 +8,35 @@
     <script type="module" src="/src/main.ts" defer></script>
   </head>
   <body>
-    <header class="toolbar">
-      <label class="button">開く…<input id="file" type="file" accept="image/*,.heic,.heif" hidden /></label>
-      <button id="sample" type="button">計測用の画像（6000×4000）</button>
-      <label>受け渡し
-        <select id="format">
-          <option value="jpeg">JPEG</option>
-          <option value="rgba">RGBA のまま</option>
-        </select>
-      </label>
-      <button id="bench" type="button">受け渡しを計測</button>
-      <button id="reset" type="button">加工をリセット</button>
-      <span id="timing" class="timing"></span>
-    </header>
     <main class="layout">
       <section id="stage" class="stage">
-        <canvas id="canvas" hidden></canvas>
-        <p id="hint" class="hint">画像をドロップするか「開く…」で選んでください</p>
+        <div id="placeholder" class="placeholder">ここに画像をドロップしてください</div>
+        <canvas id="canvas" class="preview" hidden></canvas>
       </section>
       <aside class="side">
-        <nav class="tabs">
-          <button type="button" class="tab active" data-tab="panel">加工</button>
-          <button type="button" class="tab" data-tab="exif">EXIF</button>
+        <nav class="tabs" role="tablist">
+          <button type="button" class="tab" role="tab" data-tab="adjust">加工</button>
+          <button type="button" class="tab" role="tab" data-tab="crop">切り抜き</button>
+          <button type="button" class="tab" role="tab" data-tab="output">出力</button>
+          <button type="button" class="tab" role="tab" data-tab="diorama">ジオラマ</button>
+          <button type="button" class="tab" role="tab" data-tab="exif">EXIF</button>
         </nav>
-        <div id="panel" class="panel"></div>
-        <div id="exif" class="panel exif" hidden><p class="empty">画像を開くと EXIF を表示します</p></div>
+        <div id="page-adjust" class="page" role="tabpanel"></div>
+        <div id="page-crop" class="page" role="tabpanel" hidden>
+          <p class="todo">回転・反転・トリミングは #12、フレーム・形は #13 で作ります</p>
+        </div>
+        <div id="page-output" class="page" role="tabpanel" hidden>
+          <p class="todo">サイズ変更は #14、保存の設定は #7 で作ります</p>
+        </div>
+        <div id="page-diorama" class="page" role="tabpanel" hidden></div>
+        <div id="page-exif" class="page exif" role="tabpanel" hidden></div>
+        <div class="actions">
+          <button type="button" id="before" disabled title="#19 で作ります">加工前</button>
+          <button type="button" id="save" disabled title="#7 で作ります">保存</button>
+          <button type="button" id="reset" disabled title="#20 で作ります">リセット</button>
+        </div>
       </aside>
     </main>
-    <footer id="status" class="status"></footer>
+    <footer id="status" class="status">画像が読み込まれていません</footer>
   </body>
 </html>

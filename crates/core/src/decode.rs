@@ -2,11 +2,15 @@
 //!
 //! HEIC を含め、macOS が読める形式はすべて同じ方法で読む。EXIF の向き (Orientation) は
 //! 読み込み時に直し、色は sRGB にそろえて RGBA（8bit）の画像にする。
+//! CMYK・16bit・パレット・グレーの画像も、同じく sRGB の RGBA（8bit）になる。
+//! GIF・TIFF などの複数のフレーム（ページ）がある画像は、先頭だけを読む。
 
 use std::ffi::c_void;
 use std::ptr::NonNull;
 
 use image::RgbaImage;
+
+use crate::formats::Format;
 use objc2_core_foundation::{
     CFBoolean, CFData, CFDictionary, CFNumber, CFRetained, CFString, CFType, CGPoint, CGRect, CGSize,
 };
@@ -23,6 +27,8 @@ use objc2_image_io::{
 pub enum DecodeError {
     /// 画像の形式として読めない（壊れている・対応していない）
     Unsupported,
+    /// 画像としては読めるが、このアプリでは扱わない形式（UTI）
+    UnsupportedFormat(String),
     /// 読めたが、画素を取り出せなかった
     Render,
 }
@@ -33,6 +39,7 @@ impl std::fmt::Display for DecodeError {
             DecodeError::Unsupported => {
                 write!(f, "画像を読み込めません（対応していない形式か、壊れています）")
             }
+            DecodeError::UnsupportedFormat(uti) => write!(f, "対応していない画像形式です: {uti}"),
             DecodeError::Render => write!(f, "画像の画素を取り出せません"),
         }
     }
@@ -40,15 +47,35 @@ impl std::fmt::Display for DecodeError {
 
 impl std::error::Error for DecodeError {}
 
+/// 読み込んだ画像と、元のファイルの形式・フレーム（ページ）の数。
+#[derive(Debug)]
+pub struct Decoded {
+    pub image: RgbaImage,
+    pub format: Format,
+    /// 1 より大きければアニメーション GIF・複数ページの TIFF など（先頭だけを読んでいる）
+    pub frame_count: usize,
+}
+
 /// ファイルの中身（バイト列）から画像を読み、向きを直した sRGB の RGBA 画像を返す。
 pub fn decode(bytes: &[u8]) -> Result<RgbaImage, DecodeError> {
+    decode_file(bytes).map(|d| d.image)
+}
+
+/// ファイルの中身（バイト列）から画像を読む。中身の形式が対応していなければエラー
+/// （拡張子とは関係なく、中身で決める）。
+pub fn decode_file(bytes: &[u8]) -> Result<Decoded, DecodeError> {
     let data = CFData::from_bytes(bytes);
     // SAFETY: data は有効な CFData。オプションは渡さない
     let source = unsafe { CGImageSource::with_data(&data, None) }.ok_or(DecodeError::Unsupported)?;
+    // SAFETY: 中身の形式（UTI）とフレームの数を読むだけ
+    let (uti, frame_count) = unsafe { (source.r#type(), source.count()) };
+    let uti = uti.map(|u| u.to_string()).ok_or(DecodeError::Unsupported)?;
+    let format = Format::from_uti(&uti).ok_or(DecodeError::UnsupportedFormat(uti))?;
     let (width, height) = pixel_size(&source).ok_or(DecodeError::Unsupported)?;
     // 縮小しない（最大辺 = 元の長辺）サムネイルを、向きを直して作らせると、向きを直した原寸の画像になる
     let image = oriented_image(&source, width.max(height)).ok_or(DecodeError::Unsupported)?;
-    render_rgba(&image).ok_or(DecodeError::Render)
+    let image = render_rgba(&image).ok_or(DecodeError::Render)?;
+    Ok(Decoded { image, format, frame_count })
 }
 
 /// 画像の大きさ（EXIF の向きを直す前）を返す。

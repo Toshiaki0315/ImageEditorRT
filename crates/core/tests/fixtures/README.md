@@ -11,3 +11,4 @@
 | `canon.jpg` | 64×48 の JPEG。Canon の MakerNote（位置は TIFF の先頭が基準。保存で位置がずれると壊れる） |
 | `makernote/*.tiff` | MakerNote の読み取りのテスト用の EXIF（TIFF の部分だけ）。ペンタックス・リコー・Samsung・不明な形式・壊れたものなど 13 通り |
 | `makernote/expected.json` | 上の EXIF を Python 版の `core/makernote.py` で読んだ結果（Rust 版と同じになるかを比べる） |
+| `formats/*` | 読み込みの変換のテスト用（CMYK の JPEG・16bit の PNG・パレットの PNG・アニメーション GIF・複数ページの TIFF・BMP・中身と拡張子が違うもの・WebP・Display P3）。`formats/make.py`（Pillow）で作ったもの |

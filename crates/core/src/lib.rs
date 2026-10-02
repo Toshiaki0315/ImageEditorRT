@@ -6,6 +6,7 @@ pub mod blur;
 pub mod decode;
 pub mod encode;
 pub mod exif_info;
+pub mod formats;
 pub mod makernote;
 pub mod preview;
 pub mod resize;

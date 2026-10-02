@@ -10,7 +10,7 @@ import { Panel } from "./panel";
 import { Preview } from "./preview";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
-import { defaultSettings, type EditSettings, type OpenInfo } from "./types";
+import { defaultSettings, type EditSettings, type FilterType, type OpenInfo } from "./types";
 
 const NO_IMAGE_MESSAGE = "画像が読み込まれていません";
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
@@ -34,7 +34,7 @@ let formatsText = "";
 
 const preview = new Preview(stage, $<HTMLCanvasElement>("canvas"), (error) => showError("プレビューを更新できません", error));
 const tabs = new Tabs(document.querySelector(".side")!);
-const panel = new Panel($("page-adjust"), $("page-diorama"), settings, settingsChanged);
+let panel: Panel;
 const saveOptions = new SaveOptionsPanel(
   $<HTMLInputElement>("jpeg-quality"),
   $<HTMLOutputElement>("jpeg-quality-value"),
@@ -199,6 +199,8 @@ function setupDrop() {
 
 async function setup() {
   [extensions, savableExtensions, formatsText] = await invoke<[string[], string[], string]>("supported_formats");
+  const filters = await invoke<[FilterType, string][]>("filter_types");
+  panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, settingsChanged);
   saveButton.addEventListener("click", () => void saveDialog());
   tabs.setEnabled("exif", false);
   setupDrop();

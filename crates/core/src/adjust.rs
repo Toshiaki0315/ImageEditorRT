@@ -109,27 +109,9 @@ pub fn apply_lut(image: &mut RgbaImage, lut: &Lut) {
     });
 }
 
-/// 彩度を factor 倍にする（Pillow の ImageEnhance.Color と同じ: L に変換した灰色と、元の色を混ぜる）。
+/// 彩度を factor 倍にする（Pillow の ImageEnhance.Color と同じ。`pillow::enhance_color`）。
 pub fn enhance_color(image: &mut RgbaImage, factor: f64) {
-    if factor == 1.0 {
-        return;
-    }
-    // Pillow の Image.blend は float（32bit）で計算し、整数に切り捨てる。Apple Silicon の Pillow は
-    // 掛け算と足し算を 1 回でまとめて計算する（FMA）ので、mul_add で同じ丸め方にする
-    let alpha = factor as f32;
-    let in_range = (0.0..=1.0).contains(&alpha);
-    image.as_mut().par_chunks_exact_mut(4).for_each(|p| {
-        let gray = i32::from(luma(p[0], p[1], p[2]));
-        for v in &mut p[..3] {
-            let value = alpha.mul_add((i32::from(*v) - gray) as f32, gray as f32);
-            *v = if in_range { value as u8 } else { value.clamp(0.0, 255.0) as u8 };
-        }
-    });
-}
-
-/// Pillow の RGB → L の変換（ITU-R 601-2 の係数を 16bit の整数にしたもの）。
-fn luma(r: u8, g: u8, b: u8) -> u8 {
-    ((u32::from(r) * 19595 + u32::from(g) * 38470 + u32::from(b) * 7471 + 0x8000) >> 16) as u8
+    crate::pillow::enhance_color(image, factor);
 }
 
 /// 彩度 -100〜+100（-100 で白黒、0 で変化なし、+100 で鮮やかさ 2 倍）。

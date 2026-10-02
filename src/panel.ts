@@ -1,6 +1,6 @@
 // 設定のスライダー（「加工」「ジオラマ」タブ）。範囲・刻み・値の表示は旧版と同じ（FR-UI-21〜28・53・60）。
 
-import type { EditSettings } from "./types";
+import type { EditSettings, FilterType } from "./types";
 
 /** スライダーで変える数値の項目。 */
 type NumberKey = { [K in keyof EditSettings]: EditSettings[K] extends number ? K : never }[keyof EditSettings];
@@ -53,13 +53,25 @@ const DIORAMA: Slider[] = [
 /** スライダーを作り、値を変えるたびに onChange を呼ぶ。 */
 export class Panel {
   private readonly rows = new Map<NumberKey, { slider: Slider; input: HTMLInputElement; output: HTMLOutputElement }>();
+  private readonly filter = document.createElement("select");
 
   constructor(
     adjustPage: HTMLElement,
     dioramaPage: HTMLElement,
+    filters: [FilterType, string][],
     private readonly settings: EditSettings,
     private readonly onChange: () => void,
   ) {
+    // テイスト（色だけを変える。旧版 FR-UI-20）
+    const heading = document.createElement("h2");
+    heading.textContent = "テイスト";
+    this.filter.className = "filter";
+    for (const [value, label] of filters) this.filter.add(new Option(label, value));
+    this.filter.addEventListener("change", () => {
+      this.settings.filter = this.filter.value as FilterType;
+      this.onChange();
+    });
+    adjustPage.append(heading, this.filter);
     this.build(adjustPage, "加工", COLOR);
     this.build(adjustPage, "ディテール", DETAIL);
     const reset = document.createElement("button");
@@ -120,6 +132,7 @@ export class Panel {
 
   /** settings の値をスライダーに反映する。 */
   show() {
+    this.filter.value = this.settings.filter;
     for (const key of this.rows.keys()) this.showRow(key);
   }
 

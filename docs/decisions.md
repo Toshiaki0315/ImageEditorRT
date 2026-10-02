@@ -32,3 +32,10 @@
   - 周辺減光: Pillow の `radial_gradient`（256×256）を Pillow と同じバイリニアの計算（`resize::resize_gray_bilinear`）で引き伸ばし、`ImageChops.multiply`（切り捨て）で掛ける
   - 経年劣化の粒子: Python の `random.Random(seed).randbytes` と同じ乱数（メルセンヌ・ツイスタ、`pyrandom.rs`）
 - 露出〜色温度は、旧版は 1 つずつかけていたが、作り直しでは 1 つの表にまとめてから 1 回でかける（整数の表どうしなので結果は同じ）。
+
+## テイスト（#9）
+
+- **旧版と画素まで同じにする**: 23 種すべてを旧版で作った画像と比べ、画素まで一致することを確かめる（`tests/filters_match_python.rs`）。Pillow の処理は `pillow.rs` にまとめた（`ImageEnhance` の明るさ・コントラスト・彩度、`Image.blend`、`ImageChops.screen`、`ImageOps.colorize`、`convert("L", 行列)`）。
+- **ガウスぼかしを Pillow と同じにした**（`blur.rs`）: 試作は箱ぼかし 3 回の近似だったが、Pillow の「端数のある半径の箱ぼかし」（BoxBlur.c）と UnsharpMask をそのまま移した。ディテール・ジオラマもこのぼかしを使う。
+- **半径は倍精度で計算してから float（32bit）にする**: 旧版は Python（倍精度）で半径を計算して Pillow に渡していたため。float32 で計算すると、まれに 1 だけ違う画素が出る。
+- **JSON の名前**: テイストは旧版と同じ名前（`"high_tone"` など）。旧版のプリセットを読み込むとき（#21）にそのまま使える。

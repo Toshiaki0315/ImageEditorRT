@@ -11,6 +11,7 @@ use std::time::Instant;
 use image::RgbaImage;
 use imageeditorrt_core::decode::{self, DecodeError};
 use imageeditorrt_core::exif_info::{raw_exif, read_exif_info, ExifInfo};
+use imageeditorrt_core::filters::FilterType;
 use imageeditorrt_core::formats::{self, Format};
 use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
 use imageeditorrt_core::sample;
@@ -150,6 +151,12 @@ async fn open_sample(state: State<'_, AppState>, window: WebviewWindow) -> Resul
 #[tauri::command]
 fn supported_formats() -> (Vec<&'static str>, Vec<&'static str>, &'static str) {
     (formats::SUPPORTED_EXTENSIONS.to_vec(), save::SAVABLE_EXTENSIONS.to_vec(), formats::FORMATS_TEXT)
+}
+
+/// テイストの一覧（画面のプルダウンの順。JSON の名前と表示名）。
+#[tauri::command]
+fn filter_types() -> Vec<(FilterType, &'static str)> {
+    FilterType::ALL.iter().map(|&f| (f, f.label())).collect()
 }
 
 /// プレビューに設定をかけて返す。trimmed なら切り抜いた範囲だけを表示する。
@@ -309,6 +316,7 @@ pub fn run() {
             open_path,
             open_sample,
             supported_formats,
+            filter_types,
             render_preview,
             output_size,
             default_save_path,

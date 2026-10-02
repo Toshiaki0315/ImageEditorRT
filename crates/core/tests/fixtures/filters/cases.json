@@ -1,0 +1,278 @@
+[
+ {
+  "filter": "none",
+  "label": "なし",
+  "source": "source.png",
+  "file": "none_source.png"
+ },
+ {
+  "filter": "none",
+  "label": "なし",
+  "source": "big.png",
+  "file": "none_big.png"
+ },
+ {
+  "filter": "sepia",
+  "label": "セピア",
+  "source": "source.png",
+  "file": "sepia_source.png"
+ },
+ {
+  "filter": "sepia",
+  "label": "セピア",
+  "source": "big.png",
+  "file": "sepia_big.png"
+ },
+ {
+  "filter": "monotone",
+  "label": "モノトーン",
+  "source": "source.png",
+  "file": "monotone_source.png"
+ },
+ {
+  "filter": "monotone",
+  "label": "モノトーン",
+  "source": "big.png",
+  "file": "monotone_big.png"
+ },
+ {
+  "filter": "high_tone",
+  "label": "ハイトーン",
+  "source": "source.png",
+  "file": "high_tone_source.png"
+ },
+ {
+  "filter": "high_tone",
+  "label": "ハイトーン",
+  "source": "big.png",
+  "file": "high_tone_big.png"
+ },
+ {
+  "filter": "polaroid",
+  "label": "ポラロイド風",
+  "source": "source.png",
+  "file": "polaroid_source.png"
+ },
+ {
+  "filter": "polaroid",
+  "label": "ポラロイド風",
+  "source": "big.png",
+  "file": "polaroid_big.png"
+ },
+ {
+  "filter": "positive_film",
+  "label": "ポジフィルム風",
+  "source": "source.png",
+  "file": "positive_film_source.png"
+ },
+ {
+  "filter": "positive_film",
+  "label": "ポジフィルム風",
+  "source": "big.png",
+  "file": "positive_film_big.png"
+ },
+ {
+  "filter": "retro_camera",
+  "label": "レトロカメラ風",
+  "source": "source.png",
+  "file": "retro_camera_source.png"
+ },
+ {
+  "filter": "retro_camera",
+  "label": "レトロカメラ風",
+  "source": "big.png",
+  "file": "retro_camera_big.png"
+ },
+ {
+  "filter": "high_key",
+  "label": "ハイキー",
+  "source": "source.png",
+  "file": "high_key_source.png"
+ },
+ {
+  "filter": "high_key",
+  "label": "ハイキー",
+  "source": "big.png",
+  "file": "high_key_big.png"
+ },
+ {
+  "filter": "low_key",
+  "label": "ローキー",
+  "source": "source.png",
+  "file": "low_key_source.png"
+ },
+ {
+  "filter": "low_key",
+  "label": "ローキー",
+  "source": "big.png",
+  "file": "low_key_big.png"
+ },
+ {
+  "filter": "dramatic",
+  "label": "ドラマチック",
+  "source": "source.png",
+  "file": "dramatic_source.png"
+ },
+ {
+  "filter": "dramatic",
+  "label": "ドラマチック",
+  "source": "big.png",
+  "file": "dramatic_big.png"
+ },
+ {
+  "filter": "modern",
+  "label": "モダン",
+  "source": "source.png",
+  "file": "modern_source.png"
+ },
+ {
+  "filter": "modern",
+  "label": "モダン",
+  "source": "big.png",
+  "file": "modern_big.png"
+ },
+ {
+  "filter": "natural",
+  "label": "ナチュラル",
+  "source": "source.png",
+  "file": "natural_source.png"
+ },
+ {
+  "filter": "natural",
+  "label": "ナチュラル",
+  "source": "big.png",
+  "file": "natural_big.png"
+ },
+ {
+  "filter": "cinematic",
+  "label": "シネマティック",
+  "source": "source.png",
+  "file": "cinematic_source.png"
+ },
+ {
+  "filter": "cinematic",
+  "label": "シネマティック",
+  "source": "big.png",
+  "file": "cinematic_big.png"
+ },
+ {
+  "filter": "noir",
+  "label": "ノワール",
+  "source": "source.png",
+  "file": "noir_source.png"
+ },
+ {
+  "filter": "noir",
+  "label": "ノワール",
+  "source": "big.png",
+  "file": "noir_big.png"
+ },
+ {
+  "filter": "bleach_bypass",
+  "label": "ブリーチバイパス",
+  "source": "source.png",
+  "file": "bleach_bypass_source.png"
+ },
+ {
+  "filter": "bleach_bypass",
+  "label": "ブリーチバイパス",
+  "source": "big.png",
+  "file": "bleach_bypass_big.png"
+ },
+ {
+  "filter": "pastel",
+  "label": "パステル",
+  "source": "source.png",
+  "file": "pastel_source.png"
+ },
+ {
+  "filter": "pastel",
+  "label": "パステル",
+  "source": "big.png",
+  "file": "pastel_big.png"
+ },
+ {
+  "filter": "cross_process",
+  "label": "クロスプロセス",
+  "source": "source.png",
+  "file": "cross_process_source.png"
+ },
+ {
+  "filter": "cross_process",
+  "label": "クロスプロセス",
+  "source": "big.png",
+  "file": "cross_process_big.png"
+ },
+ {
+  "filter": "cyanotype",
+  "label": "青写真",
+  "source": "source.png",
+  "file": "cyanotype_source.png"
+ },
+ {
+  "filter": "cyanotype",
+  "label": "青写真",
+  "source": "big.png",
+  "file": "cyanotype_big.png"
+ },
+ {
+  "filter": "summer",
+  "label": "夏らしい",
+  "source": "source.png",
+  "file": "summer_source.png"
+ },
+ {
+  "filter": "summer",
+  "label": "夏らしい",
+  "source": "big.png",
+  "file": "summer_big.png"
+ },
+ {
+  "filter": "autumn",
+  "label": "秋らしい",
+  "source": "source.png",
+  "file": "autumn_source.png"
+ },
+ {
+  "filter": "autumn",
+  "label": "秋らしい",
+  "source": "big.png",
+  "file": "autumn_big.png"
+ },
+ {
+  "filter": "soft_focus",
+  "label": "ソフトフォーカス",
+  "source": "source.png",
+  "file": "soft_focus_source.png"
+ },
+ {
+  "filter": "soft_focus",
+  "label": "ソフトフォーカス",
+  "source": "big.png",
+  "file": "soft_focus_big.png"
+ },
+ {
+  "filter": "hdr",
+  "label": "HDR 風",
+  "source": "source.png",
+  "file": "hdr_source.png"
+ },
+ {
+  "filter": "hdr",
+  "label": "HDR 風",
+  "source": "big.png",
+  "file": "hdr_big.png"
+ },
+ {
+  "filter": "infrared",
+  "label": "赤外線風",
+  "source": "source.png",
+  "file": "infrared_source.png"
+ },
+ {
+  "filter": "infrared",
+  "label": "赤外線風",
+  "source": "big.png",
+  "file": "infrared_big.png"
+ }
+]

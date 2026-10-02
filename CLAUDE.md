@@ -45,8 +45,10 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
     pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
-    blur.rs               # ガウスぼかし（箱ぼかし 3 回）・アンシャープマスク
-    effects.rs            # ぼかしを使う加工（ディテール・ジオラマ・HDR 風）
+    blur.rs               # ガウスぼかし・アンシャープマスク（Pillow と画素まで同じ）
+    pillow.rs             # 旧版が使っていた Pillow の処理（ImageEnhance・blend・screen など）を同じ丸め方で
+    filters.rs            # テイスト（フィルター 23 種）
+    effects.rs            # ぼかしを使う加工（ディテール・ジオラマ）
     sample.rs             # 計測用の画像
     pyrandom.rs           # Python の random.Random と同じ乱数（経年劣化の粒子を旧版とそろえる）
     text.rs               # 文字・透かし（ヒラギノなどを ab_glyph で描く）

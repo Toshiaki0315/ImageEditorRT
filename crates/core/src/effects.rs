@@ -1,5 +1,5 @@
-//! ぼかしを使う加工（ディテール・ジオラマ・HDR 風）。試作から移したもの。
-//! 旧版と同じ結果にするのは #10（ディテール）・#11（ジオラマ）・#9（HDR 風）で行う。
+//! ぼかしを使う加工（ディテール・ジオラマ）。試作から移したもの。
+//! 旧版と同じ結果にするのは #10（ディテール）・#11（ジオラマ）で行う。
 //!
 //! 半径はどれも reference（基準の短辺、px）に比例させ、縮小プレビューと原寸で効き方をそろえる。
 
@@ -17,7 +17,6 @@ const DENOISE_RADIUS_RATIO: f32 = 0.002;
 const DENOISE_EDGE_THRESHOLD: f64 = 40.0;
 const DIORAMA_MAX_RADIUS_RATIO: f32 = 0.02;
 const DIORAMA_TRANSITION: f64 = 0.25;
-const HDR_RADIUS_RATIO: f32 = 0.02;
 
 /// シャープ（0〜100）。
 pub fn sharpen(image: &RgbaImage, amount: u32, reference: f32) -> RgbaImage {
@@ -95,14 +94,6 @@ pub fn diorama(image: &RgbaImage, settings: Diorama, reference: f32, area: Optio
     out
 }
 
-/// HDR 風（細部の明暗を強めてくっきりさせる）。
-pub fn hdr(image: &RgbaImage, reference: f32) -> RgbaImage {
-    let mut out = unsharp_mask(image, (reference * HDR_RADIUS_RATIO).max(1.0), 90, 0);
-    adjust::apply_lut(&mut out, &adjust::curve_lut(|x| x.powf(0.85)));
-    adjust::enhance_color(&mut out, 1.15);
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,9 +132,7 @@ mod tests {
     fn effects_keep_alpha() {
         let image =
             RgbaImage::from_fn(30, 20, |x, y| Rgba([(x * 8) as u8, (y * 12) as u8, 90, (x * 8) as u8]));
-        for out in
-            [sharpen(&image, 50, 20.0), blur(&image, 50, 20.0), denoise(&image, 50, 20.0), hdr(&image, 20.0)]
-        {
+        for out in [sharpen(&image, 50, 20.0), blur(&image, 50, 20.0), denoise(&image, 50, 20.0)] {
             assert!(out.pixels().zip(image.pixels()).all(|(a, b)| a[3] == b[3]));
         }
     }

@@ -7,6 +7,8 @@
 use image::RgbaImage;
 use rayon::prelude::*;
 
+use crate::PIXELS_PER_TASK;
+
 use crate::pyrandom::PyRandom;
 use crate::resize::resize_gray_bilinear;
 use crate::transform::round_half_even;
@@ -102,7 +104,7 @@ fn kelvin_to_rgb(kelvin: f64) -> [f64; 3] {
 
 /// 表をかける（アルファはそのまま）。
 pub fn apply_lut(image: &mut RgbaImage, lut: &Lut) {
-    image.as_mut().par_chunks_exact_mut(4).for_each(|p| {
+    image.as_mut().par_chunks_exact_mut(4).with_min_len(PIXELS_PER_TASK).for_each(|p| {
         p[0] = lut[0][p[0] as usize];
         p[1] = lut[1][p[1] as usize];
         p[2] = lut[2][p[2] as usize];
@@ -150,12 +152,14 @@ pub fn vignette(image: &mut RgbaImage, amount: u32) {
         let t = ((v as f64 / edge - VIGNETTE_START) / (corner - VIGNETTE_START)).clamp(0.0, 1.0);
         round_half_even(255.0 * (1.0 - strength * smoothstep(t))) as u8
     });
-    image.as_mut().par_chunks_exact_mut(4).zip(distance.par_iter()).for_each(|(p, &d)| {
-        let m = multiplier[d as usize];
-        for v in &mut p[..3] {
-            *v = mul_div_255(*v, m);
-        }
-    });
+    image.as_mut().par_chunks_exact_mut(4).zip(distance.par_iter()).with_min_len(PIXELS_PER_TASK).for_each(
+        |(p, &d)| {
+            let m = multiplier[d as usize];
+            for v in &mut p[..3] {
+                *v = mul_div_255(*v, m);
+            }
+        },
+    );
 }
 
 /// 経年劣化 0〜100（退色・フェード・黄ばみと青の抜け・粒子）。粒子の模様は固定で、同じ入力なら毎回同じ。
@@ -191,16 +195,19 @@ pub fn add_grain(image: &mut RgbaImage, strength: i32, seed: u64) {
     let scale = f64::from(strength) / 128.0;
     let lift: [u8; 256] = std::array::from_fn(|v| ((v as f64 - 128.0).max(0.0) * scale + 0.5) as u8);
     let drop: [u8; 256] = std::array::from_fn(|v| ((128.0 - v as f64).max(0.0) * scale + 0.5) as u8);
-    image.as_mut().par_chunks_exact_mut(4).zip(first.par_iter().zip(second.par_iter())).for_each(
-        |(p, (&a, &b))| {
+    image
+        .as_mut()
+        .par_chunks_exact_mut(4)
+        .zip(first.par_iter().zip(second.par_iter()))
+        .with_min_len(PIXELS_PER_TASK)
+        .for_each(|(p, (&a, &b))| {
             // Pillow の Image.blend(a, b, 0.5) と同じく切り捨て
             let noise = 0.5f32.mul_add((i32::from(b) - i32::from(a)) as f32, f32::from(a)) as usize;
             let (up, down) = (lift[noise], drop[noise]);
             for v in &mut p[..3] {
                 *v = v.saturating_add(up).saturating_sub(down);
             }
-        },
-    );
+        });
 }
 
 pub fn smoothstep(x: f64) -> f64 {

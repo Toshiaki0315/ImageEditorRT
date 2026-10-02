@@ -15,3 +15,4 @@
 | `transform/*` | 回転・反転・トリミング・リサイズの期待値。旧版の `core/transform.py`・`core/pipeline.py` で作ったもの（`transform/make.py`）。`cases.json` は範囲・大きさの計算、PNG は画像 |
 | `adjust/*` | 色の調整（露出〜経年劣化）の期待値。旧版の `core/effects.py`・`core/pipeline.py` で作ったもの（`adjust/make.py`）。画素まで一致することを確かめる |
 | `filters/*` | テイスト（フィルター 23 種）の期待値。旧版の `core/filters.py` で作ったもの（`filters/make.py`）。画素まで一致することを確かめる |
+| `detail/*` | ディテール（シャープ・ぼかし・ノイズ除去）と、保存・縮小プレビューの流れの期待値。旧版の `core/effects.py`・`core/pipeline.py` で作ったもの（`detail/make.py`）。画素まで一致することを確かめる |

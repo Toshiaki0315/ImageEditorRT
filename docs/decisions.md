@@ -39,3 +39,10 @@
 - **ガウスぼかしを Pillow と同じにした**（`blur.rs`）: 試作は箱ぼかし 3 回の近似だったが、Pillow の「端数のある半径の箱ぼかし」（BoxBlur.c）と UnsharpMask をそのまま移した。ディテール・ジオラマもこのぼかしを使う。
 - **半径は倍精度で計算してから float（32bit）にする**: 旧版は Python（倍精度）で半径を計算して Pillow に渡していたため。float32 で計算すると、まれに 1 だけ違う画素が出る。
 - **JSON の名前**: テイストは旧版と同じ名前（`"high_tone"` など）。旧版のプリセットを読み込むとき（#21）にそのまま使える。
+
+## ディテールと原寸の処理の速さ（#10）
+
+- **ディテール**（シャープ・ぼかし・ノイズ除去）とリサイズ（Lanczos）も、旧版と画素まで同じにした（`tests/detail_matches_python.rs`・`tests/transform_matches_python.rs`）。リサイズは Pillow の計算（アルファを掛けた形で補間する）をそのまま移した（`resize::pillow_resize`）。プレビュー用の縮小だけは、速さを優先して fast_image_resize を使う（旧版も `reducing_gap` で近似していた）。
+- **速さ**: 同じ 6000×4000・同じ重い設定（フレーム・形なし）で、旧版 約 2.0 秒 → 約 0.78 秒。12MP では約 0.39 秒。ぼかしは転置をやめ、真ん中の画素は端の判定なしで計算し、縦は横長の帯に分けて並列にした（結果は Pillow と同じまま）。
+- 試作の報告の「旧版 0.4 秒」は 12MP の値だった（`docs/prototype.md` に訂正を書いた）。
+- 内訳を測るときは `cargo run --release -p imageeditorrt-core --example profile`。

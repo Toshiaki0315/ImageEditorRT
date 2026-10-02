@@ -322,12 +322,10 @@ pub fn transform_rect(rect: CropRect, (width, height): (u32, u32), op: OrientOp)
     }
 }
 
-/// 画像を Lanczos で指定サイズにリサイズする（大きさが同じなら複製を返す）。
-pub fn resize_to(image: &RgbaImage, (width, height): (u32, u32)) -> RgbaImage {
-    if image.dimensions() == (width, height) {
-        return image.clone();
-    }
-    resize::resize(image, width, height)
+/// 画像を Lanczos で指定サイズにリサイズする（Pillow の Image.resize(LANCZOS) と画素まで同じ。
+/// 大きさが同じなら複製を返す）。
+pub fn resize_to(image: &RgbaImage, size: (u32, u32)) -> RgbaImage {
+    resize::pillow_resize(image, size, resize::PillowFilter::Lanczos)
 }
 
 /// numerator / denominator を四捨五入し、最小 1 にする（浮動小数の誤差を避けて整数で計算）。

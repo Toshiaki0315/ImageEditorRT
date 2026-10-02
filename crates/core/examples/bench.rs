@@ -49,6 +49,10 @@ fn main() {
     let (full_best, _, _) =
         measure(3, || imageeditorrt_core::pipeline::apply_edits(&original, &heavy).unwrap());
     println!("原寸処理 6000x4000（重い設定）: {}", ms(full_best));
+    let original12 = synthetic_photo(4000, 3000);
+    let (full12, _, _) =
+        measure(3, || imageeditorrt_core::pipeline::apply_edits(&original12, &heavy).unwrap());
+    println!("原寸処理 4000x3000 / 12MP（重い設定）: {}", ms(full12));
 
     // Rust → WebView への受け渡しのやり方の候補ごとの、変換の時間
     let raw_bytes = rendered.as_raw().len();

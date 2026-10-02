@@ -1,5 +1,9 @@
 //! ImageEditorRT の画像処理・EXIF。Tauri（画面）には依存しない。
 
+/// 画素ごとの処理を並列にするとき、1 つの仕事にまとめる画素の数の下限
+/// （細かく分けすぎると、分ける手間のほうが大きくなる）。
+pub const PIXELS_PER_TASK: usize = 4096;
+
 pub mod adjust;
 pub mod blur;
 #[cfg(target_os = "macos")]

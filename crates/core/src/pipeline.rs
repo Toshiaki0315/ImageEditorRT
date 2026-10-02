@@ -147,9 +147,9 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
         transform::fit_size(image.dimensions(), settings.width, settings.height, settings.keep_aspect)?;
     let image = transform::resize_to(&image, size);
 
-    let reference = image.width().min(image.height()) as f32;
-    let image = apply_detail(apply_basic_adjustments(image, settings), settings, reference);
-    let image = apply_diorama_and_filter(image, settings, reference, None);
+    let reference = f64::from(image.width().min(image.height()));
+    let image = apply_detail(apply_basic_adjustments(image, settings), settings, reference, None);
+    let image = apply_diorama_and_filter(image, settings, reference as f32, None);
     let mut image = image;
     adjust::vignette(&mut image, settings.vignette);
     adjust::aging(&mut image, settings.aging);
@@ -170,9 +170,11 @@ pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, t
     let scaled = scale_settings(settings, factor);
     let mut rect = effective_crop(image.dimensions(), scaled.crop);
     // ディテール・ジオラマの半径は、保存時と同じく実際に切り抜く範囲（なければ全体）の短辺を基準にする
-    let reference = rect.map_or(image.width().min(image.height()) as f32, |r| r.short_side() as f32);
-    let adjusted = apply_detail(apply_basic_adjustments(image, settings), settings, reference);
-    let mut rendered = apply_diorama_and_filter(adjusted, settings, reference, rect);
+    let reference = rect.map_or(f64::from(image.width().min(image.height())), |r| r.short_side() as f64);
+    // シャープの半径の下限は保存時の写真に対するものなので、保存する写真の短辺も渡す
+    let output = saved_photo_short_side(image.dimensions(), settings, factor);
+    let adjusted = apply_detail(apply_basic_adjustments(image, settings), settings, reference, output);
+    let mut rendered = apply_diorama_and_filter(adjusted, settings, reference as f32, rect);
     if trimmed {
         if let Some(r) = rect.take() {
             rendered = transform::crop(&rendered, r);
@@ -238,7 +240,8 @@ pub fn make_preview(original: &RgbaImage, max_side: u32) -> (RgbaImage, f64) {
     }
     let factor = f64::from(max_side) / f64::from(long);
     let size = |v: u32| round_half_even(f64::from(v) * factor).max(1) as u32;
-    (transform::resize_to(original, (size(width), size(height))), factor)
+    // プレビュー用の縮小は速さを優先する（旧版も reducing_gap で近似していた）
+    (crate::resize::resize(original, size(width), size(height)), factor)
 }
 
 fn scale(value: i64, factor: f64) -> i64 {
@@ -274,8 +277,29 @@ fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> Rgb
     image
 }
 
+/// 保存する写真（切り抜き・リサイズ後）の短辺を、プレビュー（回転・反転した後の大きさ）から求める。
+fn saved_photo_short_side(preview_size: (u32, u32), settings: &EditSettings, factor: f64) -> Option<f64> {
+    let original = (
+        round_half_even(f64::from(preview_size.0) / factor) as u32,
+        round_half_even(f64::from(preview_size.1) / factor) as u32,
+    );
+    let mut size = original;
+    if let Some(rect) = effective_crop(original, settings.crop) {
+        size = (rect.width as u32, rect.height as u32);
+    }
+    let (width, height) =
+        transform::fit_size(size, settings.width, settings.height, settings.keep_aspect).ok()?;
+    Some(f64::from(width.min(height)))
+}
+
 /// ディテール（ノイズ除去 → ぼかし → シャープ）。半径は reference（短辺）に比例させる。
-fn apply_detail(mut image: RgbaImage, settings: &EditSettings, reference: f32) -> RgbaImage {
+/// output は保存する写真の短辺（プレビューでシャープの効き方を保存時とそろえる）。
+fn apply_detail(
+    mut image: RgbaImage,
+    settings: &EditSettings,
+    reference: f64,
+    output: Option<f64>,
+) -> RgbaImage {
     if settings.denoise > 0 {
         image = effects::denoise(&image, settings.denoise, reference);
     }
@@ -283,7 +307,7 @@ fn apply_detail(mut image: RgbaImage, settings: &EditSettings, reference: f32) -
         image = effects::blur(&image, settings.blur, reference);
     }
     if settings.sharpen > 0 {
-        image = effects::sharpen(&image, settings.sharpen, reference);
+        image = effects::sharpen(&image, settings.sharpen, reference, output);
     }
     image
 }

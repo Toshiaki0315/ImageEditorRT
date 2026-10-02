@@ -7,6 +7,8 @@
 use image::RgbaImage;
 use rayon::prelude::*;
 
+use crate::PIXELS_PER_TASK;
+
 /// RGB → L の変換（ImageOps.grayscale・convert("L")。ITU-R 601-2 の係数を 16bit の整数にしたもの）。
 pub fn luma(r: u8, g: u8, b: u8) -> u8 {
     ((u32::from(r) * 19595 + u32::from(g) * 38470 + u32::from(b) * 7471 + 0x8000) >> 16) as u8
@@ -33,7 +35,7 @@ pub fn screen(a: u8, b: u8) -> u8 {
 
 /// RGB の画素ごとに処理する（アルファはそのまま）。
 pub fn map_pixels(image: &mut RgbaImage, f: impl Fn(&mut [u8]) + Sync) {
-    image.as_mut().par_chunks_exact_mut(4).for_each(|p| f(&mut p[..3]));
+    image.as_mut().par_chunks_exact_mut(4).with_min_len(PIXELS_PER_TASK).for_each(|p| f(&mut p[..3]));
 }
 
 /// ImageEnhance.Color: L に変換した灰色と、元の色を factor で混ぜる。
@@ -77,7 +79,12 @@ fn luma_mean(image: &RgbaImage) -> u8 {
     if pixels == 0 {
         return 0;
     }
-    let sum: u64 = image.as_raw().par_chunks_exact(4).map(|p| u64::from(luma(p[0], p[1], p[2]))).sum();
+    let sum: u64 = image
+        .as_raw()
+        .par_chunks_exact(4)
+        .with_min_len(PIXELS_PER_TASK)
+        .map(|p| u64::from(luma(p[0], p[1], p[2])))
+        .sum();
     (sum as f64 / pixels as f64 + 0.5) as u8
 }
 

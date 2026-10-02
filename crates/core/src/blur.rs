@@ -20,7 +20,7 @@ pub fn gaussian_blur(image: &RgbaImage, sigma: f32) -> RgbaImage {
         blur_columns(&scratch, &mut data, width as usize, height as usize, radius);
     }
     // アルファは元のまま
-    for (out, src) in data.chunks_exact_mut(4).zip(image.as_raw().chunks_exact(4)) {
+    for (out, src) in data.as_chunks_mut::<4>().0.iter_mut().zip(image.as_raw().as_chunks::<4>().0) {
         out[3] = src[3];
     }
     RgbaImage::from_raw(width, height, data).expect("大きさは元と同じ")

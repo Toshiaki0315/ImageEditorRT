@@ -1,10 +1,15 @@
 //! 色の調整（露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化）。
 //!
-//! 計算式は Python 版（core/effects.py）と同じ。チャンネルごとの調整はルックアップテーブル
-//! (LUT) にして、続けてかける分は 1 つの表にまとめてから 1 回でかける。
+//! 計算式・丸め方は旧版（core/effects.py・core/tone.py と、その中で使う Pillow）と同じ。
+//! チャンネルごとの調整はルックアップテーブル (LUT) にして、続けてかける分は 1 つの表に
+//! まとめてから 1 回でかける（整数の表どうしなので、続けてかけた結果と完全に同じ）。
 
 use image::RgbaImage;
 use rayon::prelude::*;
+
+use crate::pyrandom::PyRandom;
+use crate::resize::resize_gray_bilinear;
+use crate::transform::round_half_even;
 
 /// 0〜255 → 0〜255 の表（R・G・B それぞれ）。
 pub type Lut = [[u8; 256]; 3];
@@ -20,6 +25,10 @@ const AGING_MAX_BLACK: f64 = 45.0;
 const AGING_MAX_WHITE_DROP: f64 = 25.0;
 const AGING_MAX_TINT: [f64; 3] = [1.08, 1.0, 0.72];
 const AGING_MAX_GRAIN: f64 = 14.0;
+/// 粒子の模様を毎回同じにするための乱数の種（旧版と同じ）。
+const AGING_GRAIN_SEED: u64 = 19_700_101;
+/// Pillow の Image.radial_gradient の大きさ（中心からの距離 × √2 の濃淡、四隅で 255）。
+const GRADIENT_SIZE: u32 = 256;
 
 pub fn identity_lut() -> Lut {
     let row: [u8; 256] = std::array::from_fn(|v| v as u8);
@@ -100,61 +109,81 @@ pub fn apply_lut(image: &mut RgbaImage, lut: &Lut) {
     });
 }
 
-/// 彩度を factor 倍にする（Pillow の ImageEnhance.Color と同じく、灰色との混ぜ合わせ）。
+/// 彩度を factor 倍にする（Pillow の ImageEnhance.Color と同じ: L に変換した灰色と、元の色を混ぜる）。
 pub fn enhance_color(image: &mut RgbaImage, factor: f64) {
-    if (factor - 1.0).abs() < f64::EPSILON {
+    if factor == 1.0 {
         return;
     }
-    let f = factor as f32;
+    // Pillow の Image.blend は float（32bit）で計算し、整数に切り捨てる。Apple Silicon の Pillow は
+    // 掛け算と足し算を 1 回でまとめて計算する（FMA）ので、mul_add で同じ丸め方にする
+    let alpha = factor as f32;
+    let in_range = (0.0..=1.0).contains(&alpha);
     image.as_mut().par_chunks_exact_mut(4).for_each(|p| {
-        // Pillow の L 変換（ITU-R 601、整数）
-        let gray = (u32::from(p[0]) * 299 + u32::from(p[1]) * 587 + u32::from(p[2]) * 114) / 1000;
-        let g = gray as f32;
+        let gray = i32::from(luma(p[0], p[1], p[2]));
         for v in &mut p[..3] {
-            *v = (g + (f32::from(*v) - g) * f).round().clamp(0.0, 255.0) as u8;
+            let value = alpha.mul_add((i32::from(*v) - gray) as f32, gray as f32);
+            *v = if in_range { value as u8 } else { value.clamp(0.0, 255.0) as u8 };
         }
     });
 }
 
-/// 彩度 -100〜+100（0 で変化なし）。
-pub fn saturation(image: &mut RgbaImage, amount: i32) {
-    enhance_color(image, 1.0 + f64::from(amount) / 100.0);
+/// Pillow の RGB → L の変換（ITU-R 601-2 の係数を 16bit の整数にしたもの）。
+fn luma(r: u8, g: u8, b: u8) -> u8 {
+    ((u32::from(r) * 19595 + u32::from(g) * 38470 + u32::from(b) * 7471 + 0x8000) >> 16) as u8
 }
 
-/// 周辺減光 0〜100。area（左, 上, 幅, 高さ）の中心を基準に、四隅に向かって暗くする。
-pub fn vignette(image: &mut RgbaImage, amount: u32, area: Option<[u32; 4]>) {
+/// 彩度 -100〜+100（-100 で白黒、0 で変化なし、+100 で鮮やかさ 2 倍）。
+pub fn saturation(image: &mut RgbaImage, amount: i32) {
+    if amount != 0 {
+        enhance_color(image, 1.0 + f64::from(amount) / 100.0);
+    }
+}
+
+/// Pillow の ImageChops.multiply と同じ、a × b / 255 の切り捨て。
+fn mul_div_255(a: u8, b: u8) -> u8 {
+    (u32::from(a) * u32::from(b) / 255) as u8
+}
+
+/// 周辺減光 0〜100。画像の中心を基準に、縦横比に合わせた楕円状に四隅へ向かって暗くする。
+///
+/// 旧版と同じく、中心からの距離の濃淡（Pillow の radial_gradient、256×256）を画像の大きさに
+/// バイリニアで引き伸ばし、明るさの倍率の表をかけて、画素に掛ける。
+pub fn vignette(image: &mut RgbaImage, amount: u32) {
     if amount == 0 {
         return;
     }
     let (width, height) = image.dimensions();
-    let [left, top, w, h] = area.unwrap_or([0, 0, width, height]);
+    let gradient: Vec<u8> = (0..GRADIENT_SIZE * GRADIENT_SIZE)
+        .map(|i| {
+            let (x, y) = (f64::from(i % GRADIENT_SIZE) - 128.0, f64::from(i / GRADIENT_SIZE) - 128.0);
+            ((x * x + y * y) * 2.0).sqrt().min(255.0) as u8
+        })
+        .collect();
+    let distance = resize_gray_bilinear(&gradient, (GRADIENT_SIZE, GRADIENT_SIZE), (width, height));
     let strength = VIGNETTE_MAX_DARKEN * f64::from(amount) / 100.0;
     let corner = std::f64::consts::SQRT_2;
-    // 中心からの距離の 2 乗は x と y の和なので、横の分を先に表にしておく
-    let dx2: Vec<f64> = (0..width)
-        .map(|x| ((f64::from(x) + 0.5 - f64::from(left)) / f64::from(w) * 2.0 - 1.0).powi(2))
-        .collect();
-    let stride = width as usize * 4;
-    image.as_mut().par_chunks_exact_mut(stride).enumerate().for_each(|(y, row)| {
-        let dy = (y as f64 + 0.5 - f64::from(top)) / f64::from(h) * 2.0 - 1.0;
-        for (x, p) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
-            let distance = (dx2[x] + dy * dy).sqrt();
-            let t = ((distance - VIGNETTE_START) / (corner - VIGNETTE_START)).clamp(0.0, 1.0);
-            let k = 1.0 - strength * smoothstep(t);
-            for v in &mut p[..3] {
-                *v = (f64::from(*v) * k).round() as u8;
-            }
+    // radial_gradient は四隅が 255 なので、上下左右の端（距離 1）は 255 / √2
+    let edge = 255.0 / corner;
+    let multiplier: [u8; 256] = std::array::from_fn(|v| {
+        let t = ((v as f64 / edge - VIGNETTE_START) / (corner - VIGNETTE_START)).clamp(0.0, 1.0);
+        round_half_even(255.0 * (1.0 - strength * smoothstep(t))) as u8
+    });
+    image.as_mut().par_chunks_exact_mut(4).zip(distance.par_iter()).for_each(|(p, &d)| {
+        let m = multiplier[d as usize];
+        for v in &mut p[..3] {
+            *v = mul_div_255(*v, m);
         }
     });
 }
 
-/// 経年劣化 0〜100（退色・フェード・黄ばみ・粒子）。粒子の模様は固定。
+/// 経年劣化 0〜100（退色・フェード・黄ばみと青の抜け・粒子）。粒子の模様は固定で、同じ入力なら毎回同じ。
 pub fn aging(image: &mut RgbaImage, amount: u32) {
     if amount == 0 {
         return;
     }
     let t = f64::from(amount) / 100.0;
     enhance_color(image, 1.0 - AGING_MAX_DESATURATE * t);
+    // フェードと色かぶりを 1 回の表でかける
     let black = AGING_MAX_BLACK * t;
     let white = 255.0 - AGING_MAX_WHITE_DROP * t;
     let lut: Lut = std::array::from_fn(|c| {
@@ -162,30 +191,34 @@ pub fn aging(image: &mut RgbaImage, amount: u32) {
         std::array::from_fn(|v| clip((black + v as f64 * (white - black) / 255.0) * tint))
     });
     apply_lut(image, &lut);
-    let grain = (AGING_MAX_GRAIN * t).round() as i32;
+    let grain = round_half_even(AGING_MAX_GRAIN * t) as i32;
     if grain > 0 {
-        add_grain(image, grain, 19_700_101);
+        add_grain(image, grain, AGING_GRAIN_SEED);
     }
 }
 
-/// モノクロの粒子を重ねる（明るさは最大で ±strength。同じ seed と大きさなら同じ模様）。
+/// モノクロの粒子を重ねる（明るさは最大で ±strength）。旧版と同じく、同じ seed と大きさなら同じ模様。
+///
+/// Python の random.Random(seed).randbytes で一様な乱数の画像を 2 枚作って平均し（中央に寄った
+/// 自然な粒子にする）、128 より明るい分を足し、暗い分を引く。
 pub fn add_grain(image: &mut RgbaImage, strength: i32, seed: u64) {
-    let stride = image.width() as usize * 4;
-    image.as_mut().par_chunks_exact_mut(stride).enumerate().for_each(|(y, row)| {
-        let mut state = seed ^ (y as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03;
-        for p in row.as_chunks_mut::<4>().0 {
-            // xorshift で 2 つの一様乱数を作り、平均して中央に寄せる
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            let a = (state & 0xFF) as i32;
-            let b = ((state >> 8) & 0xFF) as i32;
-            let noise = ((a + b) / 2 - 128) * strength / 128;
+    let count = (image.width() * image.height()) as usize;
+    let mut random = PyRandom::new(seed);
+    let first = random.bytes(count);
+    let second = random.bytes(count);
+    let scale = f64::from(strength) / 128.0;
+    let lift: [u8; 256] = std::array::from_fn(|v| ((v as f64 - 128.0).max(0.0) * scale + 0.5) as u8);
+    let drop: [u8; 256] = std::array::from_fn(|v| ((128.0 - v as f64).max(0.0) * scale + 0.5) as u8);
+    image.as_mut().par_chunks_exact_mut(4).zip(first.par_iter().zip(second.par_iter())).for_each(
+        |(p, (&a, &b))| {
+            // Pillow の Image.blend(a, b, 0.5) と同じく切り捨て
+            let noise = 0.5f32.mul_add((i32::from(b) - i32::from(a)) as f32, f32::from(a)) as usize;
+            let (up, down) = (lift[noise], drop[noise]);
             for v in &mut p[..3] {
-                *v = (i32::from(*v) + noise).clamp(0, 255) as u8;
+                *v = v.saturating_add(up).saturating_sub(down);
             }
-        }
-    });
+        },
+    );
 }
 
 pub fn smoothstep(x: f64) -> f64 {
@@ -274,7 +307,7 @@ mod tests {
     #[test]
     fn vignette_darkens_corners_only() {
         let mut image = RgbaImage::from_pixel(101, 101, Rgba([200, 200, 200, 255]));
-        vignette(&mut image, 100, None);
+        vignette(&mut image, 100);
         assert_eq!(image.get_pixel(50, 50)[0], 200);
         assert!(image.get_pixel(0, 0)[0] < 60);
     }

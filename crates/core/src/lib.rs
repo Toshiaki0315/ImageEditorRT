@@ -10,6 +10,7 @@ pub mod exif_info;
 pub mod formats;
 pub mod makernote;
 pub mod pipeline;
+pub mod pyrandom;
 pub mod resize;
 pub mod sample;
 pub mod save;

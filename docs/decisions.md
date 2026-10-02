@@ -24,3 +24,11 @@
 - **EXIF**: 試作の `ExifBlock` で整え、MakerNote を元の位置に置く。JPEG は APP1、PNG は eXIf のチャンク、TIFF は IFD0 に書く。
 - **旧版との違い**: 旧版は、元の EXIF の形を `ExifBlock` で読めないときに Pillow で整えて書いていた。作り直しでは、そのときは EXIF なしで保存する（ほとんど起きない）。
 - **保存の設定の保存先**: WebView の localStorage（旧版は QSettings）。
+
+## 色の調整（#8）
+
+- **旧版と画素まで同じにする**: 露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化は、旧版（Pillow）と同じ計算・丸め方にし、旧版で作った画像と画素まで一致することをテストで確かめる（`tests/adjust_matches_python.rs`）。
+  - 彩度（`ImageEnhance.Color`）: Pillow の RGB → L の整数の係数、`Image.blend` の float（32bit）の計算と切り捨て。Apple Silicon の Pillow は掛け算と足し算を 1 回でまとめる（FMA）ので `mul_add` を使う
+  - 周辺減光: Pillow の `radial_gradient`（256×256）を Pillow と同じバイリニアの計算（`resize::resize_gray_bilinear`）で引き伸ばし、`ImageChops.multiply`（切り捨て）で掛ける
+  - 経年劣化の粒子: Python の `random.Random(seed).randbytes` と同じ乱数（メルセンヌ・ツイスタ、`pyrandom.rs`）
+- 露出〜色温度は、旧版は 1 つずつかけていたが、作り直しでは 1 つの表にまとめてから 1 回でかける（整数の表どうしなので結果は同じ）。

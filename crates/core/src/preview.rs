@@ -208,7 +208,7 @@ fn diorama(image: &RgbaImage, settings: &Settings, reference: f32) -> RgbaImage 
             let outside = ((u - center).abs() - half).max(0.0);
             let blur = adjust::smoothstep((outside / DIORAMA_TRANSITION).min(1.0));
             let w = (blur * 256.0).round() as u16;
-            for (p, s) in row.chunks_exact_mut(4).zip(soft.chunks_exact(4)) {
+            for (p, s) in row.as_chunks_mut::<4>().0.iter_mut().zip(soft.as_chunks::<4>().0) {
                 for c in 0..3 {
                     p[c] = ((u16::from(s[c]) * w + u16::from(p[c]) * (256 - w)) >> 8) as u8;
                 }

@@ -18,6 +18,7 @@ ImageEditorRT は、Python + PyQt6 版の [ImageEditor](https://github.com/Toshi
 - EXIF: kamadak-exif で読み、MakerNote（ペンタックス・リコー・Samsung）は `makernote.rs`、保存は `tiff.rs` の `ExifBlock`
 - テスト: `cargo test`（Rust）、`tsc`（TypeScript の型チェック）
 - Lint/Format: `cargo fmt`（設定は `rustfmt.toml`）・`cargo clippy`
+- Rust のバージョン: `rust-toolchain.toml` で固定する（手元と CI で clippy の指摘をそろえるため）。上げるときは CI の `dtolnay/rust-toolchain@<版>` も同じにする
 - 構成管理: GitHub（Issue → ブランチ → PR）
 
 ## コマンド

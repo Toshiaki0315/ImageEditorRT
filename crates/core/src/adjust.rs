@@ -137,7 +137,7 @@ pub fn vignette(image: &mut RgbaImage, amount: u32, area: Option<[u32; 4]>) {
     let stride = width as usize * 4;
     image.as_mut().par_chunks_exact_mut(stride).enumerate().for_each(|(y, row)| {
         let dy = (y as f64 + 0.5 - f64::from(top)) / f64::from(h) * 2.0 - 1.0;
-        for (x, p) in row.chunks_exact_mut(4).enumerate() {
+        for (x, p) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
             let distance = (dx2[x] + dy * dy).sqrt();
             let t = ((distance - VIGNETTE_START) / (corner - VIGNETTE_START)).clamp(0.0, 1.0);
             let k = 1.0 - strength * smoothstep(t);
@@ -173,7 +173,7 @@ pub fn add_grain(image: &mut RgbaImage, strength: i32, seed: u64) {
     let stride = image.width() as usize * 4;
     image.as_mut().par_chunks_exact_mut(stride).enumerate().for_each(|(y, row)| {
         let mut state = seed ^ (y as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03;
-        for p in row.chunks_exact_mut(4) {
+        for p in row.as_chunks_mut::<4>().0 {
             // xorshift で 2 つの一様乱数を作り、平均して中央に寄せる
             state ^= state << 13;
             state ^= state >> 7;

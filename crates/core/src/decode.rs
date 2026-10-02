@@ -121,7 +121,7 @@ fn render_rgba(image: &CGImage) -> Option<RgbaImage> {
 
 /// 乗算済みアルファ（CoreGraphics の描き方）を、ふつうのアルファに戻す。
 fn unpremultiply(pixels: &mut [u8]) {
-    for pixel in pixels.chunks_exact_mut(4) {
+    for pixel in pixels.as_chunks_mut::<4>().0 {
         let alpha = pixel[3];
         if alpha == 255 || alpha == 0 {
             continue;

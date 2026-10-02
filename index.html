@@ -26,13 +26,21 @@
           <p class="todo">回転・反転・トリミングは #12、フレーム・形は #13 で作ります</p>
         </div>
         <div id="page-output" class="page" role="tabpanel" hidden>
-          <p class="todo">サイズ変更は #14、保存の設定は #7 で作ります</p>
+          <p class="todo">サイズ変更は #14 で作ります</p>
+          <h2>保存の設定</h2>
+          <label class="row">
+            JPEG 品質
+            <input id="jpeg-quality" type="range" min="1" max="100" step="1" title="ダブルクリックで 90 に戻す" />
+            <output id="jpeg-quality-value"></output>
+          </label>
+          <label class="check"><input id="keep-exif" type="checkbox" /> 撮影情報 (EXIF) を残す</label>
+          <label class="check"><input id="keep-gps" type="checkbox" /> 位置情報 (GPS) も残す</label>
         </div>
         <div id="page-diorama" class="page" role="tabpanel" hidden></div>
         <div id="page-exif" class="page exif" role="tabpanel" hidden></div>
         <div class="actions">
           <button type="button" id="before" disabled title="#19 で作ります">加工前</button>
-          <button type="button" id="save" disabled title="#7 で作ります">保存</button>
+          <button type="button" id="save" disabled>保存</button>
           <button type="button" id="reset" disabled title="#20 で作ります">リセット</button>
         </div>
       </aside>

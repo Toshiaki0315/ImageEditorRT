@@ -17,6 +17,12 @@ pub const TAG_PIXEL_X: u16 = 0xA002;
 pub const TAG_PIXEL_Y: u16 = 0xA003;
 /// 画像データなどの位置を指すタグ。保存する画像のデータとは合わないので書き写さない
 const LOCATION_TAGS: [u16; 7] = [0x0111, 0x0117, 0x0144, 0x0145, 0x014A, 0x0201, 0x0202];
+/// TIFF の画像の構造を表すタグ（TIFF のファイルから読んだ EXIF を、ほかの画像に書くときは外す）。
+const STRUCTURE_TAGS: [u16; 21] = [
+    0x00FE, 0x00FF, 0x0100, 0x0101, 0x0102, 0x0103, 0x0106, 0x010A, 0x0111, 0x0115, 0x0116, 0x0117, 0x011C,
+    0x013D, 0x0142, 0x0143, 0x0144, 0x0145, 0x0152, 0x0153, 0x0201,
+];
+const STRIP_OFFSETS: u16 = 0x0111;
 const SHORT: u16 = 3;
 const LONG: u16 = 4;
 const UNDEFINED: u16 = 7;
@@ -202,6 +208,59 @@ impl ExifBlock {
             block.gps = read_ifd(data, pointer.pointer(order), order).map(|e| values(data, &e, order));
         }
         Some(block)
+    }
+
+    /// 中身のない EXIF（TIFF の画像を EXIF なしで書き出すときに使う）。
+    pub fn empty(order: Order) -> Self {
+        ExifBlock { order, ifd0: Ifd::new(), exif: Ifd::new(), gps: None, interop: None, maker_note: None }
+    }
+
+    /// TIFF の画像の構造を表すタグ（幅・高さ・圧縮・画素の並びなど）を IFD0 から外す。
+    pub fn remove_image_structure(&mut self) {
+        self.ifd0.retain(|tag, _| !STRUCTURE_TAGS.contains(tag));
+    }
+
+    /// 値を設定する（SHORT・LONG の値の並び）。
+    fn set_values(&mut self, tag: u16, kind: u16, values: &[u32]) {
+        let order = self.order;
+        let data = values
+            .iter()
+            .flat_map(|&v| {
+                if kind == SHORT {
+                    order.put_u16(v as u16).to_vec()
+                } else {
+                    order.put_u32(v).to_vec()
+                }
+            })
+            .collect();
+        self.ifd0.insert(tag, Value { kind, count: values.len() as u32, data });
+    }
+
+    /// 非圧縮の TIFF の画像として書き出す（IFD0 にこの EXIF の項目を入れる。MakerNote は書かない）。
+    /// channels は 3（RGB）か 4（RGBA、アルファは「関連付けないアルファ」）。
+    pub fn to_tiff_image(&self, width: u32, height: u32, channels: u16, pixels: &[u8]) -> Vec<u8> {
+        let mut block = self.clone();
+        block.remove_image_structure();
+        block.set_values(0x0100, LONG, &[width]);
+        block.set_values(0x0101, LONG, &[height]);
+        block.set_values(0x0102, SHORT, &vec![8; channels as usize]);
+        block.set_values(0x0103, SHORT, &[1]); // 圧縮なし
+        block.set_values(0x0106, SHORT, &[2]); // RGB
+        block.set_values(STRIP_OFFSETS, LONG, &[0]);
+        block.set_values(0x0115, SHORT, &[u32::from(channels)]);
+        block.set_values(0x0116, LONG, &[height]);
+        block.set_values(0x0117, LONG, &[pixels.len() as u32]);
+        block.set_values(0x011C, SHORT, &[1]); // 画素ごとに並べる
+        if channels == 4 {
+            block.set_values(0x0152, SHORT, &[2]); // 関連付けないアルファ
+        }
+        // 画素は IFD の後ろに置く（位置を決めてから書き直しても、大きさは変わらない）
+        let header = block.to_bytes(false).len() - EXIF_HEADER.len();
+        block.set_values(STRIP_OFFSETS, LONG, &[even(header) as u32]);
+        let mut out = block.to_bytes(false).split_off(EXIF_HEADER.len());
+        out.resize(even(header), 0);
+        out.extend_from_slice(pixels);
+        out
     }
 
     pub fn set_short(&mut self, in_exif: bool, tag: u16, value: u16) {

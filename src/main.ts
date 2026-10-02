@@ -3,33 +3,44 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { message, open } from "@tauri-apps/plugin-dialog";
-import { bench } from "./bench";
+import { message, open, save } from "@tauri-apps/plugin-dialog";
+import { bench, benchSave } from "./bench";
 import { showExif } from "./exif";
 import { Panel } from "./panel";
 import { Preview } from "./preview";
+import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
 import { defaultSettings, type EditSettings, type OpenInfo } from "./types";
 
 const NO_IMAGE_MESSAGE = "画像が読み込まれていません";
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
 const LOAD_ERROR_TITLE = "画像を読み込めません";
+const SAVE_ERROR_TITLE = "保存できません";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const stage = $<HTMLElement>("stage");
 const placeholder = $<HTMLElement>("placeholder");
 const status = $<HTMLElement>("status");
+const saveButton = $<HTMLButtonElement>("save");
 
 const settings: EditSettings = defaultSettings();
 let notes: string[] = [];
 let loaded: OpenInfo | null = null;
 let opening = false;
+let saving = false;
 let extensions: string[] = [];
+let savableExtensions: string[] = [];
 let formatsText = "";
 
 const preview = new Preview(stage, $<HTMLCanvasElement>("canvas"), (error) => showError("プレビューを更新できません", error));
 const tabs = new Tabs(document.querySelector(".side")!);
 const panel = new Panel($("page-adjust"), $("page-diorama"), settings, settingsChanged);
+const saveOptions = new SaveOptionsPanel(
+  $<HTMLInputElement>("jpeg-quality"),
+  $<HTMLOutputElement>("jpeg-quality-value"),
+  $<HTMLInputElement>("keep-exif"),
+  $<HTMLInputElement>("keep-gps"),
+);
 
 /** 設定を変えたとき: プレビューとステータスバー（出力の大きさ）を更新する。 */
 function settingsChanged() {
@@ -52,8 +63,8 @@ async function showError(title: string, error: unknown, withFormats = false) {
   await message(text, { title, kind: "warning" });
 }
 
-/** ステータスバー: ファイル名・原寸・出力の大きさ（と、読み込みのときのお知らせ）。 */
-async function updateStatus() {
+/** ステータスバー: ファイル名・原寸・出力の大きさ（と、読み込みのときのお知らせ・extra）。 */
+async function updateStatus(extra?: string) {
   if (!loaded) {
     status.textContent = notes.length ? notes.join("／") : NO_IMAGE_MESSAGE;
     return;
@@ -66,13 +77,14 @@ async function updateStatus() {
     // 大きさの指定が範囲外のときは「—」
   }
   let text = `${loaded.name} ｜ 原寸 ${loaded.width}×${loaded.height} px ｜ ${output}`;
-  if (notes.length) text += `（${notes.join("／")}）`;
+  const all = extra ? [...notes, extra] : notes;
+  if (all.length) text += `（${all.join("／")}）`;
   status.textContent = text;
 }
 
 /** 画像を開く。読めなければダイアログで知らせ、それまでの画像はそのまま残す。 */
 async function openPath(path: string, openNotes: string[] = []) {
-  if (opening) return;
+  if (opening || saving) return;
   opening = true;
   try {
     const info = await invoke<OpenInfo>("open_path", { path });
@@ -92,6 +104,7 @@ function openPaths(paths: string[]) {
 }
 
 async function openDialog() {
+  if (saving) return;
   const path = await open({
     title: "画像を開く",
     multiple: false,
@@ -101,8 +114,61 @@ async function openDialog() {
   if (typeof path === "string") await openPath(path);
 }
 
+type SaveFailure = { kind: "sameFile" | "extension" | "other"; message: string };
+
+/** 保存: ダイアログで保存先を選び、原寸で処理して書き出す（処理は Rust の別のスレッド）。 */
+async function saveDialog() {
+  if (!loaded || saving) return;
+  const defaultPath = (await invoke<string | null>("default_save_path")) ?? `${loaded.name}_edited.png`;
+  // 元の画像と同じファイルが選ばれたら、知らせてダイアログを開き直す（旧版 FR-IO-11）
+  for (;;) {
+    const path = await save({
+      title: "保存",
+      defaultPath,
+      filters: [{ name: "画像ファイル", extensions: savableExtensions }],
+    });
+    if (!path) return;
+    const result = await saveTo(path);
+    if (result !== "sameFile") return;
+  }
+}
+
+/** 保存する。元の画像と同じファイルなら "sameFile" を返す。 */
+async function saveTo(path: string): Promise<"done" | "sameFile" | "failed"> {
+  const name = path.split("/").pop() ?? path;
+  setSaving(true);
+  void updateStatus(`保存中… ${name}`);
+  try {
+    await invoke<string>("save_image", { path, settings, options: saveOptions.value() });
+    void updateStatus(`保存しました: ${name}`);
+    return "done";
+  } catch (error) {
+    void updateStatus();
+    const failure = error as SaveFailure;
+    if (failure?.kind === "sameFile") {
+      await showError(SAVE_ERROR_TITLE, failure.message);
+      return "sameFile";
+    }
+    if (failure?.kind === "extension") {
+      await showError(SAVE_ERROR_TITLE, failure.message, true);
+    } else {
+      await showError(SAVE_ERROR_TITLE, `${name}\n(${failure?.message ?? error})`);
+    }
+    return "failed";
+  } finally {
+    setSaving(false);
+  }
+}
+
+/** 保存中は保存・開く・ドロップを受け付けない（画面は固まらない）。 */
+function setSaving(value: boolean) {
+  saving = value;
+  saveButton.disabled = saving || !loaded;
+}
+
 function showLoaded(info: OpenInfo, openNotes: string[]) {
   loaded = info;
+  saveButton.disabled = false;
   Object.assign(settings, defaultSettings());
   panel.show();
   placeholder.hidden = true;
@@ -122,7 +188,7 @@ function setupDrop() {
     if (payload.type === "enter") {
       accepted = payload.paths.length > 0 && isSupported(payload.paths[0]);
     } else if (payload.type === "drop") {
-      if (accepted) openPaths(payload.paths);
+      if (accepted && !saving) openPaths(payload.paths);
       accepted = false;
     } else if (payload.type === "leave") {
       accepted = false;
@@ -132,20 +198,24 @@ function setupDrop() {
 }
 
 async function setup() {
-  [extensions, formatsText] = await invoke<[string[], string]>("supported_formats");
+  [extensions, savableExtensions, formatsText] = await invoke<[string[], string[], string]>("supported_formats");
+  saveButton.addEventListener("click", () => void saveDialog());
   tabs.setEnabled("exif", false);
   setupDrop();
   await listen<string>("menu", (event) => {
     if (event.payload === "open") void openDialog();
+    if (event.payload === "save") void saveDialog();
   });
-  await listen<string[]>("open-paths", (event) => openPaths(event.payload));
+  await listen<string[]>("open-paths", (event) => {
+    if (!saving) openPaths(event.payload);
+  });
 
   // IMAGEEDITORRT_BENCH を付けて起動したときは、計測して結果を出力して終わる
   if (await invoke<boolean>("bench_mode")) {
     try {
       showLoaded(await invoke<OpenInfo>("open_sample"), []);
       const result = await bench(preview, `${loaded!.previewWidth}×${loaded!.previewHeight}`);
-      await invoke("report", { text: result });
+      await invoke("report", { text: `${result}\n${await benchSave(preview)}` });
     } catch (error) {
       await invoke("report", { text: `計測に失敗しました: ${error}` });
     }

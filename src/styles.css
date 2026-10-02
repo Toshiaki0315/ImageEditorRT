@@ -176,6 +176,17 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 6px 0;
+}
+
+.check:has(input:disabled) {
+  color: var(--muted);
+}
+
 .actions {
   display: flex;
   gap: 8px;

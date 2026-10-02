@@ -49,7 +49,8 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     effects.rs            # ぼかしを使う加工（ディテール・ジオラマ・HDR 風）
     sample.rs             # 計測用の画像
     text.rs               # 文字・透かし（ヒラギノなどを ab_glyph で描く）
-    encode.rs             # JPEG への書き出し
+    encode.rs             # JPEG への書き出し（プレビューの計測用）
+    save.rs               # 保存（形式・名前の決め方・元の画像への上書きの防止・EXIF を残す）
     exif_info.rs          # EXIF・GPS・MakerNote を表示用に読む
     makernote.rs          # kamadak-exif が読まない MakerNote を読む
     tiff.rs               # EXIF の IFD の読み書き（保存時に MakerNote を元の位置に置き直す）
@@ -64,6 +65,7 @@ src/                      # 画面（TypeScript）
   main.ts                 # 起動・開く・ドロップ・ステータスバー
   preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
   panel.ts / tabs.ts / exif.ts   # 設定パネルのスライダー・タブ・EXIF の一覧
+  saveOptions.ts          # 「出力」タブの保存の設定（JPEG 品質・EXIF・GPS。localStorage に残す）
   types.ts                # Rust とやりとりする型
   styles.css
 index.html

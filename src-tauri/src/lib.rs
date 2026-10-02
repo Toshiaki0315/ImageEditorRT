@@ -5,15 +5,16 @@ mod menu;
 mod open;
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use image::RgbaImage;
 use imageeditorrt_core::decode::{self, DecodeError};
-use imageeditorrt_core::exif_info::{read_exif_info, ExifInfo};
+use imageeditorrt_core::exif_info::{raw_exif, read_exif_info, ExifInfo};
 use imageeditorrt_core::formats::{self, Format};
 use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
 use imageeditorrt_core::sample;
+use imageeditorrt_core::save::{self, SaveError, SaveOptions, SAME_FILE_MESSAGE};
 use serde::Serialize;
 use tauri::ipc::Response;
 use tauri::{AppHandle, Manager, State, WebviewWindow};
@@ -25,12 +26,24 @@ const BENCH_ENV: &str = "IMAGEEDITORRT_BENCH";
 /// ウィンドウのタイトル（画像を開くと「ファイル名 — ImageEditorRT」）。
 const APP_NAME: &str = "ImageEditorRT";
 
-/// 読み込んだ原本（不変）と、それを縮めたプレビュー用の画像・縮小率。
+/// 読み込んだ原本（不変）と、それを縮めたプレビュー用の画像・縮小率、元のファイルの情報。
 #[derive(Default)]
 struct Loaded {
-    original: Option<RgbaImage>,
+    /// 保存のときは別のスレッドで使うので、複製せずに共有する
+    original: Option<Arc<RgbaImage>>,
     preview: Option<RgbaImage>,
     factor: f64,
+    source: Source,
+}
+
+/// 元のファイル（保存の名前・元の画像への上書きの防止・EXIF を残すのに使う）。
+#[derive(Clone, Default)]
+struct Source {
+    /// 元のファイルのパス（計測用の画像などファイルがなければ None）
+    path: Option<PathBuf>,
+    format: Option<Format>,
+    /// 元の EXIF（TIFF の部分）
+    exif: Option<Vec<u8>>,
 }
 
 #[derive(Default)]
@@ -73,6 +86,7 @@ fn store(
     decoded: decode::Decoded,
     decode_ms: f64,
     exif: ExifInfo,
+    source: Source,
 ) -> Result<OpenInfo, String> {
     let start = Instant::now();
     let original = decoded.image;
@@ -92,7 +106,7 @@ fn store(
     };
     let _ = window.set_title(&format!("{} — {APP_NAME}", info.name));
     let mut loaded = state.0.lock().map_err(|e| e.to_string())?;
-    *loaded = Loaded { original: Some(original), preview: Some(small), factor };
+    *loaded = Loaded { original: Some(Arc::new(original)), preview: Some(small), factor, source };
     Ok(info)
 }
 
@@ -118,7 +132,8 @@ async fn open_path(
     let decode_ms = elapsed_ms(start);
     // EXIF が壊れていても画像は開く（EXIF なしとして扱う）
     let exif = read_exif_info(&bytes);
-    store(&state, &window, name, decoded, decode_ms, exif)
+    let source = Source { format: Some(decoded.format), exif: raw_exif(&bytes), path: Some(path) };
+    store(&state, &window, name, decoded, decode_ms, exif, source)
 }
 
 /// 計測用の画像（6000×4000）を作って読み込んだことにする。
@@ -127,13 +142,14 @@ async fn open_sample(state: State<'_, AppState>, window: WebviewWindow) -> Resul
     let start = Instant::now();
     let image = sample::synthetic_photo(SAMPLE_SIZE.0, SAMPLE_SIZE.1);
     let decoded = decode::Decoded { image, format: Format::Png, frame_count: 1 };
-    store(&state, &window, "計測用の画像".into(), decoded, elapsed_ms(start), ExifInfo::default())
+    let (name, exif) = ("計測用の画像".into(), ExifInfo::default());
+    store(&state, &window, name, decoded, elapsed_ms(start), exif, Source::default())
 }
 
-/// 読み込める拡張子（ファイルを選ぶダイアログ・ドロップの判定に使う）と、その説明。
+/// 読み込める拡張子（ファイルを選ぶダイアログ・ドロップの判定に使う）・保存できる拡張子・対応形式の説明。
 #[tauri::command]
-fn supported_formats() -> (Vec<&'static str>, &'static str) {
-    (formats::SUPPORTED_EXTENSIONS.to_vec(), formats::FORMATS_TEXT)
+fn supported_formats() -> (Vec<&'static str>, Vec<&'static str>, &'static str) {
+    (formats::SUPPORTED_EXTENSIONS.to_vec(), save::SAVABLE_EXTENSIONS.to_vec(), formats::FORMATS_TEXT)
 }
 
 /// プレビューに設定をかけて返す。trimmed なら切り抜いた範囲だけを表示する。
@@ -162,6 +178,81 @@ async fn render_preview(
     Ok(Response::new(body))
 }
 
+/// 保存ダイアログの初期のパス `<元の名前>_edited.<拡張子>`（重ならない名前）。元のファイルがなければ None。
+#[tauri::command]
+fn default_save_path(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    let loaded = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(loaded.source.path.as_deref().map(|p| save::default_save_path(p).to_string_lossy().into_owned()))
+}
+
+/// 保存できなかったとき、画面に返す理由。kind が "sameFile" なら保存ダイアログを開き直す。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveFailure {
+    /// "sameFile"・"extension"・"other"
+    kind: &'static str,
+    message: String,
+}
+
+impl SaveFailure {
+    fn other(message: impl ToString) -> Self {
+        Self { kind: "other", message: message.to_string() }
+    }
+}
+
+/// 保存（原寸の処理）に使うスレッドの組。プレビューの描き直しが待たされないよう、
+/// プレビュー（rayon の既定の組）とは分け、CPU のコアを 2 つ残す。
+fn save_pool() -> &'static rayon::ThreadPool {
+    static POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
+    POOL.get_or_init(|| {
+        let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(cores.saturating_sub(2).max(1))
+            .thread_name(|i| format!("save-{i}"))
+            .build()
+            .expect("保存用のスレッドを作れません")
+    })
+}
+
+/// 今の設定を原寸でかけて保存する。処理はメインスレッドとは別のスレッドで行う。
+#[tauri::command]
+async fn save_image(
+    path: String,
+    settings: EditSettings,
+    options: SaveOptions,
+    state: State<'_, AppState>,
+) -> Result<String, SaveFailure> {
+    let path = PathBuf::from(path);
+    if !save::is_savable(&path) {
+        let message = SaveError::UnsupportedExtension(
+            path.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default(),
+        );
+        return Err(SaveFailure { kind: "extension", message: message.to_string() });
+    }
+    let (original, source) = {
+        let loaded = state.0.lock().map_err(SaveFailure::other)?;
+        let original =
+            loaded.original.clone().ok_or_else(|| SaveFailure::other("画像が読み込まれていません"))?;
+        (original, loaded.source.clone())
+    };
+    // 元の画像には上書きしない（大文字・小文字の違いも同じファイルとみなす）
+    if source.path.as_deref().is_some_and(|p| save::is_same_file(&path, p)) {
+        return Err(SaveFailure { kind: "sameFile", message: SAME_FILE_MESSAGE.into() });
+    }
+    let name = file_name(&path);
+    tauri::async_runtime::spawn_blocking(move || {
+        save_pool().install(|| {
+            let edited = pipeline::apply_edits(&original, &settings).map_err(SaveFailure::other)?;
+            let is_tiff = source.format == Some(Format::Tiff);
+            save::save_edited(&edited, &path, options, source.exif.as_deref(), is_tiff)
+                .map_err(SaveFailure::other)
+        })
+    })
+    .await
+    .map_err(SaveFailure::other)??;
+    Ok(name)
+}
+
 /// 設定をかけたときの出力の大きさ（ステータスバーに出す）。大きさの指定が範囲外ならエラー。
 #[tauri::command]
 fn output_size(settings: EditSettings, state: State<'_, AppState>) -> Result<(u32, u32), String> {
@@ -174,6 +265,12 @@ fn output_size(settings: EditSettings, state: State<'_, AppState>) -> Result<(u3
 #[tauri::command]
 fn bench_mode() -> bool {
     std::env::var_os(BENCH_ENV).is_some()
+}
+
+/// 計測モードで保存を試すときの保存先（一時フォルダ）。
+#[tauri::command]
+fn bench_save_path() -> String {
+    std::env::temp_dir().join("imageeditorrt-bench.jpg").to_string_lossy().into_owned()
 }
 
 /// 画面での計測の結果を標準出力に書き、計測モードなら終了する。
@@ -214,8 +311,11 @@ pub fn run() {
             supported_formats,
             render_preview,
             output_size,
+            default_save_path,
+            save_image,
             open::take_pending_paths,
             bench_mode,
+            bench_save_path,
             log,
             report
         ])

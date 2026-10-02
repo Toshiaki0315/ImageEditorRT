@@ -9,6 +9,8 @@ use tauri::{AppHandle, Emitter, Runtime};
 pub const MENU_EVENT: &str = "menu";
 /// 「ファイル > 開く…」
 pub const OPEN: &str = "open";
+/// 「ファイル > 保存…」
+pub const SAVE: &str = "save";
 
 /// メニューバーを作る。
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -25,8 +27,10 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .quit_with_text(format!("{} を終了", super::APP_NAME))
         .build()?;
     let open = MenuItemBuilder::with_id(OPEN, "開く…").accelerator("CmdOrCtrl+O").build(app)?;
+    let save = MenuItemBuilder::with_id(SAVE, "保存…").accelerator("CmdOrCtrl+S").build(app)?;
     let file = SubmenuBuilder::new(app, "ファイル")
         .item(&open)
+        .item(&save)
         .separator()
         .close_window_with_text("閉じる")
         .build()?;

@@ -42,9 +42,12 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     formats.rs            # 読み込める形式・拡張子・透過の有無
     decode.rs             # ImageIO での読み込み（向きを直した sRGB の RGBA にする。macOS のみ）
     resize.rs             # 縮小（fast_image_resize の Lanczos3）
+    transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
+    pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
     blur.rs               # ガウスぼかし（箱ぼかし 3 回）・アンシャープマスク
-    preview.rs            # Settings と render()（加工を決まった順でかける）
+    effects.rs            # ぼかしを使う加工（ディテール・ジオラマ・HDR 風）
+    sample.rs             # 計測用の画像
     text.rs               # 文字・透かし（ヒラギノなどを ab_glyph で描く）
     encode.rs             # JPEG への書き出し
     exif_info.rs          # EXIF・GPS・MakerNote を表示用に読む
@@ -72,7 +75,7 @@ docs/decisions.md         # 作り直しの中で決めたこと（色の空間�
 
 1. **画像処理と EXIF は `crates/core` に書く。** core は Tauri に依存しない。`src-tauri` は core を呼んで画面と受け渡すだけにし、TypeScript では画素を加工しない。
 2. **元画像は不変。** 読み込んだ原本は保持し、プレビュー・保存のたびに原本から処理し直す。フィルターの重ね掛けをしない。
-3. **処理の順番は旧版と同じにする**（EXIF の回転補正 → 回転・反転 → トリミング → リサイズ → ジオラマ → フィルター → 形 → 文字 → フレーム。旧版の `docs/requirements.md` §5.1）。トリミングの座標は、常に**回転・反転した後の原寸画像の座標**で持つ。
+3. **処理の順番は旧版と同じにし、`pipeline.rs` の 1 か所で決める**（EXIF の回転補正 → 回転・反転 → トリミング → リサイズ → ジオラマ → フィルター → 形 → 文字 → フレーム。旧版の `docs/requirements.md` §5.1）。トリミングの座標は、常に**回転・反転した後の原寸画像の座標**で持つ。
 4. **プレビューは縮小版で処理する。** 長辺 1600px に縮めた画像に設定をかけて表示し、保存のときだけ原寸で処理する。
 5. **プレビューの受け渡しは生のバイト列で行う。** `tauri::ipc::Response` で返し、JSON や base64 にしない（`docs/prototype.md`）。設定を変えてから描き終わるまで 200ms 以内を保つ。
 6. **重い処理で画面を止めない。** 重い処理を行うコマンドは `async fn` にし、原寸の処理・保存はメインスレッドで行わない。

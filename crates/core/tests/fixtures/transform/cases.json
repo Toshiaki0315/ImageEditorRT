@@ -1,0 +1,1234 @@
+{
+ "orientation_apply": [
+  [
+   0,
+   false,
+   "rotate_left",
+   270,
+   false
+  ],
+  [
+   0,
+   false,
+   "rotate_right",
+   90,
+   false
+  ],
+  [
+   0,
+   false,
+   "flip_horizontal",
+   0,
+   true
+  ],
+  [
+   0,
+   false,
+   "flip_vertical",
+   180,
+   true
+  ],
+  [
+   0,
+   true,
+   "rotate_left",
+   270,
+   true
+  ],
+  [
+   0,
+   true,
+   "rotate_right",
+   90,
+   true
+  ],
+  [
+   0,
+   true,
+   "flip_horizontal",
+   0,
+   false
+  ],
+  [
+   0,
+   true,
+   "flip_vertical",
+   180,
+   false
+  ],
+  [
+   90,
+   false,
+   "rotate_left",
+   0,
+   false
+  ],
+  [
+   90,
+   false,
+   "rotate_right",
+   180,
+   false
+  ],
+  [
+   90,
+   false,
+   "flip_horizontal",
+   270,
+   true
+  ],
+  [
+   90,
+   false,
+   "flip_vertical",
+   90,
+   true
+  ],
+  [
+   90,
+   true,
+   "rotate_left",
+   0,
+   true
+  ],
+  [
+   90,
+   true,
+   "rotate_right",
+   180,
+   true
+  ],
+  [
+   90,
+   true,
+   "flip_horizontal",
+   270,
+   false
+  ],
+  [
+   90,
+   true,
+   "flip_vertical",
+   90,
+   false
+  ],
+  [
+   180,
+   false,
+   "rotate_left",
+   90,
+   false
+  ],
+  [
+   180,
+   false,
+   "rotate_right",
+   270,
+   false
+  ],
+  [
+   180,
+   false,
+   "flip_horizontal",
+   180,
+   true
+  ],
+  [
+   180,
+   false,
+   "flip_vertical",
+   0,
+   true
+  ],
+  [
+   180,
+   true,
+   "rotate_left",
+   90,
+   true
+  ],
+  [
+   180,
+   true,
+   "rotate_right",
+   270,
+   true
+  ],
+  [
+   180,
+   true,
+   "flip_horizontal",
+   180,
+   false
+  ],
+  [
+   180,
+   true,
+   "flip_vertical",
+   0,
+   false
+  ],
+  [
+   270,
+   false,
+   "rotate_left",
+   180,
+   false
+  ],
+  [
+   270,
+   false,
+   "rotate_right",
+   0,
+   false
+  ],
+  [
+   270,
+   false,
+   "flip_horizontal",
+   90,
+   true
+  ],
+  [
+   270,
+   false,
+   "flip_vertical",
+   270,
+   true
+  ],
+  [
+   270,
+   true,
+   "rotate_left",
+   180,
+   true
+  ],
+  [
+   270,
+   true,
+   "rotate_right",
+   0,
+   true
+  ],
+  [
+   270,
+   true,
+   "flip_horizontal",
+   90,
+   false
+  ],
+  [
+   270,
+   true,
+   "flip_vertical",
+   270,
+   false
+  ]
+ ],
+ "transform_rect": [
+  [
+   [
+    1,
+    2,
+    3,
+    2
+   ],
+   [
+    7,
+    5
+   ],
+   "rotate_left",
+   [
+    2,
+    3,
+    2,
+    3
+   ]
+  ],
+  [
+   [
+    1,
+    2,
+    3,
+    2
+   ],
+   [
+    7,
+    5
+   ],
+   "rotate_right",
+   [
+    1,
+    1,
+    2,
+    3
+   ]
+  ],
+  [
+   [
+    1,
+    2,
+    3,
+    2
+   ],
+   [
+    7,
+    5
+   ],
+   "flip_horizontal",
+   [
+    3,
+    2,
+    3,
+    2
+   ]
+  ],
+  [
+   [
+    1,
+    2,
+    3,
+    2
+   ],
+   [
+    7,
+    5
+   ],
+   "flip_vertical",
+   [
+    1,
+    1,
+    3,
+    2
+   ]
+  ]
+ ],
+ "clamp_crop": [
+  [
+   [
+    1,
+    1,
+    3,
+    3
+   ],
+   [
+    7,
+    5
+   ],
+   [
+    1,
+    1,
+    3,
+    3
+   ]
+  ],
+  [
+   [
+    -2,
+    -1,
+    4,
+    4
+   ],
+   [
+    7,
+    5
+   ],
+   [
+    0,
+    0,
+    2,
+    3
+   ]
+  ],
+  [
+   [
+    5,
+    3,
+    10,
+    10
+   ],
+   [
+    7,
+    5
+   ],
+   [
+    5,
+    3,
+    2,
+    2
+   ]
+  ],
+  [
+   [
+    8,
+    0,
+    2,
+    2
+   ],
+   [
+    7,
+    5
+   ],
+   null
+  ],
+  [
+   [
+    0,
+    0,
+    0,
+    3
+   ],
+   [
+    7,
+    5
+   ],
+   null
+  ],
+  [
+   [
+    2,
+    2,
+    -1,
+    3
+   ],
+   [
+    7,
+    5
+   ],
+   null
+  ]
+ ],
+ "fit_aspect": [
+  [
+   [
+    0,
+    0,
+    100,
+    50
+   ],
+   [
+    1,
+    1
+   ],
+   [
+    25,
+    0,
+    50,
+    50
+   ]
+  ],
+  [
+   [
+    10,
+    20,
+    30,
+    90
+   ],
+   [
+    4,
+    3
+   ],
+   [
+    10,
+    54,
+    30,
+    22
+   ]
+  ],
+  [
+   [
+    0,
+    0,
+    7,
+    5
+   ],
+   [
+    3,
+    2
+   ],
+   [
+    0,
+    0,
+    7,
+    5
+   ]
+  ],
+  [
+   [
+    0,
+    0,
+    1,
+    9
+   ],
+   [
+    16,
+    9
+   ],
+   [
+    0,
+    4,
+    1,
+    1
+   ]
+  ],
+  [
+   [
+    5,
+    5,
+    64,
+    48
+   ],
+   [
+    62,
+    46
+   ],
+   [
+    5,
+    5,
+    64,
+    47
+   ]
+  ]
+ ],
+ "constrain_rect": [
+  [
+   [
+    0,
+    0,
+    100,
+    50
+   ],
+   [
+    1,
+    1
+   ],
+   [
+    80,
+    80
+   ],
+   [
+    0,
+    0,
+    50,
+    50
+   ]
+  ],
+  [
+   [
+    50,
+    10,
+    100,
+    100
+   ],
+   [
+    4,
+    3
+   ],
+   [
+    120,
+    80
+   ],
+   [
+    50,
+    10,
+    70,
+    52
+   ]
+  ],
+  [
+   [
+    200,
+    0,
+    5,
+    5
+   ],
+   [
+    1,
+    1
+   ],
+   [
+    100,
+    100
+   ],
+   null
+  ]
+ ],
+ "aspect_drag_rect": [
+  [
+   [
+    10,
+    10
+   ],
+   [
+    50,
+    20
+   ],
+   [
+    1,
+    1
+   ],
+   [
+    100,
+    100
+   ],
+   [
+    10,
+    10,
+    40,
+    40
+   ]
+  ],
+  [
+   [
+    50,
+    50
+   ],
+   [
+    10,
+    40
+   ],
+   [
+    4,
+    3
+   ],
+   [
+    100,
+    100
+   ],
+   [
+    10,
+    20,
+    40,
+    30
+   ]
+  ],
+  [
+   [
+    90,
+    90
+   ],
+   [
+    100,
+    0
+   ],
+   [
+    16,
+    9
+   ],
+   [
+    100,
+    100
+   ],
+   [
+    90,
+    84,
+    10,
+    6
+   ]
+  ],
+  [
+   [
+    20,
+    30
+   ],
+   [
+    0,
+    0
+   ],
+   [
+    3,
+    2
+   ],
+   [
+    200,
+    100
+   ],
+   [
+    0,
+    17,
+    20,
+    13
+   ]
+  ],
+  [
+   [
+    0,
+    0
+   ],
+   [
+    7,
+    3
+   ],
+   [
+    3,
+    4
+   ],
+   [
+    100,
+    100
+   ],
+   [
+    0,
+    0,
+    7,
+    9
+   ]
+  ]
+ ],
+ "fit_size": [
+  [
+   [
+    4000,
+    3000
+   ],
+   null,
+   null,
+   true,
+   [
+    4000,
+    3000
+   ]
+  ],
+  [
+   [
+    4000,
+    3000
+   ],
+   1000,
+   null,
+   true,
+   [
+    1000,
+    750
+   ]
+  ],
+  [
+   [
+    4000,
+    3000
+   ],
+   null,
+   1000,
+   true,
+   [
+    1333,
+    1000
+   ]
+  ],
+  [
+   [
+    4000,
+    3000
+   ],
+   1000,
+   1000,
+   true,
+   [
+    1000,
+    750
+   ]
+  ],
+  [
+   [
+    4000,
+    3000
+   ],
+   1000,
+   500,
+   true,
+   [
+    667,
+    500
+   ]
+  ],
+  [
+   [
+    4000,
+    3000
+   ],
+   1000,
+   null,
+   false,
+   [
+    1000,
+    3000
+   ]
+  ],
+  [
+   [
+    4000,
+    3000
+   ],
+   1000,
+   600,
+   false,
+   [
+    1000,
+    600
+   ]
+  ],
+  [
+   [
+    3,
+    7
+   ],
+   1,
+   null,
+   true,
+   [
+    1,
+    2
+   ]
+  ],
+  [
+   [
+    7,
+    3
+   ],
+   20000,
+   null,
+   true,
+   [
+    20000,
+    8571
+   ]
+  ],
+  [
+   [
+    333,
+    667
+   ],
+   null,
+   100,
+   true,
+   [
+    50,
+    100
+   ]
+  ]
+ ],
+ "fit_size_errors": [
+  [
+   [
+    100,
+    100
+   ],
+   0,
+   null
+  ],
+  [
+   [
+    100,
+    100
+   ],
+   null,
+   20001
+  ]
+ ],
+ "aspect_ratios": [
+  [
+   "FREE",
+   "自由",
+   null,
+   null
+  ],
+  [
+   "SQUARE",
+   "1:1",
+   [
+    1,
+    1
+   ],
+   [
+    1,
+    1
+   ]
+  ],
+  [
+   "RATIO_4_3",
+   "4:3",
+   [
+    4,
+    3
+   ],
+   [
+    3,
+    4
+   ]
+  ],
+  [
+   "RATIO_3_2",
+   "3:2",
+   [
+    3,
+    2
+   ],
+   [
+    2,
+    3
+   ]
+  ],
+  [
+   "RATIO_16_9",
+   "16:9",
+   [
+    16,
+    9
+   ],
+   [
+    9,
+    16
+   ]
+  ]
+ ],
+ "scale_settings": [
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     10,
+     20,
+     300,
+     200
+    ],
+    "width": 1000,
+    "height": null,
+    "keepAspect": true
+   },
+   0.25,
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     3,
+     5,
+     75,
+     50
+    ],
+    "width": 250,
+    "height": null,
+    "keepAspect": true
+   }
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     10,
+     20,
+     300,
+     200
+    ],
+    "width": 1000,
+    "height": null,
+    "keepAspect": true
+   },
+   0.4,
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     4,
+     8,
+     120,
+     80
+    ],
+    "width": 400,
+    "height": null,
+    "keepAspect": true
+   }
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     10,
+     20,
+     300,
+     200
+    ],
+    "width": 1000,
+    "height": null,
+    "keepAspect": true
+   },
+   0.5,
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     5,
+     10,
+     150,
+     100
+    ],
+    "width": 500,
+    "height": null,
+    "keepAspect": true
+   }
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "width": 1,
+    "height": 20000,
+    "keepAspect": true
+   },
+   0.25,
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     0,
+     0,
+     1,
+     1
+    ],
+    "width": 1,
+    "height": 5000,
+    "keepAspect": true
+   }
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "width": 1,
+    "height": 20000,
+    "keepAspect": true
+   },
+   0.4,
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     0,
+     0,
+     1,
+     1
+    ],
+    "width": 1,
+    "height": 8000,
+    "keepAspect": true
+   }
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "width": 1,
+    "height": 20000,
+    "keepAspect": true
+   },
+   0.5,
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "width": 1,
+    "height": 10000,
+    "keepAspect": true
+   }
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     -5,
+     3,
+     7,
+     0
+    ],
+    "width": null,
+    "height": null,
+    "keepAspect": true
+   },
+   0.25,
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     -1,
+     1,
+     2,
+     0
+    ],
+    "width": null,
+    "height": null,
+    "keepAspect": true
+   }
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     -5,
+     3,
+     7,
+     0
+    ],
+    "width": null,
+    "height": null,
+    "keepAspect": true
+   },
+   0.4,
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     -2,
+     1,
+     3,
+     0
+    ],
+    "width": null,
+    "height": null,
+    "keepAspect": true
+   }
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     -5,
+     3,
+     7,
+     0
+    ],
+    "width": null,
+    "height": null,
+    "keepAspect": true
+   },
+   0.5,
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     -3,
+     2,
+     4,
+     0
+    ],
+    "width": null,
+    "height": null,
+    "keepAspect": true
+   }
+  ]
+ ],
+ "output_size": [
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": null,
+    "width": null,
+    "height": null,
+    "keepAspect": true
+   },
+   [
+    4000,
+    3000
+   ]
+  ],
+  [
+   {
+    "rotation": 90,
+    "mirror": false,
+    "crop": null,
+    "width": null,
+    "height": null,
+    "keepAspect": true
+   },
+   [
+    3000,
+    4000
+   ]
+  ],
+  [
+   {
+    "rotation": 270,
+    "mirror": true,
+    "crop": [
+     100,
+     50,
+     2000,
+     1000
+    ],
+    "width": null,
+    "height": null,
+    "keepAspect": true
+   },
+   [
+    2000,
+    1000
+   ]
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     -100,
+     -100,
+     500,
+     500
+    ],
+    "width": 100,
+    "height": null,
+    "keepAspect": true
+   },
+   [
+    100,
+    100
+   ]
+  ],
+  [
+   {
+    "rotation": 0,
+    "mirror": false,
+    "crop": [
+     3000,
+     2000,
+     5000,
+     5000
+    ],
+    "width": null,
+    "height": 300,
+    "keepAspect": false
+   },
+   [
+    1000,
+    300
+   ]
+  ]
+ ]
+}

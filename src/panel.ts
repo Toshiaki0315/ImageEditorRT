@@ -1,9 +1,12 @@
 // 設定のスライダー（「加工」「ジオラマ」タブ）。値の範囲・刻みは後の Issue（#8・#10・#11）で旧版に合わせる。
 
-import type { Settings } from "./types";
+import type { EditSettings } from "./types";
+
+/** スライダーで変える数値の項目。 */
+type NumberKey = { [K in keyof EditSettings]: EditSettings[K] extends number ? K : never }[keyof EditSettings];
 
 type Slider = {
-  key: keyof Settings;
+  key: NumberKey;
   label: string;
   min: number;
   max: number;
@@ -47,12 +50,12 @@ const DIORAMA_GROUPS: [string, Slider[]][] = [
 
 /** スライダーを作り、値を変えるたびに onChange を呼ぶ。 */
 export class Panel {
-  private readonly inputs = new Map<keyof Settings, HTMLInputElement>();
+  private readonly inputs = new Map<NumberKey, HTMLInputElement>();
 
   constructor(
     adjustPage: HTMLElement,
     dioramaPage: HTMLElement,
-    private readonly settings: Settings,
+    private readonly settings: EditSettings,
     private readonly onChange: () => void,
   ) {
     this.build(adjustPage, ADJUST_GROUPS);
@@ -75,7 +78,7 @@ export class Panel {
         input.step = String(slider.step ?? 1);
         const output = document.createElement("output");
         input.addEventListener("input", () => {
-          (this.settings[slider.key] as number) = Number(input.value);
+          this.settings[slider.key] = Number(input.value);
           output.textContent = input.value;
           this.onChange();
         });

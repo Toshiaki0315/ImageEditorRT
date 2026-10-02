@@ -6,8 +6,9 @@
 use std::time::{Duration, Instant};
 
 use image::imageops;
-use imageeditorrt_core::preview::{render, synthetic_photo, Settings};
+use imageeditorrt_core::pipeline::{render_preview, EditSettings};
 use imageeditorrt_core::resize::fit_long_side;
+use imageeditorrt_core::sample::synthetic_photo;
 
 const PREVIEW_MAX_SIDE: u32 = 1600;
 
@@ -38,14 +39,15 @@ fn main() {
     });
     println!("  （参考: image クレートの Lanczos3 では {}）", ms(image_resize_ms));
 
-    let heavy = Settings::heavy();
-    let (best, median, rendered) = measure(15, || render(&preview, &heavy));
+    let heavy = EditSettings::heavy();
+    let (best, median, rendered) = measure(15, || render_preview(&preview, &heavy, 1.0, false));
     println!("プレビュー更新（重い設定）: 最小 {} / 中央値 {}", ms(best), ms(median));
-    let light = Settings { exposure: 0.7, saturation: 20, ..Settings::default() };
-    let (best_light, median_light, _) = measure(15, || render(&preview, &light));
+    let light = EditSettings { exposure: 0.7, saturation: 20, ..EditSettings::default() };
+    let (best_light, median_light, _) = measure(15, || render_preview(&preview, &light, 1.0, false));
     println!("プレビュー更新（露出＋彩度だけ）: 最小 {} / 中央値 {}", ms(best_light), ms(median_light));
 
-    let (full_best, _, _) = measure(3, || render(&original, &heavy));
+    let (full_best, _, _) =
+        measure(3, || imageeditorrt_core::pipeline::apply_edits(&original, &heavy).unwrap());
     println!("原寸処理 6000x4000（重い設定）: {}", ms(full_best));
 
     // Rust → WebView への受け渡しのやり方の候補ごとの、変換の時間
@@ -72,7 +74,7 @@ fn main() {
             let decoded = imageeditorrt_core::decode::decode_file(&jpeg).unwrap();
             let small = fit_long_side(&decoded.image, PREVIEW_MAX_SIDE);
             let exif = imageeditorrt_core::exif_info::read_exif_info(&jpeg);
-            (render(&small, &Settings::default()), exif)
+            (render_preview(&small, &EditSettings::default(), 1.0, false), exif)
         });
         let verdict = if median.as_secs_f64() < 1.0 { "OK" } else { "NG" };
         println!(

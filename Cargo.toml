@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "src-tauri"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+
+# Tauri の推奨（アプリを小さく・速くする）
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+# 開発中も画像処理は速くする（テスト・ベンチマークの時間を短くする）
+[profile.dev.package."*"]
+opt-level = 3

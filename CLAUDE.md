@@ -1,0 +1,112 @@
+# CLAUDE.md
+
+このファイルは Claude Code がこのリポジトリで作業するときの前提・ルールです。
+
+ImageEditorRT は、Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor) を Tauri（Rust + TypeScript）で作り直したものです。
+- **仕様は旧版に合わせる**：旧版の `docs/requirements.md` と旧版の動きを正とします。手元では `/Users/nomura/01_project/ImageEditor` にあります。
+- **加工の結果は旧版とそろえる**：計算式は旧版の `src/image_editor/core/` から移します。
+- **試作の結果**：`docs/prototype.md` にあります。
+
+## プロジェクト概要
+
+画像をドラッグ＆ドロップし、加工・トリミング・リサイズして保存する macOS (Apple Silicon) 向けのデスクトップアプリ。
+
+- アプリ: Tauri 2（アプリ名 ImageEditorRT、識別子 `io.github.toshiaki0315.imageeditorrt`）
+- 画像処理・EXIF: Rust（`crates/core`。Tauri に依存しない）
+- 画面: TypeScript + Vite（フレームワークなし）
+- 画像の読み込み: macOS の ImageIO（HEIC・JPEG・PNG など。EXIF の向きもここで直す）
+- EXIF: kamadak-exif で読み、MakerNote（ペンタックス・リコー・Samsung）は `makernote.rs`、保存は `tiff.rs` の `ExifBlock`
+- テスト: `cargo test`（Rust）、`tsc`（TypeScript の型チェック）
+- Lint/Format: `cargo fmt`（設定は `rustfmt.toml`）・`cargo clippy`
+- 構成管理: GitHub（Issue → ブランチ → PR）
+
+## コマンド
+
+```bash
+npm install                                   # 依存インストール（初回・package.json を変えたとき）
+npx tauri dev                                 # 開発用に起動
+npx tauri build --bundles app                 # .app を作る（target/release/bundle/macos/ImageEditorRT.app）
+cargo test --workspace                        # Rust のテスト
+cargo fmt --all                               # 整形（確認だけなら --check）
+cargo clippy --workspace --all-targets -- -D warnings   # Lint
+npm run build                                 # TypeScript の型チェックと画面のビルド
+cargo run --release -p imageeditorrt-core --example bench   # 処理の速さのベンチマーク
+```
+
+## ディレクトリ構成
+
+```
+crates/core/              # ★ Tauri に依存しない画像処理・EXIF（imageeditorrt_core）
+  src/
+    decode.rs             # ImageIO での読み込み（向きを直した RGBA にする。macOS のみ）
+    resize.rs             # 縮小（fast_image_resize の Lanczos3）
+    adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
+    blur.rs               # ガウスぼかし（箱ぼかし 3 回）・アンシャープマスク
+    preview.rs            # Settings と render()（加工を決まった順でかける）
+    text.rs               # 文字・透かし（ヒラギノなどを ab_glyph で描く）
+    encode.rs             # JPEG への書き出し
+    exif_info.rs          # EXIF・GPS・MakerNote を表示用に読む
+    makernote.rs          # kamadak-exif が読まない MakerNote を読む
+    tiff.rs               # EXIF の IFD の読み書き（保存時に MakerNote を元の位置に置き直す）
+  examples/bench.rs       # ベンチマーク
+  tests/                  # ファイルを使うテスト（fixtures/ はテスト用の画像・EXIF）
+src-tauri/                # Tauri のアプリ本体（コマンドで core を呼び、画面と受け渡すだけ）
+  src/lib.rs
+  tauri.conf.json
+src/                      # 画面（TypeScript）
+  main.ts
+  styles.css
+index.html
+docs/prototype.md         # 試作の結果
+```
+
+## 設計ルール（必ず守る）
+
+1. **画像処理と EXIF は `crates/core` に書く。** core は Tauri に依存しない。`src-tauri` は core を呼んで画面と受け渡すだけにし、TypeScript では画素を加工しない。
+2. **元画像は不変。** 読み込んだ原本は保持し、プレビュー・保存のたびに原本から処理し直す。フィルターの重ね掛けをしない。
+3. **処理の順番は旧版と同じにする**（EXIF の回転補正 → 回転・反転 → トリミング → リサイズ → ジオラマ → フィルター → 形 → 文字 → フレーム。旧版の `docs/requirements.md` §5.1）。トリミングの座標は、常に**回転・反転した後の原寸画像の座標**で持つ。
+4. **プレビューは縮小版で処理する。** 長辺 1600px に縮めた画像に設定をかけて表示し、保存のときだけ原寸で処理する。
+5. **プレビューの受け渡しは生のバイト列で行う。** `tauri::ipc::Response` で返し、JSON や base64 にしない（`docs/prototype.md`）。設定を変えてから描き終わるまで 200ms 以内を保つ。
+6. **重い処理で画面を止めない。** 重い処理を行うコマンドは `async fn` にし、原寸の処理・保存はメインスレッドで行わない。
+7. **加工の結果は旧版とそろえる。** 計算式を移したら、旧版と同じ入力で同じ（またはほぼ同じ）結果になることをテストで確かめる。期待値は推測で書かず、旧版で計算して決める。
+8. **公開する関数・型には、日本語で短いドキュメントコメント（`///`）を書く。**
+9. **依存するクレート・npm パッケージを増やすときは、PR の説明に理由を書く。** `image` クレートは `default-features = false` で、必要な機能だけを有効にする。
+
+## Git / GitHub ワークフロー
+
+作業は GitHub Issue 単位で行う。`gh` CLI が使える前提。
+
+1. `gh issue view <番号>` で受け入れ条件を確認する。
+2. `main` を最新にしてからブランチを切る。
+   ```bash
+   git switch main && git pull && git switch -c feat/<番号>-<短い英語名>
+   ```
+   ブランチの種別は `feat/` `fix/` `refactor/` `docs/` `test/` `chore/` から選ぶ。
+3. 実装してテストを足し、次がすべて通ることを確かめる。
+   - `cargo fmt --all`
+   - `cargo clippy --workspace --all-targets -- -D warnings`
+   - `cargo test --workspace`
+   - `npm run build`
+4. コミットは Conventional Commits の形にする。本文は日本語でよい。例: `feat(core): セピアフィルターを追加 (#5)`
+5. `git push -u origin HEAD` の後、`gh pr create` で PR を作る。PR の本文には `Closes #<番号>` と確認の手順を書く。
+6. **マージはユーザーの指示があるときだけ行う。**
+   - ユーザーの指示があれば、CI が緑であることを確かめてから `gh pr merge --squash --delete-branch` で squash マージしてよい。
+   - 指示がなければマージしない。
+   - `main` へ直接 push しない。`git push --force` もしない。
+
+## 完了の定義 (Definition of Done)
+
+- Issue の受け入れ条件をすべて満たす
+- `crates/core` の変更にはテストがある
+- fmt・clippy・テスト・`npm run build` が通る（CI も緑）
+- 画面の変更は、PR に手動での確認の手順を書く（できればスクリーンショットも付ける）
+
+## 注意点・既知の落とし穴
+
+- **EXIF を書き直すと MakerNote が壊れることがある。** MakerNote の中の値の位置がずれるため。保存では必ず `tiff::ExifBlock`（MakerNote を元の位置に置き直す）を通す。
+- **JPEG は透過を持てない。** 透過のある画像を JPEG で保存するときは、白い背景に合成する。
+- **プレビューの計測は、画面が見えていないと止まる。** `IMAGEEDITORRT_BENCH=1` を付けて起動すると計測できるが、ウィンドウが隠れていたり画面がスリープしていたりすると WebView の描画（`requestAnimationFrame`）が止まり、計測が進まない。
+- **ImageIO は macOS 専用。** `decode.rs` は `#[cfg(target_os = "macos")]` で囲む。CI も macOS で動かす。
+- **フォントのパスは日本語を含む。**（`/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc`）
+- **release ビルドは遅い。** LTO と `codegen-units = 1` のため、`npx tauri build` は数分かかる。開発中は `npx tauri dev` や `cargo test` を使う。
+- **画素ごとの処理は rayon で行・帯に分けて並列にする。** 1 画素ずつ `get_pixel` / `put_pixel` を呼ぶのは遅いので、生のバイト列（`as_raw` / `as_mut`）を使う。

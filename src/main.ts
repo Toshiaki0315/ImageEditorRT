@@ -6,6 +6,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { message, open, save } from "@tauri-apps/plugin-dialog";
 import { bench, benchSave } from "./bench";
 import { CropController } from "./crop";
+import { OutputSize } from "./output";
 import { showExif } from "./exif";
 import { Panel } from "./panel";
 import { Preview } from "./preview";
@@ -49,6 +50,7 @@ const preview = new Preview(stage, canvas, (error) => showError("プレビュー
 const tabs = new Tabs(document.querySelector(".side")!);
 let panel: Panel;
 let crop: CropController;
+const output = new OutputSize(settings, settingsChanged);
 const saveOptions = new SaveOptionsPanel(
   $<HTMLInputElement>("jpeg-quality"),
   $<HTMLOutputElement>("jpeg-quality-value"),
@@ -59,9 +61,12 @@ const saveOptions = new SaveOptionsPanel(
 /** 設定を変えたとき: プレビューとステータスバー（出力の大きさ）を更新する。 */
 function settingsChanged() {
   if (!loaded) return;
-  preview.request(settings);
-  void updateStatus();
-  void updateGuide();
+  // 出力の幅・高さは範囲・フレームなどで変わるので、先に合わせてからプレビューを描く
+  void output.refresh().then(() => {
+    preview.request(settings);
+    void updateStatus();
+    void updateGuide();
+  });
 }
 
 /** 「ジオラマ」タブを開いている間、プレビューにピントの帯のガイドを重ねる（ぼかしが 0 でも出す）。 */
@@ -217,12 +222,11 @@ function showLoaded(info: OpenInfo, openNotes: string[]) {
   preview.trimmed = false;
   preview.show(info.previewWidth, info.previewHeight, info.hasAlpha);
   crop.reset([info.width, info.height]);
+  output.reset(true);
   showExif($("page-exif"), info.exif);
   tabs.setEnabled("exif", info.exif.entries.length > 0);
   notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
-  void updateStatus();
-  preview.request(settings);
-  void updateGuide();
+  settingsChanged();
 }
 
 /** ドロップ: 対応形式のときだけハイライトし、受け付ける（旧版 FR-UI-02）。 */
@@ -248,10 +252,19 @@ async function setup() {
   panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, settingsChanged);
   const ratios = await invoke<[AspectRatio, string][]>("aspect_ratios");
   const [frames, shapes] = await invoke<[[FrameKind, string][], [ShapeType, string][]]>("frame_shape_types");
-  crop = new CropController(settings, canvas, ratios, frames, shapes, settingsChanged, (trimmed) => {
-    preview.trimmed = trimmed;
-    settingsChanged();
-  });
+  crop = new CropController(
+    settings,
+    canvas,
+    ratios,
+    frames,
+    shapes,
+    settingsChanged,
+    (trimmed) => {
+      preview.trimmed = trimmed;
+      settingsChanged();
+    },
+    () => output.rotate(),
+  );
   preview.onResize = () => {
     crop.draw();
     void updateGuide();

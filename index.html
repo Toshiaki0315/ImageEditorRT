@@ -58,7 +58,10 @@
           <p class="note">プレビューの画像の上をドラッグして範囲を選べます（範囲の中をドラッグで移動、四隅で大きさを変更、クリックで解除）。</p>
         </div>
         <div id="page-output" class="page" role="tabpanel" hidden>
-          <p class="todo">サイズ変更は #14 で作ります</p>
+          <h2>サイズ変更</h2>
+          <label class="row">幅 <input id="out-width" type="number" min="1" max="20000" step="1" /><span>px</span></label>
+          <label class="row">高さ <input id="out-height" type="number" min="1" max="20000" step="1" /><span>px</span></label>
+          <label class="check"><input id="keep-aspect" type="checkbox" checked /> 縦横比を保持</label>
           <h2>保存の設定</h2>
           <label class="row">
             JPEG 品質

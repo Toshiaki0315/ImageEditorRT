@@ -7,6 +7,7 @@
   --stage: #e9e9ec;
   --accent: #0a64d8;
   --accent-soft: rgba(10, 100, 216, 0.12);
+  --track: #d4d4d9;
   font-family: -apple-system, "Hiragino Sans", sans-serif;
   font-size: 13px;
   color: var(--text);
@@ -23,6 +24,7 @@
     --stage: #18181a;
     --accent: #4b9bff;
     --accent-soft: rgba(75, 155, 255, 0.16);
+    --track: #4a4a50;
   }
 }
 
@@ -291,7 +293,8 @@ button:disabled {
   grid-template-columns: 6.5em 1fr 4.5em;
   gap: 8px;
   align-items: center;
-  margin: 3px 0;
+  min-height: 28px;
+  margin: 6px 0;
 }
 
 .row input[type="range"] {
@@ -592,4 +595,53 @@ button[aria-pressed="true"] {
 .batch-dialog .dialog-buttons {
   flex-direction: row-reverse;
   justify-content: flex-start;
+}
+
+/* --- スライダー ---------------------------------------------------------- */
+/* 値が左端（既定の 0 など）でもつまみが見えるよう、つまみをアクセントの色にし、溝は細くする */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--track);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.18),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]:focus-visible {
+  outline: none;
+}
+
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.18),
+    0 0 0 4px var(--accent-soft);
+}
+
+input[type="range"]:disabled {
+  cursor: default;
+}
+
+input[type="range"]:disabled::-webkit-slider-thumb {
+  background: var(--muted);
 }

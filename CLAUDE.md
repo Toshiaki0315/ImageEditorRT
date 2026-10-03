@@ -73,7 +73,8 @@ src-tauri/                # Tauri のアプリ本体（コマンドで core を�
 src/                      # 画面（TypeScript）
   main.ts                 # 起動・開く・ドロップ・ステータスバー
   preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
-  panel.ts / tabs.ts / exif.ts   # 設定パネルのスライダー・タブ・EXIF の一覧
+  panel.ts / tabs.ts      # 設定パネルのスライダー・タブ
+  exif.ts                 # 「EXIF」タブ（折りたたみの一覧・選んだ行のコピー・マップで開く）
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）
   textDialog.ts           # 「文字・透かし」のダイアログ（⌘T・「文字…」）
   output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）

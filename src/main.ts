@@ -8,7 +8,7 @@ import { bench, benchSave } from "./bench";
 import { CropController } from "./crop";
 import { OutputSize } from "./output";
 import { TextDialog } from "./textDialog";
-import { showExif } from "./exif";
+import { ExifView } from "./exif";
 import { Panel } from "./panel";
 import { Preview } from "./preview";
 import { SaveOptionsPanel } from "./saveOptions";
@@ -53,6 +53,7 @@ let formatsText = "";
 
 const preview = new Preview(stage, canvas, (error) => showError("プレビューを更新できません", error));
 const tabs = new Tabs(document.querySelector(".side")!);
+const exifView = new ExifView($("page-exif"));
 let panel: Panel;
 let crop: CropController;
 let textDialog: TextDialog;
@@ -231,8 +232,8 @@ function showLoaded(info: OpenInfo, openNotes: string[]) {
   output.reset(true);
   textDialog.show();
   textButton.disabled = false;
-  showExif($("page-exif"), info.exif);
-  tabs.setEnabled("exif", info.exif.entries.length > 0);
+  exifView.show(info.exif);
+  tabs.setEnabled("exif", !info.exif.empty);
   notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
   settingsChanged();
 }

@@ -104,6 +104,8 @@ export type ExifInfo = {
   entries: ExifEntry[];
   makerNote: string | null;
   gps: { latitude: number; longitude: number } | null;
+  /** 表示する情報がない（画像の構造を表すタグしかない場合も含む） */
+  empty: boolean;
 };
 
 /** Rust の OpenInfo（読み込みの結果）。 */

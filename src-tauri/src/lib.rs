@@ -11,7 +11,7 @@ use std::time::Instant;
 use image::RgbaImage;
 use imageeditorrt_core::crop::{self, AspectChoice, DragMode, Oriented, SpinField};
 use imageeditorrt_core::decode::{self, DecodeError};
-use imageeditorrt_core::exif_info::{raw_exif, read_exif_info, ExifInfo};
+use imageeditorrt_core::exif_info::{raw_exif, read_exif_info, ExifInfo, GpsPosition};
 use imageeditorrt_core::filters::FilterType;
 use imageeditorrt_core::formats::{self, Format};
 use imageeditorrt_core::frames::FrameType;
@@ -369,6 +369,17 @@ fn rotate_size(state: SizeState) -> SizeState {
     output::rotate(state)
 }
 
+/// 撮影した場所を macOS のマップアプリで開く（「EXIF」タブの「マップで開く」。押したときだけ）。
+#[tauri::command]
+fn open_map(latitude: f64, longitude: f64) -> Result<(), String> {
+    if !(-90.0..=90.0).contains(&latitude) || !(-180.0..=180.0).contains(&longitude) {
+        return Err("位置情報が正しくありません".into());
+    }
+    let url = GpsPosition { latitude, longitude }.map_url();
+    std::process::Command::new("/usr/bin/open").arg(url).status().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// 設定をかけたときの出力の大きさ（ステータスバーに出す）。大きさの指定が範囲外ならエラー。
 #[tauri::command]
 fn output_size(settings: EditSettings, state: State<'_, AppState>) -> Result<(u32, u32), String> {
@@ -428,6 +439,7 @@ pub fn run() {
             filter_types,
             render_preview,
             output_size,
+            open_map,
             resolve_size,
             rotate_size,
             diorama_guide,

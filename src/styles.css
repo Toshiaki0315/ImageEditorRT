@@ -298,25 +298,96 @@ button[aria-pressed="true"] {
 
 /* --- EXIF ------------------------------------------------------------- */
 
-.exif table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
+.exif {
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-.exif th,
-.exif td {
-  text-align: left;
-  vertical-align: top;
-  padding: 3px 4px;
-  border-bottom: 1px solid var(--line);
-  word-break: break-all;
-}
-
-.exif th {
-  width: 45%;
-  font-weight: normal;
+.exif-summary {
   color: var(--muted);
+  margin: 6px 0;
+}
+
+.exif-list {
+  flex: 1;
+  font-size: 12px;
+  outline: none;
+  user-select: none;
+}
+
+.exif-group,
+.exif-row {
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: default;
+}
+
+.exif-group {
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.exif-group .toggle::before {
+  content: "▾";
+  display: inline-block;
+  width: 1.2em;
+  color: var(--muted);
+}
+
+.exif-group[aria-expanded="false"] .toggle::before {
+  content: "▸";
+}
+
+.exif-row {
+  display: grid;
+  /* 項目名が長すぎて値が見えなくならないよう、項目名の列の幅に上限を設ける（旧版と同じ） */
+  grid-template-columns: minmax(0, 170px) 1fr;
+  gap: 8px;
+  padding-left: 1.4em;
+}
+
+.exif-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exif-row span:first-child {
+  color: var(--muted);
+}
+
+.exif-list [aria-selected="true"] {
+  background: var(--accent-soft);
+}
+
+.exif-list [aria-selected="true"] span:first-child {
+  color: var(--text);
+}
+
+.exif-buttons {
+  justify-content: flex-end;
+}
+
+.context-menu {
+  position: absolute;
+  z-index: 10;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+}
+
+.context-menu button {
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.context-menu button:hover {
+  background: var(--accent-soft);
 }
 
 /* --- 下: ステータスバー --------------------------------------------------- */

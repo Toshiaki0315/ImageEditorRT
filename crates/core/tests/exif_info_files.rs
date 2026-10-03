@@ -44,3 +44,19 @@ fn heic_has_orientation() {
     let orientation = info.entries.iter().find(|e| e.tag == "Orientation").expect("HEIC の EXIF を読める");
     assert!(orientation.label.contains('（'), "{}", orientation.label);
 }
+
+#[test]
+#[cfg(target_os = "macos")]
+fn tiff_with_only_image_structure_is_empty() {
+    // EXIF のない画像を TIFF で保存すると、画像の構造のタグだけが入る
+    use imageeditorrt_core::save::{save_edited, SaveOptions};
+    let path = std::env::temp_dir().join(format!("imageeditorrt-structure-{}.tif", std::process::id()));
+    let image = image::RgbaImage::from_pixel(4, 3, image::Rgba([1, 2, 3, 255]));
+    save_edited(&image, &path, SaveOptions::default(), None, false).unwrap();
+    let info = read_exif_info(&std::fs::read(&path).unwrap());
+    std::fs::remove_file(&path).unwrap();
+    assert!(!info.entries.is_empty(), "構造のタグは読める");
+    assert!(info.empty, "表示する情報はない");
+    // 撮影情報のある JPEG は空ではない
+    assert!(!read_exif_info(&fixture("pentax.jpg")).empty);
+}

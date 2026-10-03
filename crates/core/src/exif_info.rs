@@ -59,13 +59,21 @@ pub struct ExifInfo {
     pub entries: Vec<Entry>,
     pub maker_note: Option<String>,
     pub gps: Option<GpsPosition>,
+    /// 表示する情報がないか（画像の構造を表すタグしかない場合も含む。TIFF のファイルなど）
+    pub empty: bool,
 }
+
+/// TIFF の画像の構造を表すだけのタグ（これしかなければ「EXIF がない」とみなす。旧版と同じ）。
+const STRUCTURE_TAGS: [u16; 22] = [
+    0x00FE, 0x00FF, 0x0100, 0x0101, 0x0102, 0x0103, 0x0106, 0x010A, 0x0111, 0x0115, 0x0116, 0x0117, 0x011C,
+    0x013D, 0x0142, 0x0143, 0x0144, 0x0145, 0x0152, 0x0153, 0x0201, 0x0202,
+];
 
 /// ファイルの中身（JPEG・HEIC・PNG・TIFF・WebP）から EXIF を読む。EXIF がなければ空。
 pub fn read_exif_info(file: &[u8]) -> ExifInfo {
     match exif::Reader::new().read_from_container(&mut Cursor::new(file)) {
         Ok(exif) => build(&exif),
-        Err(_) => ExifInfo::default(),
+        Err(_) => ExifInfo { empty: true, ..ExifInfo::default() },
     }
 }
 
@@ -75,11 +83,16 @@ pub fn raw_exif(file: &[u8]) -> Option<Vec<u8>> {
 }
 
 fn build(exif: &Exif) -> ExifInfo {
+    let shown = |f: &&Field| !is_pointer(f.tag) && f.tag != Tag::MakerNote;
     let mut entries: Vec<Entry> = exif
         .fields()
-        .filter(|f| !is_pointer(f.tag) && f.tag != Tag::MakerNote)
+        .filter(shown)
         .map(|f| entry(group_of(f), &f.tag.to_string(), value_text(exif, f)))
         .collect();
+    let structure_only = exif
+        .fields()
+        .filter(shown)
+        .all(|f| f.tag.context() == Context::Tiff && STRUCTURE_TAGS.contains(&f.tag.number()));
 
     let mut maker_note = None;
     if let Some(note) = read_maker_note(exif.buf()) {
@@ -96,7 +109,8 @@ fn build(exif: &Exif) -> ExifInfo {
     let gps = gps_position(exif);
     friendly_gps(&mut entries, exif);
     entries.sort_by_key(|e| e.group); // 安定な並べ替えなので、グループの中の順はそのまま
-    ExifInfo { entries, maker_note, gps }
+    let empty = entries.is_empty() || (structure_only && maker_note.is_none());
+    ExifInfo { entries, maker_note, gps, empty }
 }
 
 fn entry(group: Group, tag: &str, value: String) -> Entry {
@@ -439,6 +453,7 @@ mod tests {
 
     #[test]
     fn not_an_image() {
-        assert_eq!(read_exif_info(b"garbage"), ExifInfo::default());
+        let info = read_exif_info(b"garbage");
+        assert!(info.empty && info.entries.is_empty());
     }
 }

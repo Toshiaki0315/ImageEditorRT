@@ -40,7 +40,7 @@ export type EditSettings = {
   height: number | null;
   keepAspect: boolean;
   filter: FilterType;
-  /** テイストの強さ 0〜100（%）。100 = テイストのまま */
+  /** テイストの強さ 0〜200（%）。100 = テイストのまま、100 を超えると変化を強める */
   filterStrength: number;
   vignette: number;
   aging: number;

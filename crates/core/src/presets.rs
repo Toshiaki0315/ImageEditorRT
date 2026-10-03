@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::diorama::DioramaDirection;
 use crate::filters::FilterType;
 use crate::frames::FrameType;
-use crate::pipeline::{EditSettings, FILTER_STRENGTH_FULL};
+use crate::pipeline::{EditSettings, FILTER_STRENGTH_FULL, FILTER_STRENGTH_MAX};
 use crate::shapes::ShapeType;
 use crate::text::{TextFont, TextPosition, TextSettings};
 
@@ -330,7 +330,7 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
         let number = || if raw.is_boolean() { None } else { Some(raw) };
         match key.as_str() {
             "filter" => p.filter = enum_value(raw)?,
-            "filter_strength" => p.filter_strength = int_value::<u32>(number()?)?.min(FILTER_STRENGTH_FULL),
+            "filter_strength" => p.filter_strength = int_value::<u32>(number()?)?.min(FILTER_STRENGTH_MAX),
             "frame" => p.frame = enum_value(raw)?,
             "shape" => p.shape = enum_value(raw)?,
             "diorama_direction" => p.diorama_direction = enum_value(raw)?,
@@ -410,7 +410,7 @@ mod tests {
         let half = Preset { filter_strength: 40, ..full.clone() };
         let text = presets_json(std::slice::from_ref(&half));
         assert!(text.contains("\"filter_strength\": 40"), "{text}");
-        // 読み直すと同じ。書いていなければ 100%、範囲の外は 100% に収める
+        // 読み直すと同じ。書いていなければ 100%、上限（200%）を超える値は 200% に収める
         let value: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(preset_from_value(&value["presets"][0]), Some(half.clone()));
         assert_eq!(preset_from_value(&serde_json::json!({"name": "B"})).unwrap().filter_strength, 100);
@@ -418,7 +418,13 @@ mod tests {
             preset_from_value(&serde_json::json!({"name": "C", "filter_strength": 250}))
                 .unwrap()
                 .filter_strength,
-            100
+            200
+        );
+        assert_eq!(
+            preset_from_value(&serde_json::json!({"name": "E", "filter_strength": 150}))
+                .unwrap()
+                .filter_strength,
+            150
         );
         assert_eq!(preset_from_value(&serde_json::json!({"name": "D", "filter_strength": -1})), None);
         // 当てはめると強さも変わる

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::adjust::{self, apply_lut, clip, curve_lut, s_curve, smoothstep, Lut};
 use crate::blur::{gaussian_blur, unsharp_mask};
 use crate::pillow::{self, blend, colorize_table, convert_l_matrix, luma, map_pixels, screen};
+use crate::pipeline::FILTER_STRENGTH_MAX;
 use crate::PIXELS_PER_TASK;
 
 const SEPIA_FACTORS: [f64; 3] = [1.07, 0.74, 0.43];
@@ -172,19 +173,22 @@ impl FilterType {
 }
 
 /// 画像にテイストをかける（なしなら何もしない）。ぼかしの半径は画像の短辺に比例させる。
-/// テイストを強さ strength（0〜100%）でかける: 元の写真とテイストをかけた写真を R・G・B ごとに混ぜる
-/// （四捨五入。アルファは元のまま）。100 以上は apply_filter と同じ、0 はテイストなし。
+/// テイストを強さ strength（0〜200%）でかける: 結果 = 元の写真 + (テイストをかけた写真 − 元の写真) × 強さ。
+///
+/// R・G・B ごとに四捨五入し、0〜255 に収める（アルファは元のまま）。100 は apply_filter と同じ、0 は
+/// テイストなし、100 を超えるとテイストによる変化を強める。上限（200）を超える値は上限として扱う。
 pub fn apply_filter_with_strength(image: &mut RgbaImage, filter: FilterType, strength: u32) {
+    let strength = strength.min(FILTER_STRENGTH_MAX);
     if filter == FilterType::None || strength == 0 {
         return;
     }
-    if strength >= 100 {
+    if strength == 100 {
         apply_filter(image, filter);
         return;
     }
     let original = image.clone();
     apply_filter(image, filter);
-    let (keep, take) = (100 - strength, strength);
+    let s = strength as i32;
     image
         .as_mut()
         .par_chunks_exact_mut(4)
@@ -192,7 +196,9 @@ pub fn apply_filter_with_strength(image: &mut RgbaImage, filter: FilterType, str
         .with_min_len(PIXELS_PER_TASK)
         .for_each(|(out, before)| {
             for c in 0..3 {
-                out[c] = ((u32::from(before[c]) * keep + u32::from(out[c]) * take + 50) / 100) as u8;
+                let (o, f) = (i32::from(before[c]), i32::from(out[c]));
+                // 100 倍した値で計算して四捨五入する（100% 以下なら元とテイストの重み付きの平均）
+                out[c] = ((o * 100 + (f - o) * s + 50).div_euclid(100)).clamp(0, 255) as u8;
             }
             out[3] = before[3];
         });
@@ -401,6 +407,24 @@ mod tests {
         let quarter = at(25);
         let p = (quarter.get_pixel(10, 5), image.get_pixel(10, 5), full.get_pixel(10, 5));
         assert_eq!(u32::from(p.0[0]), (u32::from(p.1[0]) * 75 + u32::from(p.2[0]) * 25 + 50) / 100);
+        // 100% を超えると変化を強める（0〜255 に収める）。上限を超える値は上限と同じ
+        let strong = at(150);
+        for ((s, o), f) in strong.pixels().zip(image.pixels()).zip(full.pixels()) {
+            for c in 0..3 {
+                let (o, f) = (i32::from(o[c]), i32::from(f[c]));
+                assert_eq!(i32::from(s[c]), ((o * 100 + (f - o) * 150 + 50).div_euclid(100)).clamp(0, 255));
+            }
+        }
+        assert_eq!(at(200), {
+            let mut twice = image.clone();
+            for (t, (o, f)) in twice.pixels_mut().zip(image.pixels().zip(full.pixels())) {
+                for c in 0..3 {
+                    t[c] = (2 * i32::from(f[c]) - i32::from(o[c])).clamp(0, 255) as u8;
+                }
+            }
+            twice
+        });
+        assert_eq!(at(500), at(200));
         // テイストなしは強さによらず何もしない
         let mut none = image.clone();
         apply_filter_with_strength(&mut none, FilterType::None, 40);

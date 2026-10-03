@@ -45,8 +45,11 @@ const DETAIL: Slider[] = [
 /** 割合を「50%」のように表示する。 */
 export const percentText = (value: number) => `${value}%`;
 
-/** テイストの強さ（旧版にはない。元の写真とテイストをかけた写真を混ぜる）。テイストが「なし」のときは使えない。 */
-const STRENGTH: Slider[] = [{ key: "filterStrength", label: "強さ", min: 0, max: 100, initial: 100, text: percentText }];
+/**
+ * テイストの強さ（旧版にはない）。100% がテイストのまま、下げると元の写真に近づき、上げる（最大 200%）と
+ * テイストによる変化を強める。テイストが「なし」のときは使えない。
+ */
+const STRENGTH: Slider[] = [{ key: "filterStrength", label: "強さ", min: 0, max: 200, initial: 100, text: percentText }];
 
 /** 「ジオラマ」タブのスライダー（旧版 FR-UI-62）。ぼかしの次に「帯の向き」を置く。 */
 const DIORAMA_BLUR: Slider[] = [{ key: "dioramaBlur", label: "ぼかし", min: 0, max: 100, initial: 0 }];

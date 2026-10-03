@@ -43,7 +43,8 @@ const APP_NAME: &str = "ImageEditorRT";
 struct Loaded {
     /// 保存のときは別のスレッドで使うので、複製せずに共有する
     original: Option<Arc<RgbaImage>>,
-    preview: Option<RgbaImage>,
+    /// プレビューの処理中に鍵を持ち続けないよう、複製せずに共有する
+    preview: Option<Arc<RgbaImage>>,
     factor: f64,
     source: Source,
 }
@@ -93,15 +94,21 @@ fn file_name(path: &Path) -> String {
 }
 
 /// 読み込んだ画像を状態に置き、ウィンドウのタイトルを変える。
-fn store(
-    state: &AppState,
-    window: &WebviewWindow,
+/// 重い処理（読み込み・縮小など）を、非同期の処理のスレッドを止めないよう別のスレッドで行う。
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
+}
+
+/// 読み込んだ画像からプレビュー用の縮小版を作り、画面に返す情報と、覚えておく状態をそろえる（別のスレッドで呼ぶ）。
+fn prepare(
     name: String,
     decoded: decode::Decoded,
     decode_ms: f64,
     exif: ExifInfo,
     source: Source,
-) -> Result<OpenInfo, String> {
+) -> (OpenInfo, Loaded) {
     let start = Instant::now();
     let original = decoded.image;
     let (small, factor) = pipeline::make_preview(&original, PREVIEW_MAX_SIDE);
@@ -118,9 +125,19 @@ fn store(
         exif,
         name,
     };
+    let loaded =
+        Loaded { original: Some(Arc::new(original)), preview: Some(Arc::new(small)), factor, source };
+    (info, loaded)
+}
+
+/// 読み込んだ画像を今の画像にし、ウィンドウのタイトルを「ファイル名 — ImageEditorRT」にする。
+fn store(
+    state: &AppState,
+    window: &WebviewWindow,
+    (info, loaded): (OpenInfo, Loaded),
+) -> Result<OpenInfo, String> {
     let _ = window.set_title(&format!("{} — {APP_NAME}", info.name));
-    let mut loaded = state.0.lock().map_err(|e| e.to_string())?;
-    *loaded = Loaded { original: Some(Arc::new(original)), preview: Some(small), factor, source };
+    *state.0.lock().map_err(|e| e.to_string())? = loaded;
     Ok(info)
 }
 
@@ -137,28 +154,35 @@ async fn open_path(
         let ext = path.extension().map_or("(なし)".into(), |e| format!(".{}", e.to_string_lossy()));
         return Err(format!("対応していない拡張子です: {ext}"));
     }
-    let start = Instant::now();
-    let bytes = std::fs::read(&path).map_err(|e| format!("画像を読み込めません: {name}\n({e})"))?;
-    let decoded = decode::decode_file(&bytes).map_err(|e| match e {
-        DecodeError::UnsupportedFormat(_) => e.to_string(),
-        _ => format!("画像を読み込めません: {name}\n({e})"),
-    })?;
-    let decode_ms = elapsed_ms(start);
-    // EXIF が壊れていても画像は開く（EXIF なしとして扱う）
-    let exif = read_exif_info(&bytes);
-    let source =
-        Source { format: Some(decoded.format), exif: raw_exif(&bytes), path: Some(path), pasted: false };
-    store(&state, &window, name, decoded, decode_ms, exif, source)
+    let prepared = blocking(move || {
+        let start = Instant::now();
+        let bytes = std::fs::read(&path).map_err(|e| format!("画像を読み込めません: {name}\n({e})"))?;
+        let decoded = decode::decode_file(&bytes).map_err(|e| match e {
+            DecodeError::UnsupportedFormat(_) => e.to_string(),
+            _ => format!("画像を読み込めません: {name}\n({e})"),
+        })?;
+        let decode_ms = elapsed_ms(start);
+        // EXIF が壊れていても画像は開く（EXIF なしとして扱う）
+        let exif = read_exif_info(&bytes);
+        let source =
+            Source { format: Some(decoded.format), exif: raw_exif(&bytes), path: Some(path), pasted: false };
+        Ok(prepare(name, decoded, decode_ms, exif, source))
+    })
+    .await?;
+    store(&state, &window, prepared)
 }
 
 /// 計測用の画像（6000×4000）を作って読み込んだことにする。
 #[tauri::command]
 async fn open_sample(state: State<'_, AppState>, window: WebviewWindow) -> Result<OpenInfo, String> {
-    let start = Instant::now();
-    let image = sample::synthetic_photo(SAMPLE_SIZE.0, SAMPLE_SIZE.1);
-    let decoded = decode::Decoded { image, format: Format::Png, frame_count: 1 };
-    let (name, exif) = ("計測用の画像".into(), ExifInfo::default());
-    store(&state, &window, name, decoded, elapsed_ms(start), exif, Source::default())
+    let prepared = blocking(|| {
+        let start = Instant::now();
+        let image = sample::synthetic_photo(SAMPLE_SIZE.0, SAMPLE_SIZE.1);
+        let decoded = decode::Decoded { image, format: Format::Png, frame_count: 1 };
+        Ok(prepare("計測用の画像".into(), decoded, elapsed_ms(start), ExifInfo::default(), Source::default()))
+    })
+    .await?;
+    store(&state, &window, prepared)
 }
 
 /// 読み込める拡張子（ファイルを選ぶダイアログ・ドロップの判定に使う）・保存できる拡張子・対応形式の説明。
@@ -185,14 +209,17 @@ async fn render_preview(
     comparing: bool,
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
-    let (image, render_time) = {
+    // 鍵は画像を取り出すあいだだけ持ち、処理は別のスレッドで行う（その間もほかの問い合わせに答えられる）
+    let (preview, factor, settings) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        let image = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
-        let settings = shown_settings(&loaded, settings, comparing);
-        let start = Instant::now();
-        (pipeline::render_preview_with_histogram(image, &settings, loaded.factor, trimmed), start.elapsed())
+        let preview = loaded.preview.clone().ok_or("画像が読み込まれていません")?;
+        (preview, loaded.factor, shown_settings(&loaded, settings, comparing))
     };
-    let (image, histogram) = image;
+    let ((image, histogram), render_time) = blocking(move || {
+        let start = Instant::now();
+        Ok((pipeline::render_preview_with_histogram(&preview, &settings, factor, trimmed), start.elapsed()))
+    })
+    .await?;
     let (width, height) = image.dimensions();
     let pixels = image.into_raw();
     let histogram = histogram.to_le_bytes();
@@ -248,10 +275,8 @@ async fn render_actual_size(
         let settings = shown_settings(&loaded, settings, comparing);
         (original, settings)
     };
-    let image = tauri::async_runtime::spawn_blocking(move || pipeline::apply_edits(&original, &settings))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+    let image =
+        blocking(move || pipeline::apply_edits(&original, &settings).map_err(|e| e.to_string())).await?;
     let (width, height) = image.dimensions();
     let pixels = image.into_raw();
     let mut body = Vec::with_capacity(8 + pixels.len());
@@ -309,11 +334,15 @@ fn clipboard_text() -> Option<String> {
 async fn open_clipboard_image(state: State<'_, AppState>, window: WebviewWindow) -> Result<OpenInfo, String> {
     let start = Instant::now();
     let data = clipboard::image_data().ok_or("クリップボードに画像がありません")?;
-    let decoded = decode::decode_file(&data).map_err(|e| format!("画像を貼り付けられません\n({e})"))?;
-    let decoded = decode::Decoded { format: Format::Png, frame_count: 1, ..decoded };
-    let exif = ExifInfo { empty: true, ..ExifInfo::default() };
-    let source = Source { format: Some(Format::Png), pasted: true, ..Source::default() };
-    store(&state, &window, save::PASTED_NAME.into(), decoded, elapsed_ms(start), exif, source)
+    let prepared = blocking(move || {
+        let decoded = decode::decode_file(&data).map_err(|e| format!("画像を貼り付けられません\n({e})"))?;
+        let decoded = decode::Decoded { format: Format::Png, frame_count: 1, ..decoded };
+        let exif = ExifInfo { empty: true, ..ExifInfo::default() };
+        let source = Source { format: Some(Format::Png), pasted: true, ..Source::default() };
+        Ok(prepare(save::PASTED_NAME.into(), decoded, elapsed_ms(start), exif, source))
+    })
+    .await?;
+    store(&state, &window, prepared)
 }
 
 /// 保存できなかったとき、画面に返す理由。kind が "sameFile" なら保存ダイアログを開き直す。

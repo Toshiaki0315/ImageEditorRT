@@ -275,6 +275,37 @@ pub fn diorama_guide(preview_size: (u32, u32), settings: &EditSettings, factor: 
     } else {
         (area.x as f64, area.width as f64, f64::from(size.0))
     };
+    guide_lines(settings, horizontal, start, length, total)
+}
+
+/// 100% 表示（原寸で処理した保存結果）に重ねるジオラマのガイド。帯の位置は、保存結果のうち
+/// フレームの余白を除いた写真の部分に対する（リサイズ後の大きさで計算する）。
+pub fn actual_size_diorama_guide(
+    original_size: (u32, u32),
+    settings: &EditSettings,
+) -> Result<DioramaGuide, SizeError> {
+    let size = settings.orientation.size(original_size);
+    let photo = effective_crop(size, settings.crop, settings.frame, settings.shape)
+        .map_or(size, |r| (r.width as u32, r.height as u32));
+    let photo = transform::fit_size(photo, settings.width, settings.height, settings.keep_aspect)?;
+    let (left, top, right, bottom) = frames::frame_margins(settings.frame, photo);
+    let horizontal = settings.diorama_direction == DioramaDirection::Horizontal;
+    let (start, length, total) = if horizontal {
+        (top, photo.1, top + photo.1 + bottom)
+    } else {
+        (left, photo.0, left + photo.0 + right)
+    };
+    Ok(guide_lines(settings, horizontal, f64::from(start), f64::from(length), f64::from(total)))
+}
+
+/// 帯の 4 本の線（表示している画像の中の、写真の始まり start・長さ length・画像全体 total から）。
+fn guide_lines(
+    settings: &EditSettings,
+    horizontal: bool,
+    start: f64,
+    length: f64,
+    total: f64,
+) -> DioramaGuide {
     let band = diorama::diorama_band(&settings.diorama());
     let at = |fraction: f64| (start + fraction * length) / total;
     DioramaGuide {
@@ -296,6 +327,17 @@ pub fn output_size(original_size: (u32, u32), settings: &EditSettings) -> Result
     }
     let size = transform::fit_size(size, settings.width, settings.height, settings.keep_aspect)?;
     Ok(frames::framed_size(size, settings.frame))
+}
+
+/// 加工前の表示（旧版 FR-UI-44）の設定: 向きと、実際に切り抜く範囲だけを残す。
+///
+/// 色の調整・テイスト・ディテール・ジオラマ・周辺減光・経年劣化・形・フレーム・文字・リサイズは外す。
+/// フレーム・円の比に合わせた範囲も、そのままの範囲で見比べられるよう切り抜く範囲として残す。
+/// original_size は回転・反転する前の原寸。
+pub fn before_settings(original_size: (u32, u32), settings: &EditSettings) -> EditSettings {
+    let size = settings.orientation.size(original_size);
+    let crop = effective_crop(size, settings.crop, settings.frame, settings.shape);
+    EditSettings { orientation: settings.orientation, crop, ..EditSettings::default() }
 }
 
 /// 実際に切り抜く範囲を返す（size の画像の座標）。切り抜かないなら None。
@@ -535,6 +577,64 @@ mod tests {
         let guide = diorama_guide((200, 100), &vertical, 1.0);
         assert!(!guide.horizontal);
         assert!((guide.lines[1].0 - 0.4).abs() < 1e-9);
+    }
+
+    #[test]
+    fn before_settings_keep_only_orientation_and_crop() {
+        let settings = EditSettings {
+            orientation: Orientation::new(90, true),
+            crop: Some(CropRect::new(10, 20, 100, 60)),
+            frame: FrameType::Polaroid,
+            shape: ShapeType::Circle,
+            corner_radius: 30,
+            filter: FilterType::Sepia,
+            exposure: 1.5,
+            vignette: 40,
+            sharpen: 50,
+            diorama_blur: 60,
+            width: Some(50),
+            text: TextSettings { text: "ABC".into(), ..TextSettings::default() },
+            ..EditSettings::default()
+        };
+        let before = before_settings((300, 200), &settings);
+        // フレームの写真部分の比に合わせた範囲を、そのまま切り抜く範囲として残す
+        let crop = effective_crop((200, 300), settings.crop, FrameType::Polaroid, ShapeType::Circle);
+        assert!(crop.is_some() && crop != settings.crop);
+        assert_eq!(
+            before,
+            EditSettings { orientation: settings.orientation, crop, ..EditSettings::default() }
+        );
+        // 範囲がなくフレーム・形もなければ、向きだけ
+        let plain = EditSettings { orientation: Orientation::new(180, false), ..EditSettings::default() };
+        assert_eq!(before_settings((300, 200), &plain), plain);
+    }
+
+    #[test]
+    fn actual_size_guide_is_relative_to_the_saved_photo() {
+        let settings = EditSettings {
+            diorama_position: 50,
+            diorama_width: 20,
+            crop: Some(CropRect::new(0, 40, 400, 80)),
+            width: Some(200),
+            keep_aspect: true,
+            ..EditSettings::default()
+        };
+        // 保存結果は切り抜いた写真そのもの（リサイズしても割合は同じ）
+        let guide = actual_size_diorama_guide((400, 200), &settings).unwrap();
+        let solid: Vec<f64> = guide.lines.iter().filter(|l| l.1).map(|l| l.0).collect();
+        assert!((solid[0] - 0.4).abs() < 1e-9 && (solid[1] - 0.6).abs() < 1e-9, "{solid:?}");
+        // フレームがあれば、余白を除いた写真の部分に対する位置
+        let framed = EditSettings { frame: FrameType::Polaroid, crop: None, ..settings };
+        let photo = {
+            let rect = effective_crop((400, 200), None, FrameType::Polaroid, ShapeType::Rectangle).unwrap();
+            transform::fit_size((rect.width as u32, rect.height as u32), Some(200), None, true).unwrap()
+        };
+        let (_, top, _, bottom) = frames::frame_margins(FrameType::Polaroid, photo);
+        let total = f64::from(top + photo.1 + bottom);
+        let guide = actual_size_diorama_guide((400, 200), &framed).unwrap();
+        let expected = (f64::from(top) + 0.4 * f64::from(photo.1)) / total;
+        assert!((guide.lines[1].0 - expected).abs() < 1e-9, "{:?} {expected}", guide.lines);
+        assert_eq!(output_size((400, 200), &framed).unwrap().1, top + photo.1 + bottom);
     }
 
     #[test]

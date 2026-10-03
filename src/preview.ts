@@ -30,6 +30,8 @@ export class Preview {
   private pending: EditSettings | null = null;
   /** 切り抜いた範囲だけを表示する（「トリミング実行」） */
   trimmed = false;
+  /** 加工前を表示する（向きと切り抜く範囲だけを残す） */
+  comparing = false;
   /** 表示の大きさが変わったとき（ガイド・範囲の線を描き直す） */
   onResize: () => void = () => {};
   /** 描き直したとき、保存される写真のヒストグラムを知らせる */
@@ -91,7 +93,7 @@ export class Preview {
   /** Rust にプレビューを作らせて描き、内訳を返す。 */
   async render(settings: EditSettings, trimmed = false): Promise<Timing> {
     const start = performance.now();
-    const buffer = await invoke<ArrayBuffer>("render_preview", { settings, trimmed });
+    const buffer = await invoke<ArrayBuffer>("render_preview", { settings, trimmed, comparing: this.comparing });
     const received = performance.now();
     const header = new DataView(buffer, 0, 12);
     const width = header.getUint32(0, true);

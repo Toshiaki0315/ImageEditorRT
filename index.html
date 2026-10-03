@@ -18,6 +18,15 @@
           <!-- ジオラマのピントの帯のガイド（「ジオラマ」タブを開いている間だけ） -->
           <svg id="guide" class="guide" hidden preserveAspectRatio="none" viewBox="0 0 1 1"></svg>
         </div>
+        <!-- 100% 表示（表示 > 100% で表示）。ドラッグ・スクロールで動かす -->
+        <div id="zoom" class="zoom" hidden>
+          <div id="zoom-image" class="zoom-image">
+            <canvas id="zoom-canvas"></canvas>
+            <svg id="zoom-guide" class="guide" hidden preserveAspectRatio="none" viewBox="0 0 1 1"></svg>
+          </div>
+        </div>
+        <!-- 左上の表示（「加工前」「100%」「更新中…」） -->
+        <div id="badge" class="badge" hidden></div>
         <!-- R・G・B・輝度のヒストグラム（表示 > ヒストグラム） -->
         <canvas id="histogram" class="histogram" hidden></canvas>
       </section>
@@ -76,7 +85,7 @@
         <div id="page-diorama" class="page" role="tabpanel" hidden></div>
         <div id="page-exif" class="page exif" role="tabpanel" hidden></div>
         <div class="actions">
-          <button type="button" id="before" disabled title="#19 で作ります">加工前</button>
+          <button type="button" id="before" disabled title="押している間だけ加工前の画像を表示します（\ キー）">加工前</button>
           <button type="button" id="save" disabled>保存</button>
           <button type="button" id="reset" disabled title="#20 で作ります">リセット</button>
         </div>

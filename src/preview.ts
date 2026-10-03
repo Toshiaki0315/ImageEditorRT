@@ -1,8 +1,7 @@
 // プレビュー: Rust に設定をかけさせた縮小版を canvas に描き、エリアに収まるよう縦横比を保って表示する。
 
 import { invoke } from "@tauri-apps/api/core";
-import type { Histogram } from "./histogram";
-import { readPreview } from "./protocol";
+import { type Histogram, readPreview } from "./protocol";
 import type { EditSettings } from "./types";
 
 /** 1 回の描き直しの内訳 (ms)。 */

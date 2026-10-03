@@ -4,6 +4,24 @@
 /** マウスのホイールを行単位で送ってきたときの 1 行の移動量 (px)。1 段（3 行）で 30px（旧版と同じ） */
 const LINE_SCROLL_PX = 10;
 
+/** 大きさ（論理ピクセル）。 */
+export type Size = { width: number; height: number };
+
+/**
+ * 画像の左上の位置を、見える範囲に収める: 画像が表示より小さい向きは中央にそろえ、大きい向きは
+ * はみ出し過ぎない（端が表示の内側に入らない）ようにする。
+ */
+export function clampOffset(x: number, y: number, image: Size, area: Size): { x: number; y: number } {
+  const clamp = (value: number, length: number, room: number) =>
+    length <= room ? (room - length) / 2 : Math.min(0, Math.max(room - length, value));
+  return { x: clamp(x, image.width, area.width), y: clamp(y, image.height, area.height) };
+}
+
+/** 画像の点 center（画素）を表示の中央に置くときの、画像の左上の位置（ratio は画面の 1 論理ピクセルあたりの画素）。 */
+export function centeredOffset(center: [number, number], area: Size, ratio: number): { x: number; y: number } {
+  return { x: area.width / 2 - center[0] / ratio, y: area.height / 2 - center[1] / ratio };
+}
+
 export class ZoomView {
   private readonly context: CanvasRenderingContext2D;
   /** 画像の左上（表示エリアの座標、論理ピクセル） */
@@ -16,12 +34,16 @@ export class ZoomView {
   /** ダブルクリックしたとき（画面に合わせた表示に戻す） */
   onDoubleClick: () => void = () => {};
 
-  constructor(
-    private readonly stage: HTMLElement,
-    private readonly container: HTMLElement,
-    private readonly holder: HTMLElement,
-    private readonly canvas: HTMLCanvasElement,
-  ) {
+  private readonly stage: HTMLElement;
+  private readonly container: HTMLElement;
+  private readonly holder: HTMLElement;
+  private readonly canvas: HTMLCanvasElement;
+
+  constructor(stage: HTMLElement, container: HTMLElement, holder: HTMLElement, canvas: HTMLCanvasElement) {
+    this.stage = stage;
+    this.container = container;
+    this.holder = holder;
+    this.canvas = canvas;
     this.context = canvas.getContext("2d")!;
     container.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || !this.size) return;
@@ -75,8 +97,8 @@ export class ZoomView {
     this.context.putImageData(new ImageData(pixels, width, height), 0, 0);
     this.container.hidden = false;
     if (center || !previous || previous[0] !== width || previous[1] !== height) {
-      const [cx, cy] = center ?? [width / 2, height / 2];
-      this.moveTo(this.stage.clientWidth / 2 - cx / ratio, this.stage.clientHeight / 2 - cy / ratio);
+      const start = centeredOffset(center ?? [width / 2, height / 2], this.area(), ratio);
+      this.moveTo(start.x, start.y);
     } else {
       this.moveTo(this.offset.x, this.offset.y);
     }
@@ -98,16 +120,16 @@ export class ZoomView {
     return { ...this.offset, width: this.size[0] / ratio, height: this.size[1] / ratio };
   }
 
+  /** 表示エリアの大きさ。 */
+  private area(): Size {
+    return { width: this.stage.clientWidth, height: this.stage.clientHeight };
+  }
+
   /** 画像が表示より小さい向きは中央にそろえ、大きい向きははみ出し過ぎないよう止める。 */
   private moveTo(x: number, y: number) {
     const rect = this.rect();
     if (!rect) return;
-    const clamp = (value: number, length: number, area: number) =>
-      length <= area ? (area - length) / 2 : Math.min(0, Math.max(area - length, value));
-    this.offset = {
-      x: clamp(x, rect.width, this.stage.clientWidth),
-      y: clamp(y, rect.height, this.stage.clientHeight),
-    };
+    this.offset = clampOffset(x, y, rect, this.area());
     this.holder.style.transform = `translate(${this.offset.x}px, ${this.offset.y}px)`;
     this.onMove();
   }

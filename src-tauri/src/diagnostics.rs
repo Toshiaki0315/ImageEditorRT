@@ -78,9 +78,14 @@ pub fn install_panic_hook() {
             _ => "パニック".to_string(),
         };
         let place = info.location().map(|l| format!(" ({}:{})", l.file(), l.line())).unwrap_or_default();
-        let backtrace = std::backtrace::Backtrace::force_capture();
+        // リリース版は名前の情報を外してある（strip）ので、呼び出しの履歴は開発版のときだけ書く
+        let backtrace = if cfg!(debug_assertions) {
+            format!("\n{}", std::backtrace::Backtrace::force_capture())
+        } else {
+            String::new()
+        };
         if let Some(path) = log_path() {
-            append(&path, &format!("パニック: {message}{place}\n{backtrace}"));
+            append(&path, &format!("パニック: {message}{place}{backtrace}"));
             if let Some(app) = APP.get() {
                 let payload = Unexpected { message, log_path: path.to_string_lossy().into_owned() };
                 let _ = app.emit(UNEXPECTED_EVENT, payload);

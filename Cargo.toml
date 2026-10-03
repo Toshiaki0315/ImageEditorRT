@@ -11,7 +11,8 @@ version = "0.1.0"
 codegen-units = 1
 lto = true
 opt-level = 3
-panic = "abort"
+# パニックはそのスレッドの中で止める（unwind）。開く・保存などの処理で想定外のエラーが起きても、
+# ログに書いて知らせ、アプリは続ける（panic = "abort" にすると、その場でアプリが終了する）
 strip = true
 
 # 開発中も画像処理は速くする（テスト・ベンチマークの時間を短くする）

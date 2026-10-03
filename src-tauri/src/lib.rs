@@ -29,7 +29,7 @@ use imageeditorrt_core::text::{TextFont, TextPosition};
 use imageeditorrt_core::transform::{AspectRatio, CropRect, OrientOp, Orientation};
 use serde::Serialize;
 use tauri::ipc::Response;
-use tauri::{AppHandle, Manager, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 
 /// 計測用の画像の大きさ（旧版のベンチマークと同じ 6000×4000）。
 const SAMPLE_SIZE: (u32, u32) = (6000, 4000);
@@ -211,6 +211,18 @@ fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<(), 
     let _ = window.set_title(APP_NAME);
     *state.0.lock().map_err(|e| e.to_string())? = Loaded::default();
     Ok(())
+}
+
+/// 画面が終了してよいと確かめたか（Dock の「終了」などで届く終了の求めを、それまでは止める）。
+static QUIT_CONFIRMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// 終了の求めを画面に知らせるイベント（画面が未保存の変更を確かめて、quit_app を呼ぶ）。
+const QUIT_EVENT: &str = "quit-requested";
+
+/// アプリを終了する（画面が未保存の変更を確かめた後に呼ぶ）。
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    QUIT_CONFIRMED.store(true, std::sync::atomic::Ordering::SeqCst);
+    app.exit(0);
 }
 
 /// 表示に使う設定。comparing（加工前の表示）なら、向きと切り抜く範囲だけを残す。
@@ -590,6 +602,7 @@ pub fn run() {
             set_menu_checked,
             set_menu_enabled,
             close_image,
+            quit_app,
             clipboard_contents,
             clipboard_text,
             open_clipboard_image,
@@ -617,6 +630,14 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("ImageEditorRT を起動できませんでした");
     app.run(|handle, event| {
+        // Dock の「終了」・ログアウトなどで届く終了の求めは、画面が未保存の変更を確かめるまで止める
+        if let tauri::RunEvent::ExitRequested { code: None, api, .. } = &event {
+            if !QUIT_CONFIRMED.load(std::sync::atomic::Ordering::SeqCst) {
+                api.prevent_exit();
+                let _ = handle.emit(QUIT_EVENT, ());
+                return;
+            }
+        }
         // Finder の「このアプリケーションで開く」・Dock のアイコンへのドロップ
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Opened { urls } = event {

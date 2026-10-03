@@ -15,6 +15,11 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 scripts/build_app.sh --install   # ビルドして /Applications/ImageEditorRT.app に入れる（Node.js と Rust が必要）
 ```
 
+- ビルドの最後に、画面を出さずに起動確認をする（作った画像と HEIC の画像を読めるか）。
+- ImageEditorRT が起動していると入れ替えない。終了してから、もう一度実行する。
+- `--install` を付けなければ、`target/release/bundle/macos/ImageEditorRT.app` を作るだけ。
+- Finder の「このアプリケーションで開く」・Dock のアイコンへのドロップでも画像を開ける（既定のアプリは変えない）。
+
 よく使うコマンドは `make` でも動かせる:
 
 | コマンド | すること |
@@ -24,11 +29,6 @@ scripts/build_app.sh --install   # ビルドして /Applications/ImageEditorRT.a
 | `make dmg` | `.app` を作ってからディスクイメージにする（`target/release/bundle/dmg/ImageEditorRT_<版>_arm64.dmg`。開いて Applications にドラッグすればインストールできる） |
 
 どれも、画面の依存パッケージ（`node_modules`）がなければ先に入れる。
-
-- ビルドの最後に、画面を出さずに起動確認をする（作った画像と HEIC の画像を読めるか）。
-- ImageEditorRT が起動していると入れ替えない。終了してから、もう一度実行する。
-- `--install` を付けなければ、`target/release/bundle/macos/ImageEditorRT.app` を作るだけ。
-- Finder の「このアプリケーションで開く」・Dock のアイコンへのドロップでも画像を開ける（既定のアプリは変えない）。
 
 ## 使い方
 

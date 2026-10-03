@@ -1,6 +1,6 @@
 //! 保存（原寸で処理して書き出す）と、保存ダイアログの初期のパス。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use imageeditorrt_core::formats::Format;
@@ -11,7 +11,7 @@ use tauri::State;
 
 #[cfg(target_os = "macos")]
 use crate::clipboard;
-use crate::state::{file_name, AppState};
+use crate::state::{file_name, AppState, Source};
 
 /// 保存ダイアログの初期のパス `<元の名前>_edited.<拡張子>`（重ならない名前）。
 ///
@@ -20,13 +20,22 @@ use crate::state::{file_name, AppState};
 #[tauri::command]
 pub fn default_save_path(stamp: String, state: State<'_, AppState>) -> Result<Option<String>, String> {
     let loaded = state.0.lock().map_err(|e| e.to_string())?;
-    let path = match (&loaded.source.path, loaded.source.pasted) {
-        (Some(path), _) => Some(save::default_save_path(path)),
-        #[cfg(target_os = "macos")]
-        (None, true) => clipboard::pictures_or_home().map(|folder| save::pasted_save_path(&stamp, &folder)),
-        _ => None,
-    };
+    #[cfg(target_os = "macos")]
+    let pictures = clipboard::pictures_or_home();
+    #[cfg(not(target_os = "macos"))]
+    let pictures = None;
+    let path = initial_save_path(&loaded.source, &stamp, pictures.as_deref());
     Ok(path.map(|p| p.to_string_lossy().into_owned()))
+}
+
+/// 保存ダイアログの初期のパス: 元のファイルがあれば `<元の名前>_edited`、貼り付けた画像なら
+/// pictures（ピクチャ、なければホーム）の `クリップボード_<stamp>.png`、どちらでもなければ None。
+fn initial_save_path(source: &Source, stamp: &str, pictures: Option<&Path>) -> Option<PathBuf> {
+    match (&source.path, source.pasted) {
+        (Some(path), _) => Some(save::default_save_path(path)),
+        (None, true) => pictures.map(|folder| save::pasted_save_path(stamp, folder)),
+        (None, false) => None,
+    }
 }
 
 /// 保存できなかったとき、画面に返す理由。kind が "sameFile" なら保存ダイアログを開き直す。
@@ -95,4 +104,36 @@ pub async fn save_image(
     .await
     .map_err(SaveFailure::other)??;
     Ok(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn initial_save_paths() {
+        let dir = std::env::temp_dir().join(format!("imageeditorrt-app-savepath-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // 元のファイルがあれば、同じフォルダの <名前>_edited（すでにあれば _edited_2）
+        let photo = dir.join("photo.JPG");
+        std::fs::write(&photo, b"x").unwrap();
+        let from_file = Source { path: Some(photo.clone()), ..Source::default() };
+        assert_eq!(
+            initial_save_path(&from_file, "20261004-120000", Some(&dir)),
+            Some(dir.join("photo_edited.JPG"))
+        );
+        std::fs::write(dir.join("photo_edited.JPG"), b"x").unwrap();
+        assert_eq!(initial_save_path(&from_file, "s", None), Some(dir.join("photo_edited_2.JPG")));
+        // 貼り付けた画像はピクチャ（なければホーム）の クリップボード_<日時>.png
+        let pasted = Source { pasted: true, ..Source::default() };
+        assert_eq!(
+            initial_save_path(&pasted, "20261004-120000", Some(&dir)),
+            Some(dir.join("クリップボード_20261004-120000.png"))
+        );
+        assert_eq!(initial_save_path(&pasted, "s", None), None);
+        // 計測用の画像など、どちらでもなければ None（画面が名前を決める）
+        assert_eq!(initial_save_path(&Source::default(), "s", Some(&dir)), None);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

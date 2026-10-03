@@ -85,8 +85,13 @@ pub fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<
 
 /// 表示に使う設定。comparing（加工前の表示）なら、向きと切り抜く範囲だけを残す。
 pub(crate) fn shown_settings(loaded: &Loaded, settings: EditSettings, comparing: bool) -> EditSettings {
-    match (&loaded.original, comparing) {
-        (Some(original), true) => pipeline::before_settings(original.dimensions(), &settings),
+    shown_for(loaded.original.as_ref().map(|o| o.dimensions()), settings, comparing)
+}
+
+/// original_size（原寸。画像がなければ None）の画像に、表示で使う設定。
+fn shown_for(original_size: Option<(u32, u32)>, settings: EditSettings, comparing: bool) -> EditSettings {
+    match (original_size, comparing) {
+        (Some(size), true) => pipeline::before_settings(size, &settings),
         _ => settings,
     }
 }
@@ -169,4 +174,34 @@ pub fn diorama_guide(
     let preview = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
     let settings = if trimmed { EditSettings { crop: None, ..settings } } else { settings };
     Ok(pipeline::diorama_guide(preview.dimensions(), &settings, loaded.factor))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use imageeditorrt_core::filters::FilterType;
+    use imageeditorrt_core::frames::FrameType;
+    use imageeditorrt_core::transform::{CropRect, Orientation};
+
+    #[test]
+    fn before_settings_only_while_comparing() {
+        let settings = EditSettings {
+            filter: FilterType::Sepia,
+            frame: FrameType::Polaroid,
+            orientation: Orientation::new(90, false),
+            crop: Some(CropRect::new(10, 10, 200, 100)),
+            ..EditSettings::default()
+        };
+        // 比べていなければそのまま
+        assert_eq!(shown_for(Some((400, 300)), settings.clone(), false), settings);
+        // 比べている間は加工前（向きと、フレームの比に合わせた範囲だけ）
+        let before = shown_for(Some((400, 300)), settings.clone(), true);
+        assert_eq!(before, pipeline::before_settings((400, 300), &settings));
+        assert_eq!(
+            (before.filter, before.frame, before.orientation),
+            (FilterType::None, FrameType::None, settings.orientation)
+        );
+        // 画像がなければそのまま
+        assert_eq!(shown_for(None, settings.clone(), true), settings);
+    }
 }

@@ -5,6 +5,7 @@
 pub const PIXELS_PER_TASK: usize = 4096;
 
 pub mod adjust;
+pub mod batch;
 pub mod blur;
 pub mod crop;
 #[cfg(target_os = "macos")]

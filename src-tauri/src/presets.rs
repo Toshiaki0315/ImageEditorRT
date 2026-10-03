@@ -23,6 +23,13 @@ const SAVE_ID: &str = "preset-save";
 #[derive(Default)]
 pub struct PresetStore(Mutex<Vec<Preset>>);
 
+impl PresetStore {
+    /// name のプリセット（まとめて処理でかける）。
+    pub fn find(&self, name: &str) -> Option<Preset> {
+        self.0.lock().ok()?.iter().find(|p| p.name == name).cloned()
+    }
+}
+
 /// 起動時に読んだ結果。error は読めなかったときに知らせる文言（そのときはプリセットなしで使う）。
 #[derive(Serialize)]
 pub struct Loaded {

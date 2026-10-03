@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { bench, benchSave } from "./bench";
+import { BatchDialog } from "./batchDialog";
 import { type AspectState, CropController } from "./crop";
 import { OutputSize, type SizeState } from "./output";
 import { TextDialog } from "./textDialog";
@@ -78,6 +79,10 @@ let zoomCenter: [number, number] | null = null;
 let zoomTimer: ReturnType<typeof setTimeout> | undefined;
 /** 最後に保存したときの設定（未保存の変更の判定に使う） */
 let savedSettings: EditSettings | null = null;
+/** まとめて処理のダイアログ（対応形式の一覧を読んでから作る） */
+let batchDialog: BatchDialog;
+/** 画像を開いていないときの、まとめて処理の長辺の初期値 */
+const DEFAULT_BATCH_LONG_SIDE = 2048;
 /** プリセットの名前の一覧（「プリセット ▾」のメニューに出す） */
 let presetNames: string[] = [];
 /** スライダーをドラッグしている間（履歴に積むのを離すまで待つ） */
@@ -316,6 +321,27 @@ async function deletePreset(name: string) {
   } catch (error) {
     await showError("プリセットを保存できません", error);
   }
+}
+
+// --- まとめて処理（旧版 FR-UI-45） --------------------------------------------------
+
+/** まとめて処理のダイアログを開き、「開始」なら 1 枚ずつ処理して結果を知らせる（実行中は保存・開くを止める）。 */
+async function startBatch() {
+  if (saving || opening) return;
+  const result = await batchDialog.run({
+    presets: presetNames,
+    longSide: loaded ? output.longSide() : DEFAULT_BATCH_LONG_SIDE,
+    resize: loaded !== null && (settings.width !== null || settings.height !== null),
+    settings: structuredClone(settings),
+    save: saveOptions.value(),
+    onBusy: setSaving,
+  }).catch(async (error) => {
+    await showError("まとめて処理できません", error);
+    return null;
+  });
+  if (!result) return;
+  void updateStatus(`まとめて処理: ${result.saved} 枚を保存しました`);
+  await message(result.message, { title: "まとめて処理", kind: "info" });
 }
 
 // --- 加工前との比較（旧版 FR-UI-44） ------------------------------------------------
@@ -713,6 +739,7 @@ async function setup() {
     document.addEventListener(type, () => (sliderDragging = false));
   }
   resetButton.addEventListener("click", () => void resetImage());
+  batchDialog = new BatchDialog(extensions);
   const presetButton = $<HTMLButtonElement>("preset-button");
   presetButton.addEventListener("click", () =>
     showPresetMenu(presetButton).catch((error) => showError("プリセットのメニューを出せません", error)),
@@ -738,6 +765,7 @@ async function setup() {
   setupDrop();
   await listen<string>("menu", (event) => {
     if (event.payload === "open") void openDialog();
+    if (event.payload === "batch") void startBatch();
     if (event.payload === "save") void saveDialog();
     if (event.payload === "text" && loaded) textDialog.open();
     onPresetMenu(event.payload);

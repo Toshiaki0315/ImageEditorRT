@@ -1,0 +1,177 @@
+//! 一括処理（core/batch.rs）: 保存先の名前の決め方・画像の集め方・失敗と中止の扱い。
+
+use std::path::{Path, PathBuf};
+
+use image::{Rgba, RgbaImage};
+use imageeditorrt_core::batch::{
+    batch_settings, collect_images, output_path, run_batch, summary, BatchOptions,
+};
+use imageeditorrt_core::frames::FrameType;
+use imageeditorrt_core::pipeline::EditSettings;
+use imageeditorrt_core::presets::Preset;
+use imageeditorrt_core::save::SaveOptions;
+use imageeditorrt_core::shapes::ShapeType;
+
+/// テストごとの空のフォルダ。
+fn temp_dir(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("imageeditorrt-batch-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn touch(path: &Path) {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, b"x").unwrap();
+}
+
+fn options(look: Preset, long_side: Option<u32>) -> BatchOptions {
+    BatchOptions { look, long_side, save: SaveOptions::default() }
+}
+
+fn plain() -> Preset {
+    Preset::from_settings("今の加工", &EditSettings::default())
+}
+
+#[test]
+fn output_names() {
+    let dir = temp_dir("names");
+    let source = dir.join("in/photo.JPG");
+    touch(&source);
+    let out = dir.join("out");
+    // 元と同じ名前・拡張子（つづりもそのまま）
+    assert_eq!(output_path(&source, &out), out.join("photo.JPG"));
+    // 同じ名前があれば _edited、_edited_2 …
+    touch(&out.join("photo.JPG"));
+    assert_eq!(output_path(&source, &out), out.join("photo_edited.JPG"));
+    touch(&out.join("photo_edited.JPG"));
+    assert_eq!(output_path(&source, &out), out.join("photo_edited_2.JPG"));
+    // 保存できない形式（HEIC）は .jpg
+    assert_eq!(output_path(&dir.join("in/live.heic"), &out), out.join("live.jpg"));
+    // 元と同じフォルダに保存しても、元のファイルには書かない
+    assert_eq!(output_path(&source, &dir.join("in")), dir.join("in/photo_edited.JPG"));
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn collects_images_once_in_name_order() {
+    let dir = temp_dir("collect");
+    let folder = dir.join("folder");
+    for name in ["b.png", "A.jpg", "c.txt", ".hidden.png", "sub/d.png"] {
+        touch(&folder.join(name));
+    }
+    let single = dir.join("single.heic");
+    touch(&single);
+    let images =
+        collect_images(&[folder.clone(), single.clone(), folder.join("b.png"), dir.join("none.png")], &[]);
+    // フォルダは直下の対応形式の画像だけを名前順（大文字・小文字を区別しない）。隠しファイル・サブフォルダは除く
+    assert_eq!(images, vec![folder.join("A.jpg"), folder.join("b.png"), single.clone()]);
+    // すでに一覧にあるものは加えない（大文字・小文字の違いも同じファイル）
+    let more = collect_images(&[folder.join("A.JPG"), single.clone()], &images);
+    assert!(more.is_empty(), "{more:?}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn long_side_follows_the_photo_orientation() {
+    // 横長は幅、縦長は高さを長辺にする
+    let landscape = batch_settings(&options(plain(), Some(800)), (4000, 3000)).unwrap();
+    assert_eq!((landscape.width, landscape.height), (Some(800), None));
+    let portrait = batch_settings(&options(plain(), Some(800)), (3000, 4000)).unwrap();
+    assert_eq!((portrait.width, portrait.height), (None, Some(800)));
+    // 円は中央の正方形で決める（幅）。リサイズしなければ大きさはそのまま
+    let circle = Preset { shape: ShapeType::Circle, ..plain() };
+    assert_eq!(batch_settings(&options(circle, Some(500)), (3000, 4000)).unwrap().width, Some(500));
+    let framed = Preset { frame: FrameType::Polaroid, exposure: 1.0, ..plain() };
+    let settings = batch_settings(&options(framed, None), (4000, 3000)).unwrap();
+    assert_eq!(
+        (settings.width, settings.height, settings.frame, settings.exposure),
+        (None, None, FrameType::Polaroid, 1.0)
+    );
+    // 範囲の外はエラー
+    assert!(batch_settings(&options(plain(), Some(0)), (10, 10)).is_err());
+    assert!(batch_settings(&options(plain(), Some(20001)), (10, 10)).is_err());
+}
+
+#[test]
+fn failures_do_not_stop_and_cancel_stops_before_the_next() {
+    let sources: Vec<PathBuf> = ["a.png", "bad.png", "c.png", "d.png"].iter().map(PathBuf::from).collect();
+    let mut seen = Vec::new();
+    let results = run_batch(
+        &sources,
+        |p| {
+            if p.ends_with("bad.png") {
+                Err("壊れています".into())
+            } else {
+                Ok(PathBuf::from("out").join(p))
+            }
+        },
+        |index, p| seen.push((index, p.to_path_buf())),
+        || false,
+    );
+    assert_eq!(results.len(), 4);
+    assert_eq!(results[1].error.as_deref(), Some("壊れています"));
+    assert!(results[2].output.is_some());
+    assert_eq!(seen.iter().map(|s| s.0).collect::<Vec<_>>(), vec![0, 1, 2, 3]);
+    let text = summary(&results, false, Path::new("/out"));
+    assert_eq!(
+        text,
+        "3 枚を保存しました。\n保存先: /out\n\n1 枚は処理できませんでした:\n・bad.png（壊れています）"
+    );
+
+    // 中止: 2 枚目を処理し終えたところで中止されると、3 枚目からは処理しない
+    let done = std::cell::Cell::new(0);
+    let results = run_batch(
+        &sources,
+        |p| {
+            done.set(done.get() + 1);
+            Ok(p.to_path_buf())
+        },
+        |_, _| {},
+        || done.get() >= 2,
+    );
+    assert_eq!(results.len(), 2);
+    assert!(summary(&results, true, Path::new("/out")).starts_with("中止しました。2 枚を保存しました。"));
+}
+
+#[test]
+fn summary_lists_at_most_ten_failures() {
+    let results: Vec<_> = (0..12)
+        .map(|i| imageeditorrt_core::batch::BatchResult {
+            source: PathBuf::from(format!("{i}.png")),
+            output: None,
+            error: Some("x".into()),
+        })
+        .collect();
+    let text = summary(&results, false, Path::new("/o"));
+    assert_eq!(text.matches("・").count(), 10);
+    assert!(text.ends_with("…ほか 2 枚"), "{text}");
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn processes_files_and_keeps_going_after_a_broken_one() {
+    use imageeditorrt_core::batch::process_image;
+    let dir = temp_dir("process");
+    let input = dir.join("in");
+    std::fs::create_dir_all(&input).unwrap();
+    RgbaImage::from_pixel(40, 20, Rgba([200, 100, 50, 255])).save(input.join("wide.png")).unwrap();
+    RgbaImage::from_pixel(20, 40, Rgba([10, 20, 30, 255])).save(input.join("tall.png")).unwrap();
+    std::fs::write(input.join("broken.png"), b"not a png").unwrap();
+    let out = dir.join("out");
+    let opts = options(Preset { frame: FrameType::None, ..plain() }, Some(10));
+    let sources = collect_images(std::slice::from_ref(&input), &[]);
+    let results = run_batch(&sources, |p| process_image(p, &out, &opts), |_, _| {}, || false);
+    assert_eq!(results.len(), 3);
+    assert!(results[0].error.is_some(), "{results:?}"); // broken.png（名前順で先頭）
+    let wide = image::open(out.join("wide.png")).unwrap();
+    let tall = image::open(out.join("tall.png")).unwrap();
+    // 長辺がそろう
+    assert_eq!((wide.width(), wide.height()), (10, 5));
+    assert_eq!((tall.width(), tall.height()), (5, 10));
+    // もう一度処理すると _edited を付けて上書きしない。元の画像は変えない
+    let again = process_image(&input.join("wide.png"), &out, &opts).unwrap();
+    assert_eq!(again, out.join("wide_edited.png"));
+    assert_eq!(image::open(input.join("wide.png")).unwrap().width(), 40);
+    std::fs::remove_dir_all(&dir).unwrap();
+}

@@ -31,6 +31,7 @@ make dev / make app / make dmg                # 開発用に起動 / .app を作
 scripts/build_app.sh [--install]              # .app を作って署名・起動確認（--install で /Applications に入れる）
 scripts/build_dmg.sh                          # .app からディスクイメージを作る（.app と /Applications へのリンク）
 scripts/bench.sh                              # 受け渡しを含めた速さと NFR-01・02 の判定
+scripts/ui_smoke.sh                           # 画面の通しの確認（アクセシビリティで開発版を操作。CI では動かさない）
 npm test                                      # 画面（TypeScript）のテスト（tests-ts/）
 cargo test --workspace                        # Rust のテスト
 cargo fmt --all                               # 整形（確認だけなら --check）

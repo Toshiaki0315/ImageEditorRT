@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use imageeditorrt_core::{decode, pipeline, sample, save};
+use imageeditorrt_core::{decode, load, pipeline, sample, save};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
@@ -111,23 +111,14 @@ pub fn report_unexpected(message: String) -> String {
 ///
 /// file を渡せばその画像を、なければ作った画像（PNG）を読む。読めれば 0、読めなければ 1 を返す。
 pub fn smoke_test(file: Option<&Path>) -> i32 {
-    let bytes = match file {
-        Some(path) => match std::fs::read(path) {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                eprintln!("起動確認: {} を読めません（{e}）", path.display());
-                return 1;
-            }
-        },
-        None => match save::encode(&sample::synthetic_photo(64, 48), save::SaveFormat::Png, 90, None) {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                eprintln!("起動確認: 確認用の画像を作れません（{e}）");
-                return 1;
-            }
-        },
+    let decoded = match file {
+        // 画像を開くときと同じ読み方（拡張子・中身・EXIF）
+        Some(path) => load::load_file(path).map(|loaded| loaded.decoded).map_err(|e| e.to_string()),
+        None => save::encode(&sample::synthetic_photo(64, 48), save::SaveFormat::Png, 90, None)
+            .map_err(|e| format!("確認用の画像を作れません（{e}）"))
+            .and_then(|bytes| decode::decode_file(&bytes).map_err(|e| e.to_string())),
     };
-    match decode::decode_file(&bytes) {
+    match decoded {
         Ok(decoded) => {
             let (preview, _) = pipeline::make_preview(&decoded.image, pipeline::PREVIEW_MAX_SIDE);
             let _ = pipeline::render_preview(&preview, &pipeline::EditSettings::default(), 1.0, false);

@@ -74,6 +74,7 @@ src-tauri/                # Tauri のアプリ本体（コマンドで core を�
   src/menu.rs             # メニューバー（選ばれた項目は "menu" のイベントで画面へ）
   src/open.rs             # コマンドライン引数・Finder・Dock から開く
   src/batch.rs            # まとめて処理（進み具合のイベント・中止）
+  src/clipboard.rs        # クリップボード（NSPasteboard）を読む（貼り付け。書き換えない）
   src/presets.rs          # プリセットの一覧・保存・削除・当てはめと「プリセット ▾」のメニュー
   tauri.conf.json
 src/                      # 画面（TypeScript）
@@ -81,6 +82,7 @@ src/                      # 画面（TypeScript）
   preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
   zoom.ts                 # 100% 表示（1px = 1 画素、ドラッグ・スクロールで動かす）
   batchDialog.ts          # まとめて処理のダイアログと進み具合
+  paste.ts                # ⌘V で何をするか（ファイル・画像・入力欄の文字）を決める
   histogram.ts            # プレビューに重ねるヒストグラム
   history.ts              # アンドゥ／リドゥの履歴（画面の部品に依存しない。tests-ts/ で npm test）
   panel.ts / tabs.ts      # 設定パネルのスライダー・タブ

@@ -138,6 +138,22 @@ pub fn default_save_path(source: &Path) -> PathBuf {
     edited_names(source, folder).find(|p| !p.exists()).expect("候補は終わりなく続く")
 }
 
+/// クリップボードから貼り付けた画像の表示名。
+pub const PASTED_NAME: &str = "クリップボードの画像";
+
+/// 貼り付けた画像の保存ダイアログの初期のパス `<folder>/クリップボード_<stamp>.png`。
+///
+/// stamp は日時（"20261002-064500" の形。ダイアログを開いたとき）。同じ名前があれば `_2` … を付ける。
+pub fn pasted_save_path(stamp: &str, folder: &Path) -> PathBuf {
+    (1..)
+        .map(|n| {
+            let number = if n == 1 { String::new() } else { format!("_{n}") };
+            folder.join(format!("クリップボード_{stamp}{number}.png"))
+        })
+        .find(|p| !p.exists())
+        .expect("候補は終わりなく続く")
+}
+
 /// 2 つのパスが同じファイルを指すか。
 ///
 /// macOS のファイルシステムは大文字・小文字を区別しないので、実在するファイルは中身の場所
@@ -312,6 +328,26 @@ pub fn save_edited(
 mod tests {
     use super::*;
     use image::Rgba;
+
+    #[test]
+    fn pasted_names() {
+        let dir = std::env::temp_dir().join(format!("imageeditorrt-pasted-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let first = pasted_save_path("20261002-064500", &dir);
+        assert_eq!(first, dir.join("クリップボード_20261002-064500.png"));
+        std::fs::write(&first, b"x").unwrap();
+        assert_eq!(
+            pasted_save_path("20261002-064500", &dir),
+            dir.join("クリップボード_20261002-064500_2.png")
+        );
+        std::fs::write(dir.join("クリップボード_20261002-064500_2.png"), b"x").unwrap();
+        assert_eq!(
+            pasted_save_path("20261002-064500", &dir),
+            dir.join("クリップボード_20261002-064500_3.png")
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn suffixes_and_names() {

@@ -2,6 +2,8 @@
 //! ここでは画面（TypeScript）との受け渡し・メニュー・ファイルを開く経路だけを扱う。
 
 mod batch;
+#[cfg(target_os = "macos")]
+mod clipboard;
 mod menu;
 mod open;
 mod presets;
@@ -53,6 +55,8 @@ struct Source {
     format: Option<Format>,
     /// 元の EXIF（TIFF の部分）
     exif: Option<Vec<u8>>,
+    /// クリップボードから貼り付けた画像（保存の初期の名前を「クリップボード_日時.png」にする）
+    pasted: bool,
 }
 
 #[derive(Default)]
@@ -141,7 +145,8 @@ async fn open_path(
     let decode_ms = elapsed_ms(start);
     // EXIF が壊れていても画像は開く（EXIF なしとして扱う）
     let exif = read_exif_info(&bytes);
-    let source = Source { format: Some(decoded.format), exif: raw_exif(&bytes), path: Some(path) };
+    let source =
+        Source { format: Some(decoded.format), exif: raw_exif(&bytes), path: Some(path), pasted: false };
     store(&state, &window, name, decoded, decode_ms, exif, source)
 }
 
@@ -255,11 +260,47 @@ fn set_menu_checked(id: String, checked: bool, app: AppHandle) -> Result<(), Str
     menu::set_checked(&app, &id, checked).map_err(|e| e.to_string())
 }
 
-/// 保存ダイアログの初期のパス `<元の名前>_edited.<拡張子>`（重ならない名前）。元のファイルがなければ None。
+/// 保存ダイアログの初期のパス `<元の名前>_edited.<拡張子>`（重ならない名前）。
+///
+/// 貼り付けた画像は `~/ピクチャ/クリップボード_<stamp>.png`（stamp は画面が渡す今の日時）。
+/// どちらでもなければ None（計測用の画像など）。
 #[tauri::command]
-fn default_save_path(state: State<'_, AppState>) -> Result<Option<String>, String> {
+fn default_save_path(stamp: String, state: State<'_, AppState>) -> Result<Option<String>, String> {
     let loaded = state.0.lock().map_err(|e| e.to_string())?;
-    Ok(loaded.source.path.as_deref().map(|p| save::default_save_path(p).to_string_lossy().into_owned()))
+    let path = match (&loaded.source.path, loaded.source.pasted) {
+        (Some(path), _) => Some(save::default_save_path(path)),
+        #[cfg(target_os = "macos")]
+        (None, true) => clipboard::pictures_or_home().map(|folder| save::pasted_save_path(&stamp, &folder)),
+        _ => None,
+    };
+    Ok(path.map(|p| p.to_string_lossy().into_owned()))
+}
+
+/// クリップボードにあるもの（Finder でコピーしたファイル・画像・文字があるか）。
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn clipboard_contents() -> clipboard::Contents {
+    clipboard::contents()
+}
+
+/// クリップボードの文字（入力欄に貼り付ける）。
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn clipboard_text() -> Option<String> {
+    clipboard::text()
+}
+
+/// クリップボードの画像を、元のファイルのない画像として開く（PNG 扱い・EXIF なし・透過は残す）。
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn open_clipboard_image(state: State<'_, AppState>, window: WebviewWindow) -> Result<OpenInfo, String> {
+    let start = Instant::now();
+    let data = clipboard::image_data().ok_or("クリップボードに画像がありません")?;
+    let decoded = decode::decode_file(&data).map_err(|e| format!("画像を貼り付けられません\n({e})"))?;
+    let decoded = decode::Decoded { format: Format::Png, frame_count: 1, ..decoded };
+    let exif = ExifInfo { empty: true, ..ExifInfo::default() };
+    let source = Source { format: Some(Format::Png), pasted: true, ..Source::default() };
+    store(&state, &window, save::PASTED_NAME.into(), decoded, elapsed_ms(start), exif, source)
 }
 
 /// 保存できなかったとき、画面に返す理由。kind が "sameFile" なら保存ダイアログを開き直す。
@@ -527,6 +568,9 @@ pub fn run() {
             set_menu_checked,
             set_menu_enabled,
             close_image,
+            clipboard_contents,
+            clipboard_text,
+            open_clipboard_image,
             render_actual_size,
             save_image,
             open::take_pending_paths,

@@ -20,6 +20,8 @@ pub const BATCH: &str = "batch";
 pub const UNDO: &str = "undo";
 /// 「編集 > やり直す」
 pub const REDO: &str = "redo";
+/// 「編集 > ペースト」（クリップボードの画像・ファイルを開く。入力欄では文字を貼り付けることもある）
+pub const PASTE: &str = "paste";
 /// 「編集 > 文字・透かし…」
 pub const TEXT: &str = "text";
 /// 「表示 > 100% で表示」（原寸で処理した保存結果を 1px = 1 画素で見る）
@@ -53,7 +55,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .close_window_with_text("閉じる")
         .build()?;
-    // 入力欄で使う標準の編集の項目（貼り付けは後の Issue で画像の貼り付けに広げる）
+    // 入力欄で使う標準の編集の項目（ペーストは画像を開くこともあるので独自の項目）
     let text = MenuItemBuilder::with_id(TEXT, "文字・透かし…").accelerator("CmdOrCtrl+T").build(app)?;
     // 設定の変更を戻す（旧版 FR-UI-43）。戻せないときは使えない状態にし、入力欄の ⌘Z は入力欄に届く
     let undo =
@@ -62,13 +64,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .accelerator("CmdOrCtrl+Shift+Z")
         .enabled(false)
         .build(app)?;
+    let paste = MenuItemBuilder::with_id(PASTE, "ペースト").accelerator("CmdOrCtrl+V").build(app)?;
     let edit = SubmenuBuilder::new(app, "編集")
         .item(&undo)
         .item(&redo)
         .separator()
         .cut_with_text("カット")
         .copy_with_text("コピー")
-        .paste_with_text("ペースト")
+        .item(&paste)
         .select_all_with_text("すべてを選択")
         .separator()
         .item(&text)

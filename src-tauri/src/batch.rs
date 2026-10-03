@@ -14,7 +14,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::presets::PresetStore;
-use crate::{save_pool, AppState};
+use crate::saving::save_pool;
+use crate::state::AppState;
 
 /// 進み具合のイベントの名前。
 const PROGRESS_EVENT: &str = "batch-progress";

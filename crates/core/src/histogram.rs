@@ -1,10 +1,12 @@
 //! ヒストグラム（R・G・B・輝度の分布）の計算（Python 版の core/histogram.py と同じ数え方）。
 
 use image::{GrayImage, RgbaImage};
+use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::pillow::luma;
 use crate::transform::CropRect;
+use crate::PIXELS_PER_TASK;
 
 /// 段階の数。
 pub const BINS: usize = 256;
@@ -55,26 +57,49 @@ pub fn compute_histogram(image: &RgbaImage, area: Option<CropRect>, mask: Option
     let (left, top) = (area.x.clamp(0, width), area.y.clamp(0, height));
     let (right, bottom) =
         ((area.x + area.width).clamp(left, width), (area.y + area.height).clamp(top, height));
-    let mut counts = [[0u32; BINS]; 4];
-    for y in top..bottom {
-        for x in left..right {
-            let p = image.get_pixel(x as u32, y as u32).0;
-            let weight = match mask {
-                Some(m) => {
-                    u32::from(p[3]) * u32::from(m.get_pixel((x - area.x) as u32, (y - area.y) as u32)[0])
-                        / 255
+    // 行ごとに並列に数え、最後に足し合わせる（画素の並びを直接読む）
+    let stride = image.width() as usize * 4;
+    let raw = image.as_raw();
+    let rows_per_task = (PIXELS_PER_TASK / (right - left).max(1) as usize).max(1);
+    let counts = (top as usize..bottom as usize)
+        .into_par_iter()
+        .with_min_len(rows_per_task)
+        .fold(
+            || Box::new([[0u32; BINS]; 4]),
+            |mut counts, y| {
+                let row = &raw[y * stride + left as usize * 4..y * stride + right as usize * 4];
+                // mask は area の左上が原点（area が画像の外にはみ出していれば、その分ずらして読む）
+                let mask_row = mask.map(|m| {
+                    let start = (y as i64 - area.y) as usize * m.width() as usize + (left - area.x) as usize;
+                    &m.as_raw()[start..start + (right - left) as usize]
+                });
+                for (i, p) in row.as_chunks::<4>().0.iter().enumerate() {
+                    let weight = match mask_row {
+                        Some(m) => u32::from(p[3]) * u32::from(m[i]) / 255,
+                        None => u32::from(p[3]),
+                    };
+                    if weight == 0 {
+                        continue;
+                    }
+                    counts[0][usize::from(p[0])] += 1;
+                    counts[1][usize::from(p[1])] += 1;
+                    counts[2][usize::from(p[2])] += 1;
+                    counts[3][usize::from(luma(p[0], p[1], p[2]))] += 1;
                 }
-                None => u32::from(p[3]),
-            };
-            if weight == 0 {
-                continue;
-            }
-            counts[0][usize::from(p[0])] += 1;
-            counts[1][usize::from(p[1])] += 1;
-            counts[2][usize::from(p[2])] += 1;
-            counts[3][usize::from(luma(p[0], p[1], p[2]))] += 1;
-        }
-    }
+                counts
+            },
+        )
+        .reduce(
+            || Box::new([[0u32; BINS]; 4]),
+            |mut a, b| {
+                for (x, y) in a.iter_mut().zip(b.iter()) {
+                    for (c, d) in x.iter_mut().zip(y) {
+                        *c += d;
+                    }
+                }
+                a
+            },
+        );
     let [red, green, blue, luma] = counts.map(|c| c.to_vec());
     Histogram { red, green, blue, luma }
 }
@@ -121,6 +146,57 @@ mod tests {
         let area = CropRect { x: 3, y: 2, width: 4, height: 3 };
         let h = compute_histogram(&image, Some(area), None);
         assert_eq!((h.total(), h.red[200], h.red[0]), (12, 12, 0));
+    }
+
+    /// 1 画素ずつ数える、そのままの書き方（並列にした計算と比べる）。
+    fn reference(image: &RgbaImage, area: CropRect, mask: Option<&GrayImage>) -> [[u32; BINS]; 4] {
+        let mut counts = [[0u32; BINS]; 4];
+        for y in area.y..area.y + area.height {
+            for x in area.x..area.x + area.width {
+                if x < 0 || y < 0 || x >= i64::from(image.width()) || y >= i64::from(image.height()) {
+                    continue;
+                }
+                let p = image.get_pixel(x as u32, y as u32).0;
+                let m =
+                    mask.map_or(255, |m| u32::from(m.get_pixel((x - area.x) as u32, (y - area.y) as u32)[0]));
+                if u32::from(p[3]) * m / 255 == 0 {
+                    continue;
+                }
+                for c in 0..3 {
+                    counts[c][usize::from(p[c])] += 1;
+                }
+                counts[3][usize::from(luma(p[0], p[1], p[2]))] += 1;
+            }
+        }
+        counts
+    }
+
+    #[test]
+    fn parallel_counting_matches_the_reference() {
+        let image = RgbaImage::from_fn(300, 200, |x, y| {
+            Rgba([(x * 7 % 256) as u8, (y * 13 % 256) as u8, ((x + y) % 256) as u8, ((x * y) % 7 * 40) as u8])
+        });
+        let areas = [
+            CropRect::whole((300, 200)),
+            CropRect::new(10, 20, 150, 90),
+            CropRect::new(-30, -10, 100, 80),  // 左上がはみ出す
+            CropRect::new(250, 150, 100, 100), // 右下がはみ出す
+        ];
+        for area in areas {
+            let mask = GrayImage::from_fn(area.width as u32, area.height as u32, |x, y| {
+                Luma([((x * 3 + y) % 256) as u8])
+            });
+            for mask in [None, Some(&mask)] {
+                let h = compute_histogram(&image, Some(area), mask);
+                let want = reference(&image, area, mask);
+                assert_eq!(
+                    [h.red, h.green, h.blue, h.luma],
+                    want.map(|c| c.to_vec()),
+                    "{area:?} {}",
+                    mask.is_some()
+                );
+            }
+        }
     }
 
     #[test]

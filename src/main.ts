@@ -9,6 +9,7 @@ import { CropController } from "./crop";
 import { OutputSize } from "./output";
 import { TextDialog } from "./textDialog";
 import { ExifView } from "./exif";
+import { HistogramView } from "./histogram";
 import { Panel } from "./panel";
 import { Preview } from "./preview";
 import { SaveOptionsPanel } from "./saveOptions";
@@ -52,6 +53,8 @@ let savableExtensions: string[] = [];
 let formatsText = "";
 
 const preview = new Preview(stage, canvas, (error) => showError("プレビューを更新できません", error));
+const histogramView = new HistogramView($<HTMLCanvasElement>("histogram"));
+preview.onHistogram = (histogram) => histogramView.set(loaded ? histogram : null);
 const tabs = new Tabs(document.querySelector(".side")!);
 const exifView = new ExifView($("page-exif"));
 let panel: Panel;
@@ -292,7 +295,13 @@ async function setup() {
     if (event.payload === "open") void openDialog();
     if (event.payload === "save") void saveDialog();
     if (event.payload === "text" && loaded) textDialog.open();
+    if (event.payload === "histogram") {
+      histogramView.setShown(!histogramView.shown);
+      void invoke("set_menu_checked", { id: "histogram", checked: histogramView.shown });
+    }
   });
+  // メニューのチェックを環境設定に残した表示・非表示に合わせる
+  void invoke("set_menu_checked", { id: "histogram", checked: histogramView.shown });
   await listen<string[]>("open-paths", (event) => {
     if (!saving) openPaths(event.payload);
   });

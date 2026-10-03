@@ -1,6 +1,7 @@
 // プレビュー: Rust に設定をかけさせた縮小版を canvas に描き、エリアに収まるよう縦横比を保って表示する。
 
 import { invoke } from "@tauri-apps/api/core";
+import { type Histogram, readHistogram } from "./histogram";
 import type { EditSettings } from "./types";
 
 /** 1 回の描き直しの内訳 (ms)。 */
@@ -31,6 +32,8 @@ export class Preview {
   trimmed = false;
   /** 表示の大きさが変わったとき（ガイド・範囲の線を描き直す） */
   onResize: () => void = () => {};
+  /** 描き直したとき、保存される写真のヒストグラムを知らせる */
+  onHistogram: (histogram: Histogram) => void = () => {};
 
   constructor(
     private readonly stage: HTMLElement,
@@ -101,6 +104,7 @@ export class Preview {
     }
     const pixels = new Uint8ClampedArray(buffer, 12, width * height * 4);
     this.context.putImageData(new ImageData(pixels, width, height), 0, 0);
+    this.onHistogram(readHistogram(buffer, 12 + width * height * 4));
     await nextFrame(); // 画面に出るところまで含める
     const end = performance.now();
     return { render, transfer: received - start - render, draw: end - received, total: end - start };

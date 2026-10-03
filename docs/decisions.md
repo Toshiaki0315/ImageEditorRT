@@ -80,3 +80,11 @@
 - タグの名前・値の表は exifread の表から自動で作る（`tests/fixtures/makernote_makers/tables.py` → `exifread_tables.rs`。手で直さない）。
 - exifread が例外で止まる壊れた MakerNote では、旧版は MakerNote・UserComment・XMP を読まずに読み直していた。これも同じにする（UserComment を出さず、MakerNote は `makernote.rs` で読む）。
 - 旧版と同じになることは `tests/makernote_makers_match_python.rs`（19 通り。旧版のテスト部品で作った EXIF を旧版で読んだ結果と比べる）で確かめる。
+
+## ヒストグラム（#18）
+
+- 数え方は旧版と同じにした（`tests/histogram_matches_python.rs`）: 実際に切り抜く範囲（なければ全体）の、形・フレーム・文字を付ける前の写真を数え、透明な画素と形の外側は数えない（アルファ×形のマスクを ImageChops.multiply と同じく切り捨てて 0 なら除く）。輝度は Pillow の L 変換。
+- プレビューを描き直すたびに、同じ処理の途中の画像から数える（`pipeline::render_preview_with_histogram`）。画面へは、プレビューの画素のバイト列の後ろに 4 KB（R・G・B・輝度 × 256 個の u32）を付けて渡す。
+- 高さの基準は、両端（0・255）を除いた全チャンネルの最大（`Histogram::peak`。画面の `histogramPeak` も同じ）。
+- 「表示 > ヒストグラム」(⇧⌘H) はチェックの付くメニュー項目。表示・非表示は画面の環境設定（localStorage）に残し、起動時にメニューのチェックをそれに合わせる（`set_menu_checked`）。
+- 加工前の表示（旧版 FR-UI-44）での加工前の分布は、加工前の表示を作る #19 で合わせる。

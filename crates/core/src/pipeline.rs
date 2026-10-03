@@ -16,6 +16,7 @@ use crate::filters;
 pub use crate::filters::FilterType;
 pub use crate::frames::FrameType;
 use crate::frames::{self, FRAME_COLOR};
+use crate::histogram::{compute_histogram, Histogram};
 use crate::shapes;
 pub use crate::shapes::ShapeType;
 use crate::text;
@@ -193,6 +194,19 @@ fn photo_text(settings: &EditSettings) -> TextSettings {
 ///   文字もトリミング範囲に描く（範囲はいつでも選び直せる）
 /// - trimmed = true: 切り抜いた範囲だけを表示し、形とフレームも付けて完成形を見せる（範囲がなければ全体）
 pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, trimmed: bool) -> RgbaImage {
+    render_preview_with_histogram(image, settings, factor, trimmed).0
+}
+
+/// プレビュー表示用の画像と、保存される写真のヒストグラムを返す（画像の作り方は render_preview）。
+///
+/// ヒストグラムは、実際に切り抜く範囲（なければ全体）の、形・フレームを付ける前の写真から数える
+/// （範囲の外・フレームの白・形の外側・透明な画素・文字は数えない）。
+pub fn render_preview_with_histogram(
+    image: &RgbaImage,
+    settings: &EditSettings,
+    factor: f64,
+    trimmed: bool,
+) -> (RgbaImage, Histogram) {
     let image = settings.orientation.transpose(image);
     let scaled = scale_settings(settings, factor);
     let mut rect = effective_crop(image.dimensions(), scaled.crop, settings.frame, settings.shape);
@@ -219,8 +233,12 @@ pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, t
     }
     // 経年劣化は画素ごとの色の変化と固定模様の粒子なので、表示範囲全体にかける
     adjust::aging(&mut rendered, settings.aging);
+    let photo = rect.unwrap_or(CropRect::whole(rendered.dimensions()));
+    let mask =
+        shapes::shape_mask((photo.width as u32, photo.height as u32), settings.shape, settings.corner_radius);
+    let histogram = compute_histogram(&rendered, Some(photo), mask.as_ref());
     if trimmed {
-        return apply_shape_and_frame(rendered, settings);
+        return (apply_shape_and_frame(rendered, settings), histogram);
     }
     // 全体表示ではフレーム・形は付けない（形は画面でマスクと輪郭を重ねて見せる）。写真の上の文字は
     // 切り抜く範囲（なければ全体）に描く。フレームの余白の文字は「トリミング実行」の表示で見える
@@ -229,7 +247,7 @@ pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, t
         let area = rect.map(|r| (r.x, r.y, r.right(), r.bottom()));
         text::draw_text(&mut rendered, &photo_text(settings), area, None);
     }
-    rendered
+    (rendered, histogram)
 }
 
 /// プレビューに重ねる、ジオラマのピントの帯のガイドの線。

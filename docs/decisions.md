@@ -142,6 +142,10 @@
 - ウィンドウを閉じる求めは画面で止め（`onCloseRequested`）、Dock などからの終了の求め（`RunEvent::ExitRequested`）は Rust で止めて "quit-requested" のイベントで画面に知らせる。画面が確かめた後に `quit_app` で終わる。
 - 保存中・まとめて処理中は、ファイルが途中で切れないよう終了しない（終わってから終了してもらう）。
 
+## 既定値の一致のテスト（#51）
+
+- 編集設定の既定値は Rust（`EditSettings::default()`）と TypeScript（`defaultSettings()`・`defaultText()`）に二重に書いている。両方が `tests-ts/fixtures/default-settings.json` と同じかを、それぞれのテスト（`crates/core/tests/default_settings.rs`・`tests-ts/defaults.test.ts`）で確かめる。既定値を変えるときは、両方とこのファイルをそろえる。
+
 ## 画面のコードの分け方（#52）
 
 - `main.ts` は入り口だけにし、機能ごとに分けた（`editing`・`view`・`files`・`presetsUi`・`menus`・`status`・`protocol`）。共有の状態・要素・部品は `app.ts` にまとめる（`state`・`dom`・`parts`）。`app.ts` は機能のファイルを読み込まない（部品の知らせは `hooks` で受け、`main.ts` で機能につなぐ）。

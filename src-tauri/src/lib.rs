@@ -1,6 +1,7 @@
 //! ImageEditorRT のアプリ本体。画像処理は imageeditorrt-core に任せ、
 //! ここでは画面（TypeScript）との受け渡し・メニュー・ファイルを開く経路だけを扱う。
 
+mod batch;
 mod menu;
 mod open;
 mod presets;
@@ -55,7 +56,7 @@ struct Source {
 }
 
 #[derive(Default)]
-struct AppState(Mutex<Loaded>);
+pub(crate) struct AppState(Mutex<Loaded>);
 
 /// 読み込みの結果（画面に出す情報）。
 #[derive(Serialize)]
@@ -278,7 +279,7 @@ impl SaveFailure {
 
 /// 保存（原寸の処理）に使うスレッドの組。プレビューの描き直しが待たされないよう、
 /// プレビュー（rayon の既定の組）とは分け、CPU のコアを 2 つ残す。
-fn save_pool() -> &'static rayon::ThreadPool {
+pub(crate) fn save_pool() -> &'static rayon::ThreadPool {
     static POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
     POOL.get_or_init(|| {
         let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
@@ -490,6 +491,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .manage(presets::PresetStore::default())
+        .manage(batch::BatchState::default())
         .manage(open::Pending::from_args(std::env::args_os().skip(1)))
         .menu(menu::build)
         .on_menu_event(menu::on_event)
@@ -535,6 +537,10 @@ pub fn run() {
             presets::delete_preset,
             presets::apply_preset,
             presets::show_preset_menu,
+            batch::batch_current_source,
+            batch::batch_collect,
+            batch::run_batch,
+            batch::cancel_batch,
             bench_mode,
             bench_save_path,
             log,

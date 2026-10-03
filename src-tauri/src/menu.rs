@@ -14,6 +14,8 @@ pub const MENU_EVENT: &str = "menu";
 pub const OPEN: &str = "open";
 /// 「ファイル > 保存…」
 pub const SAVE: &str = "save";
+/// 「ファイル > まとめて処理…」
+pub const BATCH: &str = "batch";
 /// 「編集 > 元に戻す」（設定の変更。入力欄の文字は画面が入力欄に任せる）
 pub const UNDO: &str = "undo";
 /// 「編集 > やり直す」
@@ -43,9 +45,11 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()?;
     let open = MenuItemBuilder::with_id(OPEN, "開く…").accelerator("CmdOrCtrl+O").build(app)?;
     let save = MenuItemBuilder::with_id(SAVE, "保存…").accelerator("CmdOrCtrl+S").build(app)?;
+    let batch = MenuItemBuilder::with_id(BATCH, "まとめて処理…").build(app)?;
     let file = SubmenuBuilder::new(app, "ファイル")
         .item(&open)
         .item(&save)
+        .item(&batch)
         .separator()
         .close_window_with_text("閉じる")
         .build()?;

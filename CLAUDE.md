@@ -46,6 +46,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
     output.rs             # 「出力」タブのサイズ変更（欄に出す値と、編集設定に渡す幅・高さ）
     crop.rs               # トリミング範囲の編集（ドラッグ・数値の欄・比・回転と反転）の計算
+    batch.rs              # まとめて処理（保存先の名前・画像の集め方・1 枚ずつの処理と中止）
     presets.rs            # プリセット（名前付きの加工の組み合わせ）の保存・読み込み（旧版と同じ JSON）
     pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
@@ -72,12 +73,14 @@ src-tauri/                # Tauri のアプリ本体（コマンドで core を�
   src/lib.rs              # コマンド（開く・プレビュー）と起動
   src/menu.rs             # メニューバー（選ばれた項目は "menu" のイベントで画面へ）
   src/open.rs             # コマンドライン引数・Finder・Dock から開く
+  src/batch.rs            # まとめて処理（進み具合のイベント・中止）
   src/presets.rs          # プリセットの一覧・保存・削除・当てはめと「プリセット ▾」のメニュー
   tauri.conf.json
 src/                      # 画面（TypeScript）
   main.ts                 # 起動・開く・ドロップ・ステータスバー・加工前との比較・100% 表示・履歴・プリセット
   preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
   zoom.ts                 # 100% 表示（1px = 1 画素、ドラッグ・スクロールで動かす）
+  batchDialog.ts          # まとめて処理のダイアログと進み具合
   histogram.ts            # プレビューに重ねるヒストグラム
   history.ts              # アンドゥ／リドゥの履歴（画面の部品に依存しない。tests-ts/ で npm test）
   panel.ts / tabs.ts      # 設定パネルのスライダー・タブ

@@ -43,6 +43,11 @@ export class OutputSize {
     if (!loaded) this.width.value = this.height.value = "";
   }
 
+  /** 出力の幅・高さの長いほう（まとめて処理の長辺の初期値。フレームは含まない）。 */
+  longSide(): number {
+    return Math.max(this.state.width, this.state.height);
+  }
+
   /** 履歴に積む状態。手で変えていなければ幅・高さはトリミング後の大きさに従うので持たない。 */
   snapshot(): SizeState {
     return this.state.edited ? { ...this.state } : { ...this.state, width: 1, height: 1 };

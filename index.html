@@ -107,6 +107,51 @@
         <button type="button" id="text-close">閉じる</button>
       </div>
     </dialog>
+    <!-- まとめて処理（ファイル > まとめて処理…） -->
+    <dialog id="batch-dialog" class="batch-dialog">
+      <form method="dialog">
+        <h2>まとめて処理</h2>
+        <label for="batch-files">処理する画像</label>
+        <select id="batch-files" class="batch-files" multiple size="8"></select>
+        <div class="buttons">
+          <button type="button" id="batch-add-files">ファイルを追加…</button>
+          <button type="button" id="batch-add-folder">フォルダを追加…</button>
+          <span class="spacer"></span>
+          <button type="button" id="batch-remove">取り除く</button>
+        </div>
+        <div class="batch-form">
+          <span>かける加工</span>
+          <select id="batch-look"></select>
+          <span>リサイズ</span>
+          <span class="batch-resize">
+            <label><input type="checkbox" id="batch-resize" />長辺を</label>
+            <input type="number" id="batch-long-side" min="1" max="20000" step="1" /> px にする
+          </span>
+          <span>保存先</span>
+          <span class="batch-out">
+            <span id="batch-out-dir" class="batch-out-dir">（まだ選んでいません）</span>
+            <button type="button" id="batch-choose-out">選ぶ…</button>
+          </span>
+        </div>
+        <p class="note">
+          トリミング範囲と回転・反転はかけません（フレーム・円のときは各画像の中央をその比で切り抜きます）。元と同じ名前・形式で保存し、同じ名前があれば
+          _edited を付けて上書きしません。JPEG 品質・EXIF は「保存の設定」に従います。
+        </p>
+        <div class="buttons dialog-buttons">
+          <button type="submit" value="start" id="batch-start">開始</button>
+          <button type="submit" value="cancel" formnovalidate>キャンセル</button>
+        </div>
+      </form>
+    </dialog>
+    <!-- まとめて処理の進み具合 -->
+    <dialog id="batch-progress" class="batch-dialog">
+      <h2>まとめて処理</h2>
+      <p id="batch-progress-text">まとめて処理しています…</p>
+      <progress id="batch-progress-bar" value="0" max="1"></progress>
+      <div class="buttons dialog-buttons">
+        <button type="button" id="batch-cancel">中止</button>
+      </div>
+    </dialog>
     <!-- プリセットの名前の入力（「今の加工をプリセットとして保存…」） -->
     <dialog id="preset-dialog" class="preset-dialog">
       <form method="dialog">

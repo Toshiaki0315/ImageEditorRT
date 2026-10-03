@@ -5,12 +5,20 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { message, open, save } from "@tauri-apps/plugin-dialog";
 import { bench, benchSave } from "./bench";
+import { CropController } from "./crop";
 import { showExif } from "./exif";
 import { Panel } from "./panel";
 import { Preview } from "./preview";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
-import { defaultSettings, type DioramaGuide, type EditSettings, type FilterType, type OpenInfo } from "./types";
+import {
+  defaultSettings,
+  type AspectRatio,
+  type DioramaGuide,
+  type EditSettings,
+  type FilterType,
+  type OpenInfo,
+} from "./types";
 
 const NO_IMAGE_MESSAGE = "画像が読み込まれていません";
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
@@ -38,6 +46,7 @@ let formatsText = "";
 const preview = new Preview(stage, canvas, (error) => showError("プレビューを更新できません", error));
 const tabs = new Tabs(document.querySelector(".side")!);
 let panel: Panel;
+let crop: CropController;
 const saveOptions = new SaveOptionsPanel(
   $<HTMLInputElement>("jpeg-quality"),
   $<HTMLOutputElement>("jpeg-quality-value"),
@@ -59,7 +68,7 @@ async function updateGuide() {
     guide.toggleAttribute("hidden", true);
     return;
   }
-  const result = await invoke<DioramaGuide>("diorama_guide", { settings });
+  const result = await invoke<DioramaGuide>("diorama_guide", { settings, trimmed: preview.trimmed });
   const { width, height } = canvas;
   guide.setAttribute("viewBox", `0 0 ${width} ${height}`);
   guide.replaceChildren();
@@ -203,7 +212,9 @@ function showLoaded(info: OpenInfo, openNotes: string[]) {
   Object.assign(settings, defaultSettings());
   panel.show();
   placeholder.hidden = true;
+  preview.trimmed = false;
   preview.show(info.previewWidth, info.previewHeight, info.hasAlpha);
+  crop.reset([info.width, info.height]);
   showExif($("page-exif"), info.exif);
   tabs.setEnabled("exif", info.exif.entries.length > 0);
   notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
@@ -233,6 +244,15 @@ async function setup() {
   [extensions, savableExtensions, formatsText] = await invoke<[string[], string[], string]>("supported_formats");
   const filters = await invoke<[FilterType, string][]>("filter_types");
   panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, settingsChanged);
+  const ratios = await invoke<[AspectRatio, string][]>("aspect_ratios");
+  crop = new CropController(settings, canvas, ratios, settingsChanged, (trimmed) => {
+    preview.trimmed = trimmed;
+    settingsChanged();
+  });
+  preview.onResize = () => {
+    crop.draw();
+    void updateGuide();
+  };
   saveButton.addEventListener("click", () => void saveDialog());
   tabs.setEnabled("exif", false);
   tabs.onSelect = () => void updateGuide();

@@ -27,6 +27,10 @@ export class Preview {
   private readonly context: CanvasRenderingContext2D;
   private busy = false;
   private pending: EditSettings | null = null;
+  /** 切り抜いた範囲だけを表示する（「トリミング実行」） */
+  trimmed = false;
+  /** 表示の大きさが変わったとき（ガイド・範囲の線を描き直す） */
+  onResize: () => void = () => {};
 
   constructor(
     private readonly stage: HTMLElement,
@@ -57,6 +61,7 @@ export class Preview {
     if (!(scale > 0)) return;
     this.canvas.style.width = `${Math.floor(width * scale)}px`;
     this.canvas.style.height = `${Math.floor(height * scale)}px`;
+    this.onResize();
   }
 
   /** 設定を変えたとき。描いている途中なら、終わってから最新の設定で 1 回だけ描き直す。 */
@@ -71,7 +76,7 @@ export class Preview {
       while (this.pending) {
         const settings = this.pending;
         this.pending = null;
-        await this.render(settings);
+        await this.render(settings, this.trimmed);
       }
     } catch (error) {
       this.onError(error);

@@ -111,3 +111,9 @@ export type OpenInfo = {
 
 /** Rust の pipeline::DioramaGuide（線の位置は表示している画像に対する割合、と実線かどうか）。 */
 export type DioramaGuide = { horizontal: boolean; lines: [number, boolean][] };
+
+/** トリミングの比（Rust の transform::AspectRatio）。 */
+export type AspectRatio = "free" | "square" | "ratio4x3" | "ratio3x2" | "ratio16x9";
+
+/** 回転・反転の操作（Rust の transform::OrientOp）。 */
+export type OrientOp = "rotate_left" | "rotate_right" | "flip_horizontal" | "flip_vertical";

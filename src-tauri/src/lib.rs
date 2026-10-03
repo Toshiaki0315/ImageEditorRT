@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 use image::RgbaImage;
+use imageeditorrt_core::crop::{self, AspectChoice, DragMode, Oriented, SpinField};
 use imageeditorrt_core::decode::{self, DecodeError};
 use imageeditorrt_core::exif_info::{raw_exif, read_exif_info, ExifInfo};
 use imageeditorrt_core::filters::FilterType;
@@ -16,6 +17,7 @@ use imageeditorrt_core::formats::{self, Format};
 use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
 use imageeditorrt_core::sample;
 use imageeditorrt_core::save::{self, SaveError, SaveOptions, SAME_FILE_MESSAGE};
+use imageeditorrt_core::transform::{AspectRatio, CropRect, OrientOp, Orientation};
 use serde::Serialize;
 use tauri::ipc::Response;
 use tauri::{AppHandle, Manager, State, WebviewWindow};
@@ -260,15 +262,61 @@ async fn save_image(
     Ok(name)
 }
 
-/// 全体表示のプレビューに重ねる、ジオラマのピントの帯のガイドの線。
+/// プレビューに重ねる、ジオラマのピントの帯のガイドの線。trimmed（切り抜いた範囲だけの表示）なら
+/// 表示している写真そのものに対する位置。
 #[tauri::command]
 fn diorama_guide(
     settings: EditSettings,
+    trimmed: bool,
     state: State<'_, AppState>,
 ) -> Result<pipeline::DioramaGuide, String> {
     let loaded = state.0.lock().map_err(|e| e.to_string())?;
     let preview = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
+    let settings = if trimmed { EditSettings { crop: None, ..settings } } else { settings };
     Ok(pipeline::diorama_guide(preview.dimensions(), &settings, loaded.factor))
+}
+
+/// トリミングの比の選択肢（JSON の名前と表示名）。
+#[tauri::command]
+fn aspect_ratios() -> Vec<(AspectRatio, String)> {
+    AspectRatio::ALL.iter().map(|&r| (r, r.label())).collect()
+}
+
+/// プレビュー上のドラッグ中の範囲（座標は回転・反転した後の原寸画像の座標）。
+#[tauri::command]
+fn crop_drag(
+    mode: DragMode,
+    anchor: (i64, i64),
+    point: (i64, i64),
+    start: Option<CropRect>,
+    aspect: AspectChoice,
+    size: (u32, u32),
+) -> Option<CropRect> {
+    crop::drag(mode, anchor, point, start, aspect, size)
+}
+
+/// トリミングの数値の欄を変えたときの範囲（比を保つ）。
+#[tauri::command]
+fn crop_spin(
+    field: SpinField,
+    values: CropRect,
+    previous: Option<CropRect>,
+    aspect: AspectChoice,
+    size: (u32, u32),
+) -> Option<CropRect> {
+    crop::spin_edit(field, values, previous, aspect, size)
+}
+
+/// 比を変えたとき、範囲の中央を新しい比に直す。
+#[tauri::command]
+fn crop_fit(rect: Option<CropRect>, aspect: AspectChoice, size: (u32, u32)) -> Option<CropRect> {
+    crop::fit_to_aspect(rect, aspect, size)
+}
+
+/// 回転・反転（範囲も一緒に回す）。
+#[tauri::command]
+fn crop_orient(orientation: Orientation, op: OrientOp, crop: Option<CropRect>, size: (u32, u32)) -> Oriented {
+    crop::orient(orientation, op, crop, size)
 }
 
 /// 設定をかけたときの出力の大きさ（ステータスバーに出す）。大きさの指定が範囲外ならエラー。
@@ -331,6 +379,11 @@ pub fn run() {
             render_preview,
             output_size,
             diorama_guide,
+            aspect_ratios,
+            crop_drag,
+            crop_spin,
+            crop_fit,
+            crop_orient,
             default_save_path,
             save_image,
             open::take_pending_paths,

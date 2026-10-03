@@ -6,6 +6,7 @@ pub const PIXELS_PER_TASK: usize = 4096;
 
 pub mod adjust;
 pub mod blur;
+pub mod crop;
 #[cfg(target_os = "macos")]
 pub mod decode;
 pub mod diorama;

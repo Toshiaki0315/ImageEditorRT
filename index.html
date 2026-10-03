@@ -13,6 +13,8 @@
         <div id="placeholder" class="placeholder">ここに画像をドロップしてください</div>
         <div class="frame">
           <canvas id="canvas" class="preview" hidden></canvas>
+          <!-- トリミング範囲の選択（範囲の外を暗くし、ドラッグで選ぶ） -->
+          <svg id="overlay" class="overlay" hidden></svg>
           <!-- ジオラマのピントの帯のガイド（「ジオラマ」タブを開いている間だけ） -->
           <svg id="guide" class="guide" hidden preserveAspectRatio="none" viewBox="0 0 1 1"></svg>
         </div>
@@ -27,7 +29,26 @@
         </nav>
         <div id="page-adjust" class="page" role="tabpanel"></div>
         <div id="page-crop" class="page" role="tabpanel" hidden>
-          <p class="todo">回転・反転・トリミングは #12、フレーム・形は #13 で作ります</p>
+          <p class="todo">フレーム・形は #13 で作ります</p>
+          <h2>回転・反転</h2>
+          <div class="buttons">
+            <button type="button" data-orient="rotate_left">左に回転</button>
+            <button type="button" data-orient="rotate_right">右に回転</button>
+            <button type="button" data-orient="flip_horizontal">左右反転</button>
+            <button type="button" data-orient="flip_vertical">上下反転</button>
+          </div>
+          <h2>トリミング</h2>
+          <label class="row">比 <select id="aspect"></select></label>
+          <label class="check"><input id="portrait" type="checkbox" /> 縦向き</label>
+          <label class="row">X <input id="crop-x" type="number" min="0" step="1" /><span>px</span></label>
+          <label class="row">Y <input id="crop-y" type="number" min="0" step="1" /><span>px</span></label>
+          <label class="row">幅 <input id="crop-width" type="number" min="0" step="1" /><span>px</span></label>
+          <label class="row">高さ <input id="crop-height" type="number" min="0" step="1" /><span>px</span></label>
+          <div class="buttons">
+            <button type="button" id="clear-crop">範囲をクリア</button>
+            <button type="button" id="trim" aria-pressed="false">トリミング実行</button>
+          </div>
+          <p class="note">プレビューの画像の上をドラッグして範囲を選べます（範囲の中をドラッグで移動、四隅で大きさを変更、クリックで解除）。</p>
         </div>
         <div id="page-output" class="page" role="tabpanel" hidden>
           <p class="todo">サイズ変更は #14 で作ります</p>

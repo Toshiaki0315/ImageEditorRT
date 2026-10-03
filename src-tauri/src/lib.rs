@@ -168,7 +168,8 @@ fn filter_types() -> Vec<(FilterType, &'static str)> {
 /// プレビューに設定をかけて返す。trimmed なら切り抜いた範囲だけを表示する。
 ///
 /// 返すバイト列: 先頭 12 バイトが幅・高さ・処理の時間 (µs)（どれも u32 リトルエンディアン）、
-/// その後ろが RGBA の画素。JSON にしないので、1600px の画像でも受け渡しは数 ms で済む。
+/// その後ろが RGBA の画素、最後が保存される写真のヒストグラム（R・G・B・輝度の順に 256 個ずつの
+/// u32 リトルエンディアン）。JSON にしないので、1600px の画像でも受け渡しは数 ms で済む。
 #[tauri::command]
 async fn render_preview(
     settings: EditSettings,
@@ -179,16 +180,25 @@ async fn render_preview(
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let image = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
         let start = Instant::now();
-        (pipeline::render_preview(image, &settings, loaded.factor, trimmed), start.elapsed())
+        (pipeline::render_preview_with_histogram(image, &settings, loaded.factor, trimmed), start.elapsed())
     };
+    let (image, histogram) = image;
     let (width, height) = image.dimensions();
     let pixels = image.into_raw();
-    let mut body = Vec::with_capacity(12 + pixels.len());
+    let histogram = histogram.to_le_bytes();
+    let mut body = Vec::with_capacity(12 + pixels.len() + histogram.len());
     for v in [width, height, render_time.as_micros() as u32] {
         body.extend_from_slice(&v.to_le_bytes());
     }
     body.extend_from_slice(&pixels);
+    body.extend_from_slice(&histogram);
     Ok(Response::new(body))
+}
+
+/// メニューのチェックの付く項目の状態を変える（環境設定に残した状態に合わせる）。
+#[tauri::command]
+fn set_menu_checked(id: String, checked: bool, app: AppHandle) -> Result<(), String> {
+    menu::set_checked(&app, &id, checked).map_err(|e| e.to_string())
 }
 
 /// 保存ダイアログの初期のパス `<元の名前>_edited.<拡張子>`（重ならない名前）。元のファイルがなければ None。
@@ -452,6 +462,7 @@ pub fn run() {
             crop_fit,
             crop_orient,
             default_save_path,
+            set_menu_checked,
             save_image,
             open::take_pending_paths,
             bench_mode,

@@ -19,6 +19,7 @@ mod exifread_tables;
 pub mod filters;
 pub mod formats;
 pub mod frames;
+pub mod histogram;
 pub mod makernote;
 pub mod output;
 pub mod pillow;

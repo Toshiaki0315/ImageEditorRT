@@ -20,3 +20,4 @@
 | `frame/*` | フレーム・形の期待値（マスク・切り抜き・余白・実際に切り抜く範囲・保存とプレビューの流れ）。旧版の `core/frames.py`・`core/shapes.py`・`core/pipeline.py` で作ったもの（`frame/make.py`）。画素まで一致することを確かめる |
 | `makernote_makers/*.tiff` | 主なメーカー（Canon・Nikon・Sony・Apple・Fujifilm・Olympus・Casio・DJI）の MakerNote を入れた EXIF（TIFF の部分だけ）。19 通り。`makernote_makers/make.py` で旧版のテスト部品を使って作ったもの |
 | `makernote_makers/expected.json` | 上の EXIF を旧版の `core/exif_info.py`（exifread）で読んだ結果（MakerNote の項目・形式の名前・UserComment の有無） |
+| `histogram/cases.json` | ヒストグラムの期待値（切り抜き・形・フレーム・文字・トリミング実行の表示の組み合わせ 7 通り）。旧版の `core/pipeline.py` の `render_preview_with_histogram` で数えたもの（`histogram/make.py`。画像は `frame/` のもの） |

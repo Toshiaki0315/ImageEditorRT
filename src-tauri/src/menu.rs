@@ -2,7 +2,9 @@
 //!
 //! 画面で処理する項目は、"menu" のイベントで項目の ID を画面に送る。
 
-use tauri::menu::{AboutMetadataBuilder, Menu, MenuEvent, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{
+    AboutMetadataBuilder, CheckMenuItemBuilder, Menu, MenuEvent, MenuItemBuilder, SubmenuBuilder,
+};
 use tauri::{AppHandle, Emitter, Runtime};
 
 /// 画面に送るイベントの名前（中身は項目の ID）。
@@ -13,6 +15,8 @@ pub const OPEN: &str = "open";
 pub const SAVE: &str = "save";
 /// 「編集 > 文字・透かし…」
 pub const TEXT: &str = "text";
+/// 「表示 > ヒストグラム」（チェックの付く項目。状態は画面が環境設定に残し、set_menu_checked で合わせる）
+pub const HISTOGRAM: &str = "histogram";
 
 /// メニューバーを作る。
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -49,7 +53,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .item(&text)
         .build()?;
-    let view = SubmenuBuilder::new(app, "表示").fullscreen_with_text("フルスクリーンにする").build()?;
+    let histogram = CheckMenuItemBuilder::with_id(HISTOGRAM, "ヒストグラム")
+        .accelerator("CmdOrCtrl+Shift+H")
+        .checked(true)
+        .build(app)?;
+    let view = SubmenuBuilder::new(app, "表示")
+        .item(&histogram)
+        .separator()
+        .fullscreen_with_text("フルスクリーンにする")
+        .build()?;
     let window = SubmenuBuilder::new(app, "ウインドウ")
         .minimize_with_text("しまう")
         .maximize_with_text("拡大／縮小")
@@ -60,4 +72,19 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 /// メニューの項目が選ばれたとき、画面に知らせる。
 pub fn on_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     let _ = app.emit(MENU_EVENT, event.id().as_ref());
+}
+
+/// チェックの付く項目の状態を変える（画面の環境設定に合わせる）。
+pub fn set_checked<R: Runtime>(app: &AppHandle<R>, id: &str, checked: bool) -> tauri::Result<()> {
+    let Some(menu) = app.menu() else { return Ok(()) };
+    for item in menu.items()? {
+        if let Some(sub) = item.as_submenu() {
+            if let Some(found) = sub.get(id) {
+                if let Some(check) = found.as_check_menuitem() {
+                    check.set_checked(checked)?;
+                }
+            }
+        }
+    }
+    Ok(())
 }

@@ -1,7 +1,8 @@
 // プレビュー: Rust に設定をかけさせた縮小版を canvas に描き、エリアに収まるよう縦横比を保って表示する。
 
 import { invoke } from "@tauri-apps/api/core";
-import { type Histogram, readHistogram } from "./histogram";
+import type { Histogram } from "./histogram";
+import { readPreview } from "./protocol";
 import type { EditSettings } from "./types";
 
 /** 1 回の描き直しの内訳 (ms)。 */
@@ -107,18 +108,14 @@ export class Preview {
     const buffer = await invoke<ArrayBuffer>("render_preview", { settings, trimmed, comparing: this.comparing });
     const received = performance.now();
     if (generation !== this.generation) return { render: 0, transfer: 0, draw: 0, total: 0 };
-    const header = new DataView(buffer, 0, 12);
-    const width = header.getUint32(0, true);
-    const height = header.getUint32(4, true);
-    const render = header.getUint32(8, true) / 1000;
+    const { width, height, renderMs: render, pixels, histogram } = readPreview(buffer);
     if (this.canvas.width !== width || this.canvas.height !== height) {
       this.canvas.width = width;
       this.canvas.height = height;
       this.fit();
     }
-    const pixels = new Uint8ClampedArray(buffer, 12, width * height * 4);
     this.context.putImageData(new ImageData(pixels, width, height), 0, 0);
-    this.onHistogram(readHistogram(buffer, 12 + width * height * 4));
+    this.onHistogram(histogram);
     await nextFrame(); // 画面に出るところまで含める
     const end = performance.now();
     return { render, transfer: received - start - render, draw: end - received, total: end - start };

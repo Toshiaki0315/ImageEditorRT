@@ -76,7 +76,13 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
   examples/bench.rs       # ベンチマーク
   tests/                  # ファイルを使うテスト（fixtures/ はテスト用の画像・EXIF）
 src-tauri/                # Tauri のアプリ本体（コマンドで core を呼び、画面と受け渡すだけ）
-  src/lib.rs              # コマンド（開く・プレビュー）と起動
+  src/lib.rs              # 起動（コマンドの登録・終了の求めの扱い）だけ
+  src/state.rs            # 開いている画像の状態と、読み込んだ画像を状態に置くまでの共通の処理
+  src/image.rs            # 開く・閉じる・プレビュー・100% 表示・クリップボードの画像・ジオラマのガイド
+  src/saving.rs           # 保存（保存用のスレッドの組）と保存ダイアログの初期のパス
+  src/settings.rs         # 設定パネルの選択肢と、範囲・出力の大きさの計算（計算は core）
+  src/system.rs           # メニューの状態・マップで開く・終了の確認
+  src/bench.rs            # 計測モード
   src/menu.rs             # メニューバー（選ばれた項目は "menu" のイベントで画面へ）
   src/open.rs             # コマンドライン引数・Finder・Dock から開く
   src/batch.rs            # まとめて処理（進み具合のイベント・中止）

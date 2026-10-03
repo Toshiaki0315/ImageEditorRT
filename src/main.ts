@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
-import { bench, benchSave } from "./bench";
+import { bench, benchSave, verdict } from "./bench";
 import { BatchDialog } from "./batchDialog";
 import { type AspectState, CropController } from "./crop";
 import { OutputSize, type SizeState } from "./output";
@@ -546,6 +546,40 @@ function extensionOf(path: string): string {
 
 const isSupported = (path: string) => extensions.includes(extensionOf(path));
 
+/** 想定外のエラーを知らせている間（続けて起きても、ダイアログは 1 つだけにする） */
+let reportingUnexpected = false;
+
+/**
+ * 想定外のエラー（旧版 NFR-04）: ログ（~/Library/Logs/ImageEditorRT/）に書き、ダイアログで知らせる。アプリは終わらせない。
+ * logPath を渡したとき（Rust のパニック）は、もうログに書いてある。
+ */
+async function reportUnexpected(error: unknown, logPath?: string) {
+  const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  let path = logPath ?? "";
+  try {
+    path ||= await invoke<string>("report_unexpected", {
+      message: error instanceof Error && error.stack ? `${detail}\n${error.stack}` : detail,
+    });
+  } catch {
+    // ログに書けなくても、ダイアログでは知らせる
+  }
+  if (reportingUnexpected) return;
+  reportingUnexpected = true;
+  try {
+    await message(`予期しないエラーが発生しました。\n${detail}\n\n詳細はログを参照してください:\n${path}`, {
+      title: "予期しないエラー",
+      kind: "error",
+    });
+  } catch {
+    // 知らせることもできなければ、何もしない（知らせるためのエラーで繰り返さない）
+  } finally {
+    reportingUnexpected = false;
+  }
+}
+
+window.addEventListener("error", (event) => void reportUnexpected(event.error ?? event.message));
+window.addEventListener("unhandledrejection", (event) => void reportUnexpected(event.reason));
+
 async function showError(title: string, error: unknown, withFormats = false) {
   let text = String(error);
   if (withFormats) text += `\n\n対応形式: ${formatsText}`;
@@ -824,6 +858,9 @@ async function setup() {
   });
   // メニューのチェックを環境設定に残した表示・非表示に合わせる
   void invoke("set_menu_checked", { id: "histogram", checked: histogramView.shown });
+  await listen<{ message: string; logPath: string }>("unexpected-error", (event) =>
+    reportUnexpected(event.payload.message, event.payload.logPath),
+  );
   await listen<string[]>("open-paths", (event) => {
     if (!saving) openPaths(event.payload);
   });
@@ -831,9 +868,17 @@ async function setup() {
   // IMAGEEDITORRT_BENCH を付けて起動したときは、計測して結果を出力して終わる
   if (await invoke<boolean>("bench_mode")) {
     try {
+      // NFR-01: 12MP の JPEG を開いてから、プレビューを描き終えるまで
+      const jpeg = await invoke<string>("bench_jpeg_path");
+      const start = performance.now();
+      showLoaded(await invoke<OpenInfo>("open_path", { path: jpeg }), []);
+      await preview.render(settings);
+      const loadMs = performance.now() - start;
+      const load = `読み込み→プレビュー表示（12MP の JPEG）: ${loadMs.toFixed(1)}ms`;
       showLoaded(await invoke<OpenInfo>("open_sample"), []);
       const result = await bench(preview, `${loaded!.previewWidth}×${loaded!.previewHeight}`);
-      await invoke("report", { text: `${result}\n${await benchSave(preview)}` });
+      const text = [load, result.text, await benchSave(preview), verdict(loadMs, result.heavyMax)].join("\n");
+      await invoke("report", { text });
     } catch (error) {
       await invoke("report", { text: `計測に失敗しました: ${error}` });
     }

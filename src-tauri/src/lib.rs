@@ -4,6 +4,7 @@
 mod batch;
 #[cfg(target_os = "macos")]
 mod clipboard;
+mod diagnostics;
 mod menu;
 mod open;
 mod presets;
@@ -511,6 +512,18 @@ fn bench_save_path() -> String {
     std::env::temp_dir().join("imageeditorrt-bench.jpg").to_string_lossy().into_owned()
 }
 
+/// 計測モードで読み込みを測る 12MP（4000×3000）の JPEG（一時フォルダに作る。旧版の NFR-01 と同じ大きさ）。
+#[tauri::command]
+async fn bench_jpeg_path() -> Result<String, String> {
+    let path = std::env::temp_dir().join("imageeditorrt-bench-12mp.jpg");
+    if !path.exists() {
+        let image = sample::synthetic_photo(4000, 3000);
+        let bytes = save::encode(&image, save::SaveFormat::Jpeg, 90, None).map_err(|e| e.to_string())?;
+        std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    }
+    Ok(path.to_string_lossy().into_owned())
+}
+
 /// 画面での計測の結果を標準出力に書き、計測モードなら終了する。
 #[tauri::command]
 fn report(text: String, app: AppHandle) {
@@ -528,6 +541,14 @@ fn log(text: String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // ビルドの後の起動確認（画面を出さずに、画像を読めるかだけを確かめて終わる）
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    if let Some(i) = args.iter().position(|a| a == diagnostics::SMOKE_TEST_FLAG) {
+        let file = args.get(i + 1).map(PathBuf::from);
+        std::process::exit(diagnostics::smoke_test(file.as_deref()));
+    }
+    // 想定外のエラー（パニック）はログに書き、画面で知らせる（旧版 NFR-04）
+    diagnostics::install_panic_hook();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
@@ -537,6 +558,7 @@ pub fn run() {
         .menu(menu::build)
         .on_menu_event(menu::on_event)
         .setup(|app| {
+            diagnostics::set_app(app.handle().clone());
             // 計測ではウィンドウが隠れていると描画が止まるので、前に出す
             if bench_mode() {
                 if let Some(window) = app.get_webview_window("main") {
@@ -571,6 +593,7 @@ pub fn run() {
             clipboard_contents,
             clipboard_text,
             open_clipboard_image,
+            diagnostics::report_unexpected,
             render_actual_size,
             save_image,
             open::take_pending_paths,
@@ -587,6 +610,7 @@ pub fn run() {
             batch::cancel_batch,
             bench_mode,
             bench_save_path,
+            bench_jpeg_path,
             log,
             report
         ])

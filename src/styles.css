@@ -301,8 +301,10 @@ button:disabled {
   width: 100%;
 }
 
+/* プルダウンはスライダー・数値の欄と同じ幅にする（右の値の列には広げない） */
 .row select {
-  grid-column: 2 / 4;
+  grid-column: 2;
+  min-width: 0;
 }
 
 .row input[type="number"] {

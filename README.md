@@ -12,9 +12,18 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 自分の Mac（Apple Silicon、macOS 13 以降）で使う。署名は ad-hoc（他の Mac への配布はしない）。
 
 ```bash
-npm install                      # 初回だけ（Node.js と Rust が必要）
-scripts/build_app.sh --install   # ビルドして /Applications/ImageEditorRT.app に入れる
+scripts/build_app.sh --install   # ビルドして /Applications/ImageEditorRT.app に入れる（Node.js と Rust が必要）
 ```
+
+よく使うコマンドは `make` でも動かせる:
+
+| コマンド | すること |
+|---|---|
+| `make dev` | 開発用に起動する（画面の変更はすぐ反映） |
+| `make app` | `.app` を作る（署名・起動確認まで。`target/release/bundle/macos/ImageEditorRT.app`） |
+| `make dmg` | `.app` を作ってからディスクイメージにする（`target/release/bundle/dmg/ImageEditorRT_<版>_arm64.dmg`。開いて Applications にドラッグすればインストールできる） |
+
+どれも、画面の依存パッケージ（`node_modules`）がなければ先に入れる。
 
 - ビルドの最後に、画面を出さずに起動確認をする（作った画像と HEIC の画像を読めるか）。
 - ImageEditorRT が起動していると入れ替えない。終了してから、もう一度実行する。
@@ -52,7 +61,7 @@ NFR-01（読み込み→表示 1 秒以内）・NFR-02（プレビュー更新 2
 ## 開発
 
 ```bash
-npx tauri dev                    # 開発用に起動
+make dev                         # 開発用に起動（npx tauri dev）
 cargo test --workspace           # Rust のテスト
 npm test                         # 画面（TypeScript）のテスト
 npm run build                    # TypeScript の型チェックと画面のビルド

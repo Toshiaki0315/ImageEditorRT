@@ -8,6 +8,8 @@ import type { AspectRatio, CropRect, EditSettings, FrameKind, OrientOp, Orientat
 type DragMode = "new" | "move" | "resize";
 type Drag = { mode: DragMode; anchor: [number, number]; start: CropRect | null };
 type Oriented = { orientation: Orientation; crop: CropRect | null; size: [number, number] };
+/** アンドゥ／リドゥで範囲と一緒に戻す、比の選択と「縦向き」（戻した範囲と比の固定が食い違わないように） */
+export type AspectState = { ratio: AspectRatio; portrait: boolean };
 
 const SVG = "http://www.w3.org/2000/svg";
 /** ハンドルの大きさと、当たり判定の半径（画面の px） */
@@ -111,6 +113,31 @@ export class CropController {
     this.setTrimmed(false, false);
     this.updateControls();
     this.draw();
+  }
+
+  /** 比の選択と「縦向き」（履歴に積む）。 */
+  aspectState(): AspectState {
+    return { ratio: this.chosenRatio, portrait: this.portrait.checked };
+  }
+
+  /**
+   * 履歴の状態に戻したとき（settings はもう戻してある）。比の固定で範囲を直したりせず、取ったときの値をそのまま使う。
+   * originalSize は回転・反転する前の原寸。
+   */
+  restore(state: AspectState, originalSize: [number, number]) {
+    this.chosenRatio = state.ratio;
+    this.portrait.checked = state.portrait;
+    const [width, height] = originalSize;
+    this.size = this.settings.orientation.rotation % 180 === 0 ? [width, height] : [height, width];
+    this.shapeArea = null;
+    this.updateControls();
+    this.draw();
+    void this.refreshShapeArea();
+  }
+
+  /** 範囲をドラッグしている間は true（ドラッグ全体を 1 回の操作として履歴に積む）。 */
+  isDragging(): boolean {
+    return this.drag !== null;
   }
 
   isTrimmed(): boolean {

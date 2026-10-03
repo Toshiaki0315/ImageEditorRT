@@ -32,6 +32,8 @@ export class Preview {
   trimmed = false;
   /** 加工前を表示する（向きと切り抜く範囲だけを残す） */
   comparing = false;
+  /** 画像を閉じるたびに増やす（閉じる前の依頼の結果は描かない） */
+  private generation = 0;
   /** 表示の大きさが変わったとき（ガイド・範囲の線を描き直す） */
   onResize: () => void = () => {};
   /** 描き直したとき、保存される写真のヒストグラムを知らせる */
@@ -75,16 +77,24 @@ export class Preview {
     if (!this.busy) void this.drain();
   }
 
+  /** 画像を閉じたとき（リセット）: 描きかけの結果は描かず、canvas を隠す。 */
+  clear() {
+    this.pending = null;
+    this.generation += 1;
+    this.canvas.hidden = true;
+  }
+
   private async drain() {
     this.busy = true;
+    const generation = this.generation;
     try {
-      while (this.pending) {
+      while (this.pending && generation === this.generation) {
         const settings = this.pending;
         this.pending = null;
         await this.render(settings, this.trimmed);
       }
     } catch (error) {
-      this.onError(error);
+      if (generation === this.generation) this.onError(error);
     } finally {
       this.busy = false;
     }
@@ -93,8 +103,10 @@ export class Preview {
   /** Rust にプレビューを作らせて描き、内訳を返す。 */
   async render(settings: EditSettings, trimmed = false): Promise<Timing> {
     const start = performance.now();
+    const generation = this.generation;
     const buffer = await invoke<ArrayBuffer>("render_preview", { settings, trimmed, comparing: this.comparing });
     const received = performance.now();
+    if (generation !== this.generation) return { render: 0, transfer: 0, draw: 0, total: 0 };
     const header = new DataView(buffer, 0, 12);
     const width = header.getUint32(0, true);
     const height = header.getUint32(4, true);

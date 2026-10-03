@@ -145,3 +145,9 @@
 ## 既定値の一致のテスト（#51）
 
 - 編集設定の既定値は Rust（`EditSettings::default()`）と TypeScript（`defaultSettings()`・`defaultText()`）に二重に書いている。両方が `tests-ts/fixtures/default-settings.json` と同じかを、それぞれのテスト（`crates/core/tests/default_settings.rs`・`tests-ts/defaults.test.ts`）で確かめる。既定値を変えるときは、両方とこのファイルをそろえる。
+
+## 画面のコードの分け方（#52）
+
+- `main.ts` は入り口だけにし、機能ごとに分けた（`editing`・`view`・`files`・`presetsUi`・`menus`・`status`・`protocol`）。共有の状態・要素・部品は `app.ts` にまとめる（`state`・`dom`・`parts`）。`app.ts` は機能のファイルを読み込まない（部品の知らせは `hooks` で受け、`main.ts` で機能につなぐ）。
+- 機能のファイルの中だけで使う状態（100% 表示・加工前の表示・終了の確認中など）は、そのファイルの中に置く。
+- メニューの項目の ID は `menus.ts` の `MENU` にまとめる（Rust の `menu.rs`・`presets.rs` と同じ文字列）。

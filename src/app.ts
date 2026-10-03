@@ -1,0 +1,98 @@
+// 画面全体で共有する状態・要素・部品。機能ごとのファイル（editing・view・files・presetsUi など）から使う。
+// ここでは機能のファイルを読み込まない（部品のコールバックだけ、呼ばれたときに機能を呼ぶ）。
+
+import type { BatchDialog } from "./batchDialog";
+import type { CropController } from "./crop";
+import { ExifView } from "./exif";
+import { HistogramView } from "./histogram";
+import type { HistoryRecorder } from "./history";
+import { OutputSize, type SizeState } from "./output";
+import type { Panel } from "./panel";
+import { Preview } from "./preview";
+import { SaveOptionsPanel } from "./saveOptions";
+import { Tabs } from "./tabs";
+import type { TextDialog } from "./textDialog";
+import { defaultSettings, type EditSettings, type OpenInfo } from "./types";
+import type { AspectState } from "./crop";
+import { ZoomView } from "./zoom";
+
+export const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+/** 画面の要素。 */
+export const dom = {
+  stage: $<HTMLElement>("stage"),
+  placeholder: $<HTMLElement>("placeholder"),
+  status: $<HTMLElement>("status"),
+  saveButton: $<HTMLButtonElement>("save"),
+  beforeButton: $<HTMLButtonElement>("before"),
+  resetButton: $<HTMLButtonElement>("reset"),
+  canvas: $<HTMLCanvasElement>("canvas"),
+  guide: document.getElementById("guide") as unknown as SVGSVGElement,
+  zoomGuide: document.getElementById("zoom-guide") as unknown as SVGSVGElement,
+  zoomCanvas: $<HTMLCanvasElement>("zoom-canvas"),
+  /** 全体表示のプレビュー（canvas・範囲の選択・ガイド）。100% 表示の間は隠す */
+  frame: document.querySelector<HTMLElement>(".frame")!,
+  badge: $<HTMLElement>("badge"),
+};
+
+/** 開いている画像と、操作の状態。 */
+export const state = {
+  /** 編集設定（部品と共有するので、置き換えずに中身を書き換える） */
+  settings: defaultSettings() as EditSettings,
+  loaded: null as OpenInfo | null,
+  /** 読み込みのときのお知らせ（ステータスバーに出す） */
+  notes: [] as string[],
+  opening: false,
+  /** 保存中・まとめて処理中（保存・開く・リセット・終了などを止める） */
+  saving: false,
+  /** 最後に保存したときの設定（未保存の変更の判定に使う） */
+  savedSettings: null as EditSettings | null,
+  /** 読み込める拡張子・保存できる拡張子・対応形式の説明（起動時に Rust から読む） */
+  extensions: [] as string[],
+  savableExtensions: [] as string[],
+  formatsText: "",
+};
+
+/** アンドゥ／リドゥで戻す、設定パネルの状態（旧版の PanelState）。 */
+export type Snapshot = { settings: EditSettings; aspect: AspectState; size: SizeState };
+
+/** 画面の部品のうち、起動時に Rust から選択肢を読んでから作るもの（setup で入れる）。 */
+export const parts = {} as {
+  panel: Panel;
+  crop: CropController;
+  textDialog: TextDialog;
+  /** 「加工」タブの「文字…」のボタン（設定パネルを作った後に取る） */
+  textButton: HTMLButtonElement;
+  recorder: HistoryRecorder<Snapshot>;
+  batchDialog: BatchDialog;
+};
+
+/** 部品の知らせを受ける先（機能のファイルが setup で入れる。ここから機能のファイルを読み込まないため）。 */
+export const hooks = {
+  /** 画面で設定を変えたとき（履歴に積み、プレビューを描き直す） */
+  userChanged: () => {},
+  /** プレビューを描き直せなかったとき */
+  previewError: (_error: unknown) => {},
+};
+
+export const preview = new Preview(dom.stage, dom.canvas, (error) => hooks.previewError(error));
+export const zoomView = new ZoomView(dom.stage, $<HTMLElement>("zoom"), $<HTMLElement>("zoom-image"), dom.zoomCanvas);
+export const histogramView = new HistogramView($<HTMLCanvasElement>("histogram"));
+export const tabs = new Tabs(document.querySelector(".side")!);
+export const exifView = new ExifView($("page-exif"));
+export const output = new OutputSize(state.settings, () => hooks.userChanged());
+export const saveOptions = new SaveOptionsPanel(
+  $<HTMLInputElement>("jpeg-quality"),
+  $<HTMLOutputElement>("jpeg-quality-value"),
+  $<HTMLInputElement>("keep-exif"),
+  $<HTMLInputElement>("keep-gps"),
+);
+
+function extensionOf(path: string): string {
+  const name = path.split("/").pop() ?? "";
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
+}
+
+/** 読み込める拡張子のファイルか。 */
+export const isSupported = (path: string) => state.extensions.includes(extensionOf(path));

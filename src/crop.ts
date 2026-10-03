@@ -135,6 +135,11 @@ export class CropController {
     void this.refreshShapeArea();
   }
 
+  /** プリセットでフレーム・形が変わったとき: 手で選んだときと同じく、範囲をその比に直す。 */
+  refit(): Promise<void> {
+    return this.aspectChanged();
+  }
+
   /** 範囲をドラッグしている間は true（ドラッグ全体を 1 回の操作として履歴に積む）。 */
   isDragging(): boolean {
     return this.drag !== null;

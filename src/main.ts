@@ -78,6 +78,8 @@ let zoomCenter: [number, number] | null = null;
 let zoomTimer: ReturnType<typeof setTimeout> | undefined;
 /** 最後に保存したときの設定（未保存の変更の判定に使う） */
 let savedSettings: EditSettings | null = null;
+/** プリセットの名前の一覧（「プリセット ▾」のメニューに出す） */
+let presetNames: string[] = [];
 /** スライダーをドラッグしている間（履歴に積むのを離すまで待つ） */
 let sliderDragging = false;
 
@@ -214,6 +216,106 @@ async function resetImage() {
   recorder.reset();
   updateMenus();
   void updateStatus();
+}
+
+// --- プリセット（旧版 FR-UI-59） ----------------------------------------------------
+
+/**
+ * 「プリセット ▾」のメニューをボタンの下に出す（メニューは Rust で作る）。選んだ項目は "menu" のイベントで届く:
+ * "preset-apply:<番号>"（当てはめる）・"preset-save"（保存…）・"preset-delete:<番号>"（削除）。
+ */
+async function showPresetMenu(button: HTMLElement) {
+  const rect = button.getBoundingClientRect();
+  await invoke("show_preset_menu", { x: rect.left, y: rect.bottom, loaded: loaded !== null });
+}
+
+/** "menu" のイベントのうち、プリセットのメニューの項目を処理する。 */
+function onPresetMenu(id: string) {
+  const index = (prefix: string) => Number(id.slice(prefix.length));
+  if (id === "preset-save") void savePresetDialog();
+  if (id.startsWith("preset-apply:")) {
+    const name = presetNames[index("preset-apply:")];
+    if (name !== undefined) void applyPreset(name);
+  }
+  if (id.startsWith("preset-delete:")) {
+    const name = presetNames[index("preset-delete:")];
+    if (name !== undefined) void deletePreset(name);
+  }
+}
+
+/** プリセットの加工を当てはめる（サイズ・範囲・向きはそのまま）。1 回の操作として元に戻せる。 */
+async function applyPreset(name: string) {
+  if (!loaded || saving) return;
+  try {
+    Object.assign(settings, await invoke<EditSettings>("apply_preset", { name, settings }));
+  } catch (error) {
+    await showError("プリセットを当てはめられません", error);
+    return;
+  }
+  panel.show();
+  textDialog.show();
+  // フレーム・円の比が変わったら、手で選んだときと同じく範囲をその比に直す
+  await crop.refit();
+  userChanged();
+}
+
+/** 名前を入力してもらう（キャンセルなら null）。 */
+function askPresetName(initial: string): Promise<string | null> {
+  const dialog = $<HTMLDialogElement>("preset-dialog");
+  const input = $<HTMLInputElement>("preset-name");
+  input.value = initial;
+  dialog.returnValue = "";
+  dialog.showModal();
+  input.select();
+  return new Promise((resolve) =>
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok" ? input.value : null), {
+      once: true,
+    }),
+  );
+}
+
+/** 今の加工を、名前を付けてプリセットとして保存する。同じ名前なら上書きを確かめる。 */
+async function savePresetDialog() {
+  if (!loaded) return;
+  const text = await askPresetName(await invoke<string>("default_preset_name"));
+  if (text === null) return;
+  const check = await invoke<{ name: string; exists: boolean }>("check_preset_name", { name: text });
+  const name = check.name;
+  if (!name) return;
+  if (
+    check.exists &&
+    !(await ask(`プリセット「${name}」はすでにあります。上書きしますか？`, {
+      title: "プリセットを保存",
+      kind: "warning",
+      okLabel: "上書き",
+      cancelLabel: "キャンセル",
+    }))
+  ) {
+    return;
+  }
+  try {
+    presetNames = await invoke<string[]>("save_preset", { name, settings });
+    void updateStatus(`プリセット「${name}」を保存しました`);
+  } catch (error) {
+    await showError("プリセットを保存できません", error);
+  }
+}
+
+/** プリセットを確かめてから削除する。 */
+async function deletePreset(name: string) {
+  const ok = await ask(`プリセット「${name}」を削除しますか？`, {
+    title: "プリセットを削除",
+    kind: "warning",
+    okLabel: "削除",
+    cancelLabel: "キャンセル",
+  });
+  if (!ok) return;
+  try {
+    presetNames = await invoke<string[]>("delete_preset", { name });
+    void updateStatus(`プリセット「${name}」を削除しました`);
+  } catch (error) {
+    await showError("プリセットを保存できません", error);
+  }
 }
 
 // --- 加工前との比較（旧版 FR-UI-44） ------------------------------------------------
@@ -611,6 +713,14 @@ async function setup() {
     document.addEventListener(type, () => (sliderDragging = false));
   }
   resetButton.addEventListener("click", () => void resetImage());
+  const presetButton = $<HTMLButtonElement>("preset-button");
+  presetButton.addEventListener("click", () =>
+    showPresetMenu(presetButton).catch((error) => showError("プリセットのメニューを出せません", error)),
+  );
+  // プリセットを読む。ファイルが壊れていたら知らせ、プリセットなしで使えるようにする
+  const presetResult = await invoke<{ names: string[]; error: string | null }>("load_presets");
+  presetNames = presetResult.names;
+  if (presetResult.error) void showError("プリセットを読み込めません", presetResult.error);
   textButton = $<HTMLButtonElement>("text-button");
   textButton.addEventListener("click", () => {
     if (loaded) textDialog.open();
@@ -630,6 +740,7 @@ async function setup() {
     if (event.payload === "open") void openDialog();
     if (event.payload === "save") void saveDialog();
     if (event.payload === "text" && loaded) textDialog.open();
+    onPresetMenu(event.payload);
     if (event.payload === "undo") undo();
     if (event.payload === "redo") redo();
     if (event.payload === "actual_size") showActualSize();

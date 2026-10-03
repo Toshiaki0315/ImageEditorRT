@@ -107,5 +107,17 @@
         <button type="button" id="text-close">閉じる</button>
       </div>
     </dialog>
+    <!-- プリセットの名前の入力（「今の加工をプリセットとして保存…」） -->
+    <dialog id="preset-dialog" class="preset-dialog">
+      <form method="dialog">
+        <h2>プリセットを保存</h2>
+        <label class="field">プリセットの名前:<input type="text" id="preset-name" autocomplete="off" /></label>
+        <div class="buttons dialog-buttons">
+          <!-- Return で押されるのは先に書いたボタン（OK）。並びは CSS で右に OK -->
+          <button type="submit" value="ok" id="preset-ok">OK</button>
+          <button type="submit" value="cancel" formnovalidate>キャンセル</button>
+        </div>
+      </form>
+    </dialog>
   </body>
 </html>

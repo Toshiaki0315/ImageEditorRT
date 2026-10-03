@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "name": "夕焼け",
+      "filter": "sepia",
+      "exposure": 0.7,
+      "brightness": -10,
+      "contrast": 15,
+      "temperature": 5200,
+      "saturation": 20,
+      "vignette": 30,
+      "aging": 10,
+      "sharpen": 40,
+      "blur": 0,
+      "denoise": 5,
+      "diorama_blur": 0,
+      "diorama_direction": "horizontal",
+      "diorama_position": 50,
+      "diorama_width": 20,
+      "diorama_vivid": 30,
+      "frame": "polaroid",
+      "shape": "rounded",
+      "corner_radius": 25,
+      "text": {
+        "text": "2026 \"夏\"\n旅",
+        "font": "MINCHO",
+        "size": 7.5,
+        "color": [
+          10,
+          20,
+          30
+        ],
+        "opacity": 80,
+        "position": "frame_margin"
+      }
+    },
+    {
+      "name": "ジオラマ",
+      "filter": "none",
+      "exposure": 0.0,
+      "brightness": 0,
+      "contrast": 0,
+      "temperature": 6500,
+      "saturation": 0,
+      "vignette": 0,
+      "aging": 0,
+      "sharpen": 0,
+      "blur": 0,
+      "denoise": 0,
+      "diorama_blur": 60,
+      "diorama_direction": "vertical",
+      "diorama_position": 40,
+      "diorama_width": 15,
+      "diorama_vivid": 70,
+      "frame": "instax_mini",
+      "shape": "circle",
+      "corner_radius": 10,
+      "text": {
+        "text": "",
+        "font": "GOTHIC",
+        "size": 5.0,
+        "color": [
+          255,
+          255,
+          255
+        ],
+        "opacity": 80,
+        "position": "bottom_right"
+      }
+    },
+    {
+      "name": "既定",
+      "filter": "none",
+      "exposure": 0.0,
+      "brightness": 0,
+      "contrast": 0,
+      "temperature": 6500,
+      "saturation": 0,
+      "vignette": 0,
+      "aging": 0,
+      "sharpen": 0,
+      "blur": 0,
+      "denoise": 0,
+      "diorama_blur": 0,
+      "diorama_direction": "horizontal",
+      "diorama_position": 50,
+      "diorama_width": 20,
+      "diorama_vivid": 30,
+      "frame": "none",
+      "shape": "rectangle",
+      "corner_radius": 10,
+      "text": {
+        "text": "",
+        "font": "GOTHIC",
+        "size": 5.0,
+        "color": [
+          255,
+          255,
+          255
+        ],
+        "opacity": 80,
+        "position": "bottom_right"
+      }
+    }
+  ]
+}

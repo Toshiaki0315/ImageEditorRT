@@ -80,6 +80,9 @@ export class Panel {
     for (const [value, label] of filters) this.filter.add(new Option(label, value));
     this.filter.addEventListener("change", () => {
       this.settings.filter = this.filter.value as FilterType;
+      // テイストを選び直したら、強さは既定（100%）に戻す（前のテイストに合わせた強さを持ち越さない）
+      this.settings.filterStrength = STRENGTH[0].initial;
+      this.showRow("filterStrength");
       this.updateStrength();
       this.onChange();
     });

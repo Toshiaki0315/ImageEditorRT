@@ -115,3 +115,86 @@ pub fn margin_box(size: (u32, u32), frame: FrameType) -> Option<(u32, u32, u32, 
         (left, top + height, left + width, top + height + bottom)
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::Rgba;
+
+    const FRAMES: [FrameType; 2] = [FrameType::Polaroid, FrameType::InstaxMini];
+
+    #[test]
+    fn no_frame_adds_nothing() {
+        assert_eq!(frame_margins(FrameType::None, (300, 200)), (0, 0, 0, 0));
+        assert_eq!(framed_size((300, 200), FrameType::None), (300, 200));
+        assert_eq!(
+            (window_aspect(FrameType::None, (1, 1)), margin_box((1, 1), FrameType::None)),
+            (None, None)
+        );
+        let image = RgbaImage::from_pixel(3, 2, Rgba([1, 2, 3, 4]));
+        assert_eq!(add_frame(&image, FrameType::None), image);
+    }
+
+    #[test]
+    fn tiny_photos_still_get_a_frame() {
+        for frame in FRAMES {
+            let (l, t, r, b) = frame_margins(frame, (1, 1));
+            assert!(l >= 1 && t >= 1 && r >= 1 && b >= 1, "{frame:?}");
+            assert_eq!(framed_size((1, 1), frame), (1 + l + r, 1 + t + b));
+        }
+    }
+
+    #[test]
+    fn the_wide_margin_follows_the_orientation() {
+        // ポラロイド（正方形の写真部分）はどの向きでも下が広い
+        for size in [(400, 400), (300, 500), (500, 300)] {
+            let (l, t, r, b) = frame_margins(FrameType::Polaroid, size);
+            assert!(b > t && b > l && b > r, "{size:?}");
+            assert_eq!(l, r);
+        }
+        // チェキは縦長の写真なら下、横長なら右（カードを横向きにする）が広い
+        let (_, t, _, b) = frame_margins(FrameType::InstaxMini, (460, 620));
+        assert!(b > t);
+        let (l, _, r, _) = frame_margins(FrameType::InstaxMini, (620, 460));
+        assert!(r > l);
+        assert_eq!(window_aspect(FrameType::InstaxMini, (620, 460)), Some((62.0, 46.0)));
+        assert_eq!(window_aspect(FrameType::InstaxMini, (460, 620)), Some((46.0, 62.0)));
+    }
+
+    #[test]
+    fn margins_scale_with_the_photo() {
+        // 写真部分にちょうど合う大きさなら、余白は実物の比率どおり（ポラロイド 79mm に 4.5mm）
+        let (l, _, _, b) = frame_margins(FrameType::Polaroid, (790, 790));
+        assert_eq!((l, b), (45, 220));
+        // 写真部分と比が違うときは、収まる側の縮尺に合わせる
+        assert_eq!(
+            frame_margins(FrameType::Polaroid, (790, 1580)),
+            frame_margins(FrameType::Polaroid, (790, 790))
+        );
+    }
+
+    #[test]
+    fn margin_box_is_the_widest_margin() {
+        let size = (460, 620);
+        let (l, t, _, b) = frame_margins(FrameType::InstaxMini, size);
+        assert_eq!(margin_box(size, FrameType::InstaxMini), Some((l, t + 620, l + 460, t + 620 + b)));
+        let wide = (620, 460);
+        let (l, t, r, _) = frame_margins(FrameType::InstaxMini, wide);
+        assert_eq!(margin_box(wide, FrameType::InstaxMini), Some((l + 620, t, l + 620 + r, t + 460)));
+    }
+
+    #[test]
+    fn add_frame_puts_the_photo_inside_a_white_card() {
+        let photo = RgbaImage::from_pixel(50, 40, Rgba([10, 20, 30, 128]));
+        for frame in FRAMES {
+            let framed = add_frame(&photo, frame);
+            let (l, t, _, _) = frame_margins(frame, (50, 40));
+            assert_eq!(framed.dimensions(), framed_size((50, 40), frame));
+            assert_eq!(*framed.get_pixel(0, 0), Rgba([255, 255, 255, 255]));
+            // 写真の透過はそのまま
+            assert_eq!(*framed.get_pixel(l, t), Rgba([10, 20, 30, 128]));
+            assert_eq!(*framed.get_pixel(l + 49, t + 39), Rgba([10, 20, 30, 128]));
+            assert_eq!(*framed.get_pixel(l + 50, t + 40), Rgba([255, 255, 255, 255]));
+        }
+    }
+}

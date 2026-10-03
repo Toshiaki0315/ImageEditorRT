@@ -10,6 +10,8 @@ use tauri::{AppHandle, Emitter, Runtime};
 
 /// 画面に送るイベントの名前（中身は項目の ID）。
 pub const MENU_EVENT: &str = "menu";
+/// 「ImageEditorRT を終了」（未保存の変更があれば画面が確かめてから終わる）
+pub const QUIT: &str = "quit";
 /// 「ファイル > 開く…」
 pub const OPEN: &str = "open";
 /// 「ファイル > 保存…」
@@ -34,6 +36,9 @@ pub const HISTOGRAM: &str = "histogram";
 /// メニューバーを作る。
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let about = AboutMetadataBuilder::new().name(Some(super::APP_NAME)).build();
+    let quit = MenuItemBuilder::with_id(QUIT, format!("{} を終了", super::APP_NAME))
+        .accelerator("CmdOrCtrl+Q")
+        .build(app)?;
     let app_menu = SubmenuBuilder::new(app, super::APP_NAME)
         .about_with_text(format!("{} について", super::APP_NAME), Some(about))
         .separator()
@@ -43,7 +48,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .hide_others_with_text("ほかを隠す")
         .show_all_with_text("すべてを表示")
         .separator()
-        .quit_with_text(format!("{} を終了", super::APP_NAME))
+        .item(&quit)
         .build()?;
     let open = MenuItemBuilder::with_id(OPEN, "開く…").accelerator("CmdOrCtrl+O").build(app)?;
     let save = MenuItemBuilder::with_id(SAVE, "保存…").accelerator("CmdOrCtrl+S").build(app)?;

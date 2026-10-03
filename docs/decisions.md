@@ -135,3 +135,9 @@
 - 想定外のエラー（旧版 NFR-04）: Rust のパニックはパニックのフックでログ（`~/Library/Logs/ImageEditorRT/imageeditorrt.log`。日時は UTC）に書き、"unexpected-error" のイベントで画面に知らせる。画面の想定外のエラー（`error`・`unhandledrejection`）もログに書く。どちらもダイアログで知らせ、アプリは終わらせない。
 - 速さの判定（旧版 NFR-01・02）: `scripts/bench.sh`（計測モード）の最後に出す。NFR-01 は 12MP（4000×3000）の JPEG を開いてプレビューを描き終えるまで、NFR-02 は重い設定のプレビュー更新（受け渡し・描画を含む）の最大。M4 の Mac で NFR-01 は 84ms、NFR-02 は 29ms（どちらも OK）。
 - `make dev`・`make app`・`make dmg`（`Makefile`）。dmg は Tauri の dmg の作り方（Finder を AppleScript で動かして見た目を整える）を使わず、`.app` と /Applications へのリンクを入れたフォルダを `diskutil image create from`（古い macOS では `hdiutil create`）で固める（画面の操作がいらず、CI などでも止まらない）。署名は ad-hoc なので、ほかの Mac では Gatekeeper に止められる。
+
+## 未保存のまま終了するときの確認（#47）
+
+- 旧版にはない動き（ユーザーの希望で足した）。⌘Q（メニューの「ImageEditorRT を終了」を独自の項目にした）・ウィンドウを閉じる（赤いボタン・⌘W）・Dock の「終了」などで、未保存の変更（初期状態とも最後に保存した設定とも違う）があれば、開く・リセットのときと同じ確認（「終了」「キャンセル」）を出す。変更がなければそのまま終わる。
+- ウィンドウを閉じる求めは画面で止め（`onCloseRequested`）、Dock などからの終了の求め（`RunEvent::ExitRequested`）は Rust で止めて "quit-requested" のイベントで画面に知らせる。画面が確かめた後に `quit_app` で終わる。
+- 保存中・まとめて処理中は、ファイルが途中で切れないよう終了しない（終わってから終了してもらう）。

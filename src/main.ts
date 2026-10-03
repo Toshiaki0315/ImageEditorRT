@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { bench, benchSave, verdict } from "./bench";
 import { BatchDialog } from "./batchDialog";
@@ -194,6 +195,36 @@ function hasUnsavedChanges(): boolean {
 async function confirmDiscard(): Promise<boolean> {
   if (!hasUnsavedChanges()) return true;
   return ask(DISCARD_QUESTION, { title: DISCARD_TITLE, kind: "warning", okLabel: "破棄", cancelLabel: "キャンセル" });
+}
+
+/** 終了を確かめている間（⌘Q を続けて押しても、ダイアログは 1 つだけにする） */
+let quitting = false;
+
+/**
+ * 終了する（⌘Q・ウィンドウを閉じる・Dock の「終了」）。未保存の変更があれば確かめ、キャンセルなら終了しない。
+ * 保存中・まとめて処理中は、ファイルが途中で切れないよう終了しない。
+ */
+async function requestQuit() {
+  if (quitting) return;
+  quitting = true;
+  try {
+    if (saving) {
+      await message("保存（またはまとめて処理）の途中です。終わってから終了してください。", {
+        title: "終了できません",
+        kind: "warning",
+      });
+      return;
+    }
+    if (
+      hasUnsavedChanges() &&
+      !(await ask(DISCARD_QUESTION, { title: DISCARD_TITLE, kind: "warning", okLabel: "終了", cancelLabel: "キャンセル" }))
+    ) {
+      return;
+    }
+    await invoke("quit_app");
+  } finally {
+    quitting = false;
+  }
 }
 
 /** リセット: 画像と設定を未読込の状態に戻す（未保存の変更があれば確かめる）。 */
@@ -841,6 +872,7 @@ async function setup() {
   tabs.onSelect = () => void updateGuide();
   setupDrop();
   await listen<string>("menu", (event) => {
+    if (event.payload === "quit") void requestQuit();
     if (event.payload === "open") void openDialog();
     if (event.payload === "batch") void startBatch();
     if (event.payload === "save") void saveDialog();
@@ -861,6 +893,13 @@ async function setup() {
   await listen<{ message: string; logPath: string }>("unexpected-error", (event) =>
     reportUnexpected(event.payload.message, event.payload.logPath),
   );
+  // Dock の「終了」など、メニュー以外からの終了の求めも同じく確かめる
+  await listen("quit-requested", () => requestQuit());
+  // ウィンドウを閉じる（赤いボタン・⌘W）とアプリが終わるので、同じく確かめる
+  await getCurrentWindow().onCloseRequested((event) => {
+    event.preventDefault();
+    void requestQuit();
+  });
   await listen<string[]>("open-paths", (event) => {
     if (!saving) openPaths(event.payload);
   });

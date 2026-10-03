@@ -29,12 +29,20 @@ fn pentax_jpeg() {
 }
 
 #[test]
-fn canon_maker_note_is_read_without_names() {
-    // Canon のタグの名前は試作ではまだ持たない（ヘッダーのない IFD として番号で出す）
+fn canon_maker_note_has_names() {
+    // Canon は旧版（exifread）と同じタグの名前で出す
     let info = read_exif_info(&fixture("canon.jpg"));
-    assert_eq!(info.maker_note.as_deref(), Some("不明な形式"));
-    let note = info.entries.iter().find(|e| e.tag == "Tag 0x0006").unwrap();
-    assert_eq!(note.value, "Canon EOS R5 IMAGE TYPE");
+    assert_eq!(info.maker_note.as_deref(), Some("Canon"));
+    let notes: Vec<(&str, &str)> = info
+        .entries
+        .iter()
+        .filter(|e| e.group == Group::MakerNote)
+        .map(|e| (e.tag.as_str(), e.value.as_str()))
+        .collect();
+    assert_eq!(
+        notes,
+        [("ImageType", "Canon EOS R5 IMAGE TYPE"), ("FirmwareVersion", "Firmware Version 1.8.1")]
+    );
 }
 
 #[test]

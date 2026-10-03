@@ -13,6 +13,9 @@ pub mod diorama;
 pub mod effects;
 pub mod encode;
 pub mod exif_info;
+pub mod exifread_note;
+#[rustfmt::skip]
+mod exifread_tables;
 pub mod filters;
 pub mod formats;
 pub mod frames;

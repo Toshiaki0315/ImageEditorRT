@@ -72,3 +72,11 @@
 - フォントのファイルが読めないときは、ヒラギノ角ゴシック W3 で描く（旧版は Pillow の組み込みフォントだった）。
 - JSON の名前は旧版のプリセットと同じ（フォントは `GOTHIC` など、位置は `bottom_right` など）。
 - ダイアログは HTML の dialog を、開いたまま調整できる形（モーダルでない）で開く。
+
+## 主なメーカーの MakerNote（#17）
+
+- 旧版が exifread で読んでいた Canon・Nikon・Sony・Apple (iPhone)・Fujifilm・Olympus・Casio・DJI の MakerNote は、exifread 3.5.1 の読み方（`decode_maker_note`・`dump_ifd`）をそのまま移した（`core/exifread_note.rs`）。exifread が読めなかった（項目が 1 つもない）ときは、これまでどおり `makernote.rs`（ペンタックス・リコー・Samsung など）で読む。
+- 値の表示も exifread と同じにする: Python の `str()` の形（`[0, 200]`・`7/2`・`(1.5,)`・`b'...'`）、21 個以上の並びの省略（`..., ... ]`）、表で値の名前を引く、Nikon の露出補正・Olympus の撮影モード・Canon の位置ごとのタグと CameraInfo。exifread の癖（Sony の "SONY DSC" ヘッダーを読み飛ばさない、Apple の値の位置の基準など）もそのまま。
+- タグの名前・値の表は exifread の表から自動で作る（`tests/fixtures/makernote_makers/tables.py` → `exifread_tables.rs`。手で直さない）。
+- exifread が例外で止まる壊れた MakerNote では、旧版は MakerNote・UserComment・XMP を読まずに読み直していた。これも同じにする（UserComment を出さず、MakerNote は `makernote.rs` で読む）。
+- 旧版と同じになることは `tests/makernote_makers_match_python.rs`（19 通り。旧版のテスト部品で作った EXIF を旧版で読んだ結果と比べる）で確かめる。

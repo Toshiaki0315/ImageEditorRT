@@ -15,7 +15,7 @@ ImageEditorRT は、Python + PyQt6 版の [ImageEditor](https://github.com/Toshi
 - 画像処理・EXIF: Rust（`crates/core`。Tauri に依存しない）
 - 画面: TypeScript + Vite（フレームワークなし）
 - 画像の読み込み: macOS の ImageIO（HEIC・JPEG・PNG など。EXIF の向きもここで直す）
-- EXIF: kamadak-exif で読み、MakerNote（ペンタックス・リコー・Samsung）は `makernote.rs`、保存は `tiff.rs` の `ExifBlock`
+- EXIF: kamadak-exif で読み、MakerNote は主なメーカー（Canon・Nikon・Sony・Apple など、旧版の exifread が読んでいたもの）を `exifread_note.rs`、ペンタックス・リコー・Samsung などを `makernote.rs` で読む。保存は `tiff.rs` の `ExifBlock`
 - テスト: `cargo test`（Rust）、`tsc`（TypeScript の型チェック）
 - Lint/Format: `cargo fmt`（設定は `rustfmt.toml`）・`cargo clippy`
 - Rust のバージョン: `rust-toolchain.toml` で固定する（手元と CI で clippy の指摘をそろえるため）。上げるときは CI の `dtolnay/rust-toolchain@<版>` も同じにする
@@ -61,7 +61,8 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     encode.rs             # JPEG への書き出し（プレビューの計測用）
     save.rs               # 保存（形式・名前の決め方・元の画像への上書きの防止・EXIF を残す）
     exif_info.rs          # EXIF・GPS・MakerNote を表示用に読む
-    makernote.rs          # kamadak-exif が読まない MakerNote を読む
+    exifread_note.rs      # 主なメーカーの MakerNote を exifread と同じに読む（表は exifread_tables.rs、自動生成）
+    makernote.rs          # exifread も読まない MakerNote（ペンタックス・リコー・Samsung）を読む
     tiff.rs               # EXIF の IFD の読み書き（保存時に MakerNote を元の位置に置き直す）
   examples/bench.rs       # ベンチマーク
   tests/                  # ファイルを使うテスト（fixtures/ はテスト用の画像・EXIF）

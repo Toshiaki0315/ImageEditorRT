@@ -18,3 +18,5 @@
 | `detail/*` | ディテール（シャープ・ぼかし・ノイズ除去）と、保存・縮小プレビューの流れの期待値。旧版の `core/effects.py`・`core/pipeline.py` で作ったもの（`detail/make.py`）。画素まで一致することを確かめる |
 | `diorama/*` | ジオラマ風の期待値（横・縦の帯、写真の範囲あり・なし、保存とプレビューの流れ）。旧版の `core/diorama.py`・`core/pipeline.py` で作ったもの（`diorama/make.py`）。画素まで一致することを確かめる |
 | `frame/*` | フレーム・形の期待値（マスク・切り抜き・余白・実際に切り抜く範囲・保存とプレビューの流れ）。旧版の `core/frames.py`・`core/shapes.py`・`core/pipeline.py` で作ったもの（`frame/make.py`）。画素まで一致することを確かめる |
+| `makernote_makers/*.tiff` | 主なメーカー（Canon・Nikon・Sony・Apple・Fujifilm・Olympus・Casio・DJI）の MakerNote を入れた EXIF（TIFF の部分だけ）。19 通り。`makernote_makers/make.py` で旧版のテスト部品を使って作ったもの |
+| `makernote_makers/expected.json` | 上の EXIF を旧版の `core/exif_info.py`（exifread）で読んだ結果（MakerNote の項目・形式の名前・UserComment の有無） |

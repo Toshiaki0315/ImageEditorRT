@@ -1,0 +1,1292 @@
+{
+ "canon_5d3": {
+  "maker_note": "Canon",
+  "tags": [
+   [
+    "ImageType",
+    "Canon EOS 5D Mark III"
+   ],
+   [
+    "FirmwareVersion",
+    "Firmware Version 1.3.4"
+   ],
+   [
+    "OwnerName",
+    ""
+   ],
+   [
+    "SerialNumber",
+    "123456789"
+   ],
+   [
+    "ModelID",
+    "PowerShot G15"
+   ],
+   [
+    "Tag 0x7777",
+    "5"
+   ],
+   [
+    "Macromode",
+    "Normal"
+   ],
+   [
+    "SelfTimer",
+    "0"
+   ],
+   [
+    "Quality",
+    "RAW"
+   ],
+   [
+    "FlashMode",
+    "Flash Not Fired"
+   ],
+   [
+    "ContinuousDriveMode",
+    "Single Or Timer"
+   ],
+   [
+    "Unknown",
+    "2"
+   ],
+   [
+    "FocusMode",
+    "MF"
+   ],
+   [
+    "RecordMode",
+    "MOV"
+   ],
+   [
+    "ImageSize",
+    "Unknown"
+   ],
+   [
+    "EasyShootingMode",
+    "Full Auto"
+   ],
+   [
+    "DigitalZoom",
+    "Unknown"
+   ],
+   [
+    "Contrast",
+    "Normal"
+   ],
+   [
+    "Saturation",
+    "Unknown"
+   ],
+   [
+    "Sharpness",
+    "High"
+   ],
+   [
+    "FocalType",
+    "Unknown"
+   ],
+   [
+    "FocalLength",
+    "1000"
+   ],
+   [
+    "AutoISO",
+    "1"
+   ],
+   [
+    "BaseISO",
+    "2"
+   ],
+   [
+    "MeasuredEV",
+    "3"
+   ],
+   [
+    "TargetAperture",
+    "4"
+   ],
+   [
+    "TargetExposureTime",
+    "5"
+   ],
+   [
+    "ExposureCompensation",
+    "6"
+   ],
+   [
+    "WhiteBalance",
+    "Black & White"
+   ],
+   [
+    "SlowShutter",
+    "Unknown"
+   ],
+   [
+    "SequenceNumber",
+    "9"
+   ],
+   [
+    "OpticalZoomCode",
+    "10"
+   ],
+   [
+    "CameraTemperature",
+    "42 C"
+   ],
+   [
+    "FlashGuideNumber",
+    "13"
+   ],
+   [
+    "AFPointUsed",
+    "14"
+   ],
+   [
+    "ValidAFPoints",
+    "9"
+   ],
+   [
+    "CanonImageWidth",
+    "3"
+   ],
+   [
+    "CanonImageHeight",
+    "5472"
+   ],
+   [
+    "AFImageWidth",
+    "3648"
+   ],
+   [
+    "AFImageHeight",
+    "100"
+   ],
+   [
+    "AFAreaMode",
+    "Unknown"
+   ],
+   [
+    "NumAFPoints",
+    "-300"
+   ],
+   [
+    "FileNumber",
+    "100"
+   ],
+   [
+    "BracketMode",
+    "Off"
+   ],
+   [
+    "FileIndex",
+    "9002"
+   ],
+   [
+    "FileIndex2",
+    "9003"
+   ],
+   [
+    "DirectoryIndex",
+    "103"
+   ],
+   [
+    "DirectoryIndex2",
+    "104"
+   ]
+  ],
+  "user_comment": false
+ },
+ "canon_5d": {
+  "maker_note": "Canon",
+  "tags": [
+   [
+    "ImageType",
+    "Canon EOS 5D Mark III"
+   ],
+   [
+    "FirmwareVersion",
+    "Firmware Version 1.3.4"
+   ],
+   [
+    "OwnerName",
+    ""
+   ],
+   [
+    "SerialNumber",
+    "123456789"
+   ],
+   [
+    "ModelID",
+    "PowerShot G15"
+   ],
+   [
+    "Tag 0x7777",
+    "5"
+   ],
+   [
+    "Macromode",
+    "Normal"
+   ],
+   [
+    "SelfTimer",
+    "0"
+   ],
+   [
+    "Quality",
+    "RAW"
+   ],
+   [
+    "FlashMode",
+    "Flash Not Fired"
+   ],
+   [
+    "ContinuousDriveMode",
+    "Single Or Timer"
+   ],
+   [
+    "Unknown",
+    "2"
+   ],
+   [
+    "FocusMode",
+    "MF"
+   ],
+   [
+    "RecordMode",
+    "MOV"
+   ],
+   [
+    "ImageSize",
+    "Unknown"
+   ],
+   [
+    "EasyShootingMode",
+    "Full Auto"
+   ],
+   [
+    "DigitalZoom",
+    "Unknown"
+   ],
+   [
+    "Contrast",
+    "Normal"
+   ],
+   [
+    "Saturation",
+    "Unknown"
+   ],
+   [
+    "Sharpness",
+    "High"
+   ],
+   [
+    "FocalType",
+    "Unknown"
+   ],
+   [
+    "FocalLength",
+    "1000"
+   ],
+   [
+    "AutoISO",
+    "1"
+   ],
+   [
+    "BaseISO",
+    "2"
+   ],
+   [
+    "MeasuredEV",
+    "3"
+   ],
+   [
+    "TargetAperture",
+    "4"
+   ],
+   [
+    "TargetExposureTime",
+    "5"
+   ],
+   [
+    "ExposureCompensation",
+    "6"
+   ],
+   [
+    "WhiteBalance",
+    "Black & White"
+   ],
+   [
+    "SlowShutter",
+    "Unknown"
+   ],
+   [
+    "SequenceNumber",
+    "9"
+   ],
+   [
+    "OpticalZoomCode",
+    "10"
+   ],
+   [
+    "CameraTemperature",
+    "22 C"
+   ],
+   [
+    "FlashGuideNumber",
+    "13"
+   ],
+   [
+    "AFPointUsed",
+    "14"
+   ],
+   [
+    "ValidAFPoints",
+    "9"
+   ],
+   [
+    "CanonImageWidth",
+    "3"
+   ],
+   [
+    "CanonImageHeight",
+    "5472"
+   ],
+   [
+    "AFImageWidth",
+    "3648"
+   ],
+   [
+    "AFImageHeight",
+    "100"
+   ],
+   [
+    "AFAreaMode",
+    "Unknown"
+   ],
+   [
+    "NumAFPoints",
+    "-300"
+   ],
+   [
+    "FileNumber",
+    "100"
+   ],
+   [
+    "BracketMode",
+    "Off"
+   ],
+   [
+    "DirectoryIndex",
+    "100"
+   ],
+   [
+    "FileIndex",
+    "5002"
+   ]
+  ],
+  "user_comment": false
+ },
+ "canon_5d2": {
+  "maker_note": "Canon",
+  "tags": [
+   [
+    "ImageType",
+    "Canon EOS 5D Mark III"
+   ],
+   [
+    "FirmwareVersion",
+    "Firmware Version 1.3.4"
+   ],
+   [
+    "OwnerName",
+    ""
+   ],
+   [
+    "SerialNumber",
+    "123456789"
+   ],
+   [
+    "ModelID",
+    "PowerShot G15"
+   ],
+   [
+    "Tag 0x7777",
+    "5"
+   ],
+   [
+    "Macromode",
+    "Normal"
+   ],
+   [
+    "SelfTimer",
+    "0"
+   ],
+   [
+    "Quality",
+    "RAW"
+   ],
+   [
+    "FlashMode",
+    "Flash Not Fired"
+   ],
+   [
+    "ContinuousDriveMode",
+    "Single Or Timer"
+   ],
+   [
+    "Unknown",
+    "2"
+   ],
+   [
+    "FocusMode",
+    "MF"
+   ],
+   [
+    "RecordMode",
+    "MOV"
+   ],
+   [
+    "ImageSize",
+    "Unknown"
+   ],
+   [
+    "EasyShootingMode",
+    "Full Auto"
+   ],
+   [
+    "DigitalZoom",
+    "Unknown"
+   ],
+   [
+    "Contrast",
+    "Normal"
+   ],
+   [
+    "Saturation",
+    "Unknown"
+   ],
+   [
+    "Sharpness",
+    "High"
+   ],
+   [
+    "FocalType",
+    "Unknown"
+   ],
+   [
+    "FocalLength",
+    "1000"
+   ],
+   [
+    "AutoISO",
+    "1"
+   ],
+   [
+    "BaseISO",
+    "2"
+   ],
+   [
+    "MeasuredEV",
+    "3"
+   ],
+   [
+    "TargetAperture",
+    "4"
+   ],
+   [
+    "TargetExposureTime",
+    "5"
+   ],
+   [
+    "ExposureCompensation",
+    "6"
+   ],
+   [
+    "WhiteBalance",
+    "Black & White"
+   ],
+   [
+    "SlowShutter",
+    "Unknown"
+   ],
+   [
+    "SequenceNumber",
+    "9"
+   ],
+   [
+    "OpticalZoomCode",
+    "10"
+   ],
+   [
+    "CameraTemperature",
+    "32 C"
+   ],
+   [
+    "FlashGuideNumber",
+    "13"
+   ],
+   [
+    "AFPointUsed",
+    "14"
+   ],
+   [
+    "ValidAFPoints",
+    "9"
+   ],
+   [
+    "CanonImageWidth",
+    "3"
+   ],
+   [
+    "CanonImageHeight",
+    "5472"
+   ],
+   [
+    "AFImageWidth",
+    "3648"
+   ],
+   [
+    "AFImageHeight",
+    "100"
+   ],
+   [
+    "AFAreaMode",
+    "Unknown"
+   ],
+   [
+    "NumAFPoints",
+    "-300"
+   ],
+   [
+    "FileNumber",
+    "100"
+   ],
+   [
+    "BracketMode",
+    "Off"
+   ],
+   [
+    "FileIndex",
+    "7002"
+   ],
+   [
+    "DirectoryIndex",
+    "101"
+   ]
+  ],
+  "user_comment": false
+ },
+ "canon_600d": {
+  "maker_note": "Canon",
+  "tags": [
+   [
+    "ImageType",
+    "Canon EOS 5D Mark III"
+   ],
+   [
+    "FirmwareVersion",
+    "Firmware Version 1.3.4"
+   ],
+   [
+    "OwnerName",
+    ""
+   ],
+   [
+    "SerialNumber",
+    "123456789"
+   ],
+   [
+    "ModelID",
+    "PowerShot G15"
+   ],
+   [
+    "Tag 0x7777",
+    "5"
+   ],
+   [
+    "Macromode",
+    "Normal"
+   ],
+   [
+    "SelfTimer",
+    "0"
+   ],
+   [
+    "Quality",
+    "RAW"
+   ],
+   [
+    "FlashMode",
+    "Flash Not Fired"
+   ],
+   [
+    "ContinuousDriveMode",
+    "Single Or Timer"
+   ],
+   [
+    "Unknown",
+    "2"
+   ],
+   [
+    "FocusMode",
+    "MF"
+   ],
+   [
+    "RecordMode",
+    "MOV"
+   ],
+   [
+    "ImageSize",
+    "Unknown"
+   ],
+   [
+    "EasyShootingMode",
+    "Full Auto"
+   ],
+   [
+    "DigitalZoom",
+    "Unknown"
+   ],
+   [
+    "Contrast",
+    "Normal"
+   ],
+   [
+    "Saturation",
+    "Unknown"
+   ],
+   [
+    "Sharpness",
+    "High"
+   ],
+   [
+    "FocalType",
+    "Unknown"
+   ],
+   [
+    "FocalLength",
+    "1000"
+   ],
+   [
+    "AutoISO",
+    "1"
+   ],
+   [
+    "BaseISO",
+    "2"
+   ],
+   [
+    "MeasuredEV",
+    "3"
+   ],
+   [
+    "TargetAperture",
+    "4"
+   ],
+   [
+    "TargetExposureTime",
+    "5"
+   ],
+   [
+    "ExposureCompensation",
+    "6"
+   ],
+   [
+    "WhiteBalance",
+    "Black & White"
+   ],
+   [
+    "SlowShutter",
+    "Unknown"
+   ],
+   [
+    "SequenceNumber",
+    "9"
+   ],
+   [
+    "OpticalZoomCode",
+    "10"
+   ],
+   [
+    "CameraTemperature",
+    "32 C"
+   ],
+   [
+    "FlashGuideNumber",
+    "13"
+   ],
+   [
+    "AFPointUsed",
+    "14"
+   ],
+   [
+    "ValidAFPoints",
+    "9"
+   ],
+   [
+    "CanonImageWidth",
+    "3"
+   ],
+   [
+    "CanonImageHeight",
+    "5472"
+   ],
+   [
+    "AFImageWidth",
+    "3648"
+   ],
+   [
+    "AFImageHeight",
+    "100"
+   ],
+   [
+    "AFAreaMode",
+    "Unknown"
+   ],
+   [
+    "NumAFPoints",
+    "-300"
+   ],
+   [
+    "FileNumber",
+    "100"
+   ],
+   [
+    "BracketMode",
+    "Off"
+   ],
+   [
+    "FileIndex",
+    "8002"
+   ],
+   [
+    "DirectoryIndex",
+    "102"
+   ]
+  ],
+  "user_comment": false
+ },
+ "canon_other": {
+  "maker_note": "Canon",
+  "tags": [
+   [
+    "ImageType",
+    "Canon EOS 5D Mark III"
+   ],
+   [
+    "FirmwareVersion",
+    "Firmware Version 1.3.4"
+   ],
+   [
+    "OwnerName",
+    ""
+   ],
+   [
+    "SerialNumber",
+    "123456789"
+   ],
+   [
+    "ModelID",
+    "PowerShot G15"
+   ],
+   [
+    "Tag 0x7777",
+    "5"
+   ],
+   [
+    "Macromode",
+    "Normal"
+   ],
+   [
+    "SelfTimer",
+    "0"
+   ],
+   [
+    "Quality",
+    "RAW"
+   ],
+   [
+    "FlashMode",
+    "Flash Not Fired"
+   ],
+   [
+    "ContinuousDriveMode",
+    "Single Or Timer"
+   ],
+   [
+    "Unknown",
+    "2"
+   ],
+   [
+    "FocusMode",
+    "MF"
+   ],
+   [
+    "RecordMode",
+    "MOV"
+   ],
+   [
+    "ImageSize",
+    "Unknown"
+   ],
+   [
+    "EasyShootingMode",
+    "Full Auto"
+   ],
+   [
+    "DigitalZoom",
+    "Unknown"
+   ],
+   [
+    "Contrast",
+    "Normal"
+   ],
+   [
+    "Saturation",
+    "Unknown"
+   ],
+   [
+    "Sharpness",
+    "High"
+   ],
+   [
+    "FocalType",
+    "Unknown"
+   ],
+   [
+    "FocalLength",
+    "1000"
+   ],
+   [
+    "AutoISO",
+    "1"
+   ],
+   [
+    "BaseISO",
+    "2"
+   ],
+   [
+    "MeasuredEV",
+    "3"
+   ],
+   [
+    "TargetAperture",
+    "4"
+   ],
+   [
+    "TargetExposureTime",
+    "5"
+   ],
+   [
+    "ExposureCompensation",
+    "6"
+   ],
+   [
+    "WhiteBalance",
+    "Black & White"
+   ],
+   [
+    "SlowShutter",
+    "Unknown"
+   ],
+   [
+    "SequenceNumber",
+    "9"
+   ],
+   [
+    "OpticalZoomCode",
+    "10"
+   ],
+   [
+    "CameraTemperature",
+    "22 C"
+   ],
+   [
+    "FlashGuideNumber",
+    "13"
+   ],
+   [
+    "AFPointUsed",
+    "14"
+   ],
+   [
+    "ValidAFPoints",
+    "9"
+   ],
+   [
+    "CanonImageWidth",
+    "3"
+   ],
+   [
+    "CanonImageHeight",
+    "5472"
+   ],
+   [
+    "AFImageWidth",
+    "3648"
+   ],
+   [
+    "AFImageHeight",
+    "100"
+   ],
+   [
+    "AFAreaMode",
+    "Unknown"
+   ],
+   [
+    "NumAFPoints",
+    "-300"
+   ],
+   [
+    "FileNumber",
+    "100"
+   ],
+   [
+    "BracketMode",
+    "Off"
+   ]
+  ],
+  "user_comment": false
+ },
+ "canon_odd": {
+  "maker_note": "Canon",
+  "tags": [
+   [
+    "FlashInfo",
+    "[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, ... ]"
+   ],
+   [
+    "ImageNumber",
+    "-5"
+   ],
+   [
+    "OwnerName",
+    "b'bad \\xff\\xfe utf8'"
+   ],
+   [
+    "FileLength",
+    "[0, 0, 0]"
+   ],
+   [
+    "Tag 0x0016",
+    "8"
+   ],
+   [
+    "Tag 0x0017",
+    "[]"
+   ],
+   [
+    "Tag 0x0018",
+    "b'b\\x80b\\x80b\\x80b\\x80b\\x80b\\x80b\\x80b\\x80b\\x80b\\x80, ... ]"
+   ],
+   [
+    "Tag 0x0019",
+    "[-1, 2]"
+   ],
+   [
+    "SuperMacro",
+    "0/0"
+   ],
+   [
+    "ImageUniqueID",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…"
+   ]
+  ],
+  "user_comment": false
+ },
+ "nikon_type2": {
+  "maker_note": "NIKON CORPORATION",
+  "tags": [
+   [
+    "MakernoteVersion",
+    "0210"
+   ],
+   [
+    "ISOSetting",
+    "[0, 200]"
+   ],
+   [
+    "Quality",
+    "FINE"
+   ],
+   [
+    "ExposureDifference",
+    "-0.5 1/2 EV"
+   ],
+   [
+    "FlashCompensation",
+    "-2/3 EV"
+   ],
+   [
+    "ExternalFlashExposureComp",
+    "+1.3333333333333333 1/3 EV"
+   ],
+   [
+    "FlashBracketCompensationApplied",
+    "0 EV"
+   ],
+   [
+    "SerialNumber",
+    "SERIAL1234567"
+   ],
+   [
+    "LensMinMaxFocalMaxAperture",
+    "[18, 55, 7/2, 28/5]"
+   ],
+   [
+    "Saturation",
+    "Normal"
+   ],
+   [
+    "Tag 0x9999",
+    "[-1/2, 5/0]"
+   ]
+  ],
+  "user_comment": false
+ },
+ "nikon_type2_no_marker": {
+  "maker_note": "不明な形式（解読できない形式）",
+  "tags": [
+   [
+    "MakerNote",
+    "解読できない形式（234 バイト）"
+   ]
+  ],
+  "user_comment": false
+ },
+ "nikon_type1": {
+  "maker_note": "NIKON",
+  "tags": [
+   [
+    "Quality",
+    "VGA Fine"
+   ],
+   [
+    "ColorMode",
+    "Monochrome"
+   ],
+   [
+    "CCDSpeed",
+    "9"
+   ],
+   [
+    "Tag 0x000A",
+    "3/2"
+   ]
+  ],
+  "user_comment": false
+ },
+ "nikon_plain": {
+  "maker_note": "NIKON",
+  "tags": [
+   [
+    "ISOSetting",
+    "[0, 100]"
+   ],
+   [
+    "Quality",
+    "NORMAL"
+   ],
+   [
+    "FlashCompensation",
+    "+1/2 EV"
+   ]
+  ],
+  "user_comment": false
+ },
+ "olympus": {
+  "maker_note": "OLYMPUS IMAGING CORP.",
+  "tags": [
+   [
+    "SpecialMode",
+    "Panorama - Sequence 2 - Left to right"
+   ],
+   [
+    "JPEGQual",
+    "HQ"
+   ],
+   [
+    "DigitalZoom",
+    "1"
+   ],
+   [
+    "SoftwareRelease",
+    "OLYMPUS FIRMWARE"
+   ],
+   [
+    "CameraID",
+    "OLYMPUS DIGITAL CAMERA"
+   ],
+   [
+    "ShutterSpeedValue",
+    "-7/3"
+   ]
+  ],
+  "user_comment": true
+ },
+ "olympus_broken": {
+  "maker_note": "不明な形式（解読できない形式）",
+  "tags": [
+   [
+    "MakerNote",
+    "解読できない形式（160 バイト）"
+   ]
+  ],
+  "user_comment": false
+ },
+ "casio": {
+  "maker_note": "CASIO COMPUTER CO.,LTD.",
+  "tags": [
+   [
+    "RecordingMode",
+    "Panorama"
+   ],
+   [
+    "Quality",
+    "Fine"
+   ],
+   [
+    "FocusingMode",
+    "Macro"
+   ],
+   [
+    "CCDSpeed",
+    "Normal"
+   ]
+  ],
+  "user_comment": false
+ },
+ "sony": {
+  "maker_note": "SONY",
+  "tags": [
+   [
+    "CreativeStyle",
+    "Standard"
+   ],
+   [
+    "DynamicRangeOptimizer",
+    "Standard"
+   ],
+   [
+    "ExposureMode",
+    "Sports"
+   ],
+   [
+    "Tag 0x2000",
+    "[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, ... ]"
+   ],
+   [
+    "Tag 0x9999",
+    "[-1, -2, 3, 4, 5]"
+   ]
+  ],
+  "user_comment": false
+ },
+ "sony_header": {
+  "maker_note": "SONY",
+  "tags": [
+   [
+    "CreativeStyle",
+    "Standard"
+   ],
+   [
+    "DynamicRangeOptimizer",
+    "Standard"
+   ],
+   [
+    "ExposureMode",
+    "Sports"
+   ],
+   [
+    "Tag 0x2000",
+    "[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, ... ]"
+   ],
+   [
+    "Tag 0x9999",
+    "[-1, -2, 3, 4, 5]"
+   ]
+  ],
+  "user_comment": false
+ },
+ "fujifilm": {
+  "maker_note": "FUJIFILM",
+  "tags": [
+   [
+    "NoteVersion",
+    "0130"
+   ],
+   [
+    "Quality",
+    "NORMAL"
+   ],
+   [
+    "Sharpness",
+    "Normal"
+   ],
+   [
+    "FlashMode",
+    "On"
+   ],
+   [
+    "Tag 0x9998",
+    "[(1.5,), (0.10000000149011612,)]"
+   ],
+   [
+    "Tag 0x9999",
+    "(1e+16,)"
+   ]
+  ],
+  "user_comment": false
+ },
+ "apple": {
+  "maker_note": "Apple",
+  "tags": [
+   [
+    "MakerNoteVersion",
+    "14"
+   ],
+   [
+    "Tag 0x0008",
+    "[4/5, 0/0, 0/0]"
+   ],
+   [
+    "HDRImageType",
+    "HDR Image"
+   ]
+  ],
+  "user_comment": false
+ },
+ "apple_intel": {
+  "maker_note": "不明な形式（解読できない形式）",
+  "tags": [
+   [
+    "MakerNote",
+    "解読できない形式（80 バイト）"
+   ]
+  ],
+  "user_comment": false
+ },
+ "dji": {
+  "maker_note": "DJI",
+  "tags": [
+   [
+    "Make",
+    "DJI"
+   ],
+   [
+    "SpeedX",
+    "(1.25,)"
+   ],
+   [
+    "Pitch",
+    "(-3.5,)"
+   ],
+   [
+    "CameraPitch",
+    "(0.0,)"
+   ]
+  ],
+  "user_comment": false
+ }
+}

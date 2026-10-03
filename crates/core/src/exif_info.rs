@@ -1,12 +1,14 @@
 //! EXIF・GPS・MakerNote を表示用に読む（Python 版の core/exif_info.py を移したもの）。
 //!
-//! 標準のタグは kamadak-exif で読み、kamadak-exif が読まない MakerNote は makernote で読む。
+//! 標準のタグは kamadak-exif で読む。MakerNote は、旧版の exifread が読んでいたメーカー（Canon・Nikon
+//! など）は exifread_note で、それ以外（ペンタックス・リコー・Samsung など）は makernote で読む。
 
 use std::io::Cursor;
 
 use exif::{Context, Exif, Field, In, Tag, Value};
 use serde::Serialize;
 
+use crate::exifread_note::{self, Outcome};
 use crate::makernote::read_maker_note;
 
 /// 値の文字列の長さの上限（それより長ければ省略する）。
@@ -82,8 +84,18 @@ pub fn raw_exif(file: &[u8]) -> Option<Vec<u8>> {
     exif::Reader::new().read_from_container(&mut Cursor::new(file)).ok().map(|e| e.buf().to_vec())
 }
 
+/// exifread が MakerNote の読み取りで止まったとき、旧版が読み直しで読まなかったタグ
+/// （exifread の IGNORE_TAGS のうち MakerNote 以外: XMP・UserComment）。
+const IGNORED_ON_RETRY: [u16; 2] = [0x02BC, 0x9286];
+
 fn build(exif: &Exif) -> ExifInfo {
-    let shown = |f: &&Field| !is_pointer(f.tag) && f.tag != Tag::MakerNote;
+    let outcome = exifread_note::read(exif.buf());
+    let failed = outcome == Outcome::Failed;
+    let shown = |f: &&Field| {
+        !is_pointer(f.tag)
+            && f.tag != Tag::MakerNote
+            && !(failed && IGNORED_ON_RETRY.contains(&f.tag.number()))
+    };
     let mut entries: Vec<Entry> = exif
         .fields()
         .filter(shown)
@@ -95,7 +107,12 @@ fn build(exif: &Exif) -> ExifInfo {
         .all(|f| f.tag.context() == Context::Tiff && STRUCTURE_TAGS.contains(&f.tag.number()));
 
     let mut maker_note = None;
-    if let Some(note) = read_maker_note(exif.buf()) {
+    if let Outcome::Decoded { make, tags } = outcome {
+        // exifread が読めたメーカー（Canon・Nikon・Sony・Apple など）
+        entries.extend(tags.into_iter().map(|(name, value)| entry(Group::MakerNote, &name, tidy(&value))));
+        let make = tidy(&make);
+        maker_note = Some(if make.is_empty() { "MakerNote".to_string() } else { make });
+    } else if let Some(note) = read_maker_note(exif.buf()) {
         if note.is_decoded() {
             entries
                 .extend(note.tags.iter().map(|(name, value)| entry(Group::MakerNote, name, value.clone())));
@@ -149,6 +166,12 @@ fn value_text(exif: &Exif, field: &Field) -> String {
     {
         text = text[1..text.len() - 1].to_string();
     }
+    tidy(&text)
+}
+
+/// 値の文字列を表示用に整える（NUL を除き、前後の空白を取り、長ければ省略する）。
+fn tidy(text: &str) -> String {
+    let text = text.replace('\0', "");
     let text = text.trim();
     match text.char_indices().nth(MAX_VALUE_LENGTH) {
         Some((i, _)) => format!("{}…", &text[..i]),

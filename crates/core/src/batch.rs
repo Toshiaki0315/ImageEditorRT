@@ -102,22 +102,17 @@ pub fn collect_images(paths: &[PathBuf], existing: &[PathBuf]) -> Vec<PathBuf> {
 /// 1 枚を読み込み、加工して out_dir に保存し、保存先を返す（元の画像は変えない）。
 #[cfg(target_os = "macos")]
 pub fn process_image(source: &Path, out_dir: &Path, options: &BatchOptions) -> Result<PathBuf, String> {
-    use crate::decode;
-    use crate::exif_info::raw_exif;
     use crate::formats::Format;
 
-    if !formats::is_supported(source) {
-        return Err("対応していない拡張子です".to_string());
-    }
-    let bytes = std::fs::read(source).map_err(|e| format!("読み込めません（{e}）"))?;
-    let decoded = decode::decode_file(&bytes).map_err(|e| e.to_string())?;
+    let loaded = crate::load::load_file(source).map_err(|e| e.to_string())?;
+    let decoded = loaded.decoded;
     let settings = batch_settings(options, decoded.image.dimensions()).map_err(|e| e.to_string())?;
     let edited = crate::pipeline::apply_edits(&decoded.image, &settings).map_err(|e| e.to_string())?;
     let path = output_path(source, out_dir);
     std::fs::create_dir_all(out_dir).map_err(|e| format!("保存先のフォルダを作れません（{e}）"))?;
-    let exif = raw_exif(&bytes);
     let is_tiff = decoded.format == Format::Tiff;
-    save::save_edited(&edited, &path, options.save, exif.as_deref(), is_tiff).map_err(|e| e.to_string())?;
+    save::save_edited(&edited, &path, options.save, loaded.raw_exif.as_deref(), is_tiff)
+        .map_err(|e| e.to_string())?;
     Ok(path)
 }
 

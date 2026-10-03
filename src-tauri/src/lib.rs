@@ -15,11 +15,12 @@ use std::time::Instant;
 
 use image::RgbaImage;
 use imageeditorrt_core::crop::{self, AspectChoice, DragMode, Oriented, SpinField};
-use imageeditorrt_core::decode::{self, DecodeError};
-use imageeditorrt_core::exif_info::{raw_exif, read_exif_info, ExifInfo, GpsPosition};
+use imageeditorrt_core::decode;
+use imageeditorrt_core::exif_info::{ExifInfo, GpsPosition};
 use imageeditorrt_core::filters::FilterType;
 use imageeditorrt_core::formats::{self, Format};
 use imageeditorrt_core::frames::FrameType;
+use imageeditorrt_core::load;
 use imageeditorrt_core::output::{self, SizeResult, SizeState};
 use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
 use imageeditorrt_core::sample;
@@ -150,23 +151,17 @@ async fn open_path(
 ) -> Result<OpenInfo, String> {
     let path = PathBuf::from(path);
     let name = file_name(&path);
-    if !formats::is_supported(&path) {
-        let ext = path.extension().map_or("(なし)".into(), |e| format!(".{}", e.to_string_lossy()));
-        return Err(format!("対応していない拡張子です: {ext}"));
-    }
     let prepared = blocking(move || {
         let start = Instant::now();
-        let bytes = std::fs::read(&path).map_err(|e| format!("画像を読み込めません: {name}\n({e})"))?;
-        let decoded = decode::decode_file(&bytes).map_err(|e| match e {
-            DecodeError::UnsupportedFormat(_) => e.to_string(),
-            _ => format!("画像を読み込めません: {name}\n({e})"),
-        })?;
+        let loaded = load::load_file(&path).map_err(|e| e.message(&name))?;
         let decode_ms = elapsed_ms(start);
-        // EXIF が壊れていても画像は開く（EXIF なしとして扱う）
-        let exif = read_exif_info(&bytes);
-        let source =
-            Source { format: Some(decoded.format), exif: raw_exif(&bytes), path: Some(path), pasted: false };
-        Ok(prepare(name, decoded, decode_ms, exif, source))
+        let source = Source {
+            format: Some(loaded.decoded.format),
+            exif: loaded.raw_exif,
+            path: Some(path),
+            pasted: false,
+        };
+        Ok(prepare(name, loaded.decoded, decode_ms, loaded.exif, source))
     })
     .await?;
     store(&state, &window, prepared)

@@ -51,6 +51,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
     output.rs             # 「出力」タブのサイズ変更（欄に出す値と、編集設定に渡す幅・高さ）
     crop.rs               # トリミング範囲の編集（ドラッグ・数値の欄・比・回転と反転）の計算
+    load.rs               # 画像のファイルを読む（拡張子・中身・EXIF。開く・まとめて処理・起動確認で共通）
     batch.rs              # まとめて処理（保存先の名前・画像の集め方・1 枚ずつの処理と中止）
     presets.rs            # プリセット（名前付きの加工の組み合わせ）の保存・読み込み（旧版と同じ JSON）
     pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定

@@ -15,6 +15,7 @@ use imageeditorrt_core::exif_info::{raw_exif, read_exif_info, ExifInfo};
 use imageeditorrt_core::filters::FilterType;
 use imageeditorrt_core::formats::{self, Format};
 use imageeditorrt_core::frames::FrameType;
+use imageeditorrt_core::output::{self, SizeResult, SizeState};
 use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
 use imageeditorrt_core::sample;
 use imageeditorrt_core::save::{self, SaveError, SaveOptions, SAME_FILE_MESSAGE};
@@ -340,6 +341,24 @@ fn crop_orient(orientation: Orientation, op: OrientOp, crop: Option<CropRect>, s
     crop::orient(orientation, op, crop, size)
 }
 
+/// 「出力」タブのサイズ変更: 欄に出す幅・高さと、編集設定に渡す幅・高さ。
+#[tauri::command]
+fn resolve_size(
+    settings: EditSettings,
+    state: SizeState,
+    app: State<'_, AppState>,
+) -> Result<SizeResult, String> {
+    let loaded = app.0.lock().map_err(|e| e.to_string())?;
+    let original = loaded.original.as_ref().ok_or("画像が読み込まれていません")?;
+    Ok(output::resolve(original.dimensions(), &settings, state))
+}
+
+/// 90° 回転したときのサイズ変更の欄（手で変えた幅・高さを入れ替える）。
+#[tauri::command]
+fn rotate_size(state: SizeState) -> SizeState {
+    output::rotate(state)
+}
+
 /// 設定をかけたときの出力の大きさ（ステータスバーに出す）。大きさの指定が範囲外ならエラー。
 #[tauri::command]
 fn output_size(settings: EditSettings, state: State<'_, AppState>) -> Result<(u32, u32), String> {
@@ -399,6 +418,8 @@ pub fn run() {
             filter_types,
             render_preview,
             output_size,
+            resolve_size,
+            rotate_size,
             diorama_guide,
             aspect_ratios,
             frame_shape_types,

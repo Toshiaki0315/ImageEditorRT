@@ -44,6 +44,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     decode.rs             # ImageIO での読み込み（向きを直した sRGB の RGBA にする。macOS のみ）
     resize.rs             # 縮小（プレビューは fast_image_resize、保存は Pillow と画素まで同じリサイズ）
     transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
+    output.rs             # 「出力」タブのサイズ変更（欄に出す値と、編集設定に渡す幅・高さ）
     crop.rs               # トリミング範囲の編集（ドラッグ・数値の欄・比・回転と反転）の計算
     pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
@@ -74,6 +75,7 @@ src/                      # 画面（TypeScript）
   preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
   panel.ts / tabs.ts / exif.ts   # 設定パネルのスライダー・タブ・EXIF の一覧
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）
+  output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）
   saveOptions.ts          # 「出力」タブの保存の設定（JPEG 品質・EXIF・GPS。localStorage に残す）
   types.ts                # Rust とやりとりする型
   styles.css

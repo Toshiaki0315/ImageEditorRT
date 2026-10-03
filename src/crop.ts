@@ -62,6 +62,7 @@ export class CropController {
     shapes: [ShapeType, string][],
     private readonly onChange: () => void,
     private readonly onTrimChange: (trimmed: boolean) => void,
+    private readonly onRotate: () => Promise<void> = async () => {},
   ) {
     for (const [value, label] of ratios) this.aspect.add(new Option(label, value));
     const follow = new Option(FOLLOW_TEXT, FOLLOW);
@@ -269,6 +270,8 @@ export class CropController {
     this.size = result.size;
     const swaps = op === "rotate_left" || op === "rotate_right";
     if (swaps && !this.portrait.disabled) this.portrait.checked = !this.portrait.checked;
+    // 90° 回したときは、手で変えた出力の幅・高さも入れ替える
+    if (swaps) await this.onRotate();
     this.shapeArea = null;
     this.setCrop(result.crop);
   }

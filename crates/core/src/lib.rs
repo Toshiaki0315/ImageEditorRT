@@ -17,6 +17,7 @@ pub mod filters;
 pub mod formats;
 pub mod frames;
 pub mod makernote;
+pub mod output;
 pub mod pillow;
 pub mod pipeline;
 pub mod pyrandom;

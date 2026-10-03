@@ -77,6 +77,7 @@ src/                      # 画面（TypeScript）
   preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
   zoom.ts                 # 100% 表示（1px = 1 画素、ドラッグ・スクロールで動かす）
   histogram.ts            # プレビューに重ねるヒストグラム
+  history.ts              # アンドゥ／リドゥの履歴（画面の部品に依存しない。tests-ts/ で npm test）
   panel.ts / tabs.ts      # 設定パネルのスライダー・タブ
   exif.ts                 # 「EXIF」タブ（折りたたみの一覧・選んだ行のコピー・マップで開く）
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）

@@ -197,6 +197,14 @@ async fn render_preview(
     Ok(Response::new(body))
 }
 
+/// リセット（旧版 FR-UI-42）: 読み込んだ画像を捨てて、未読込の状態に戻す。
+#[tauri::command]
+fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {
+    let _ = window.set_title(APP_NAME);
+    *state.0.lock().map_err(|e| e.to_string())? = Loaded::default();
+    Ok(())
+}
+
 /// 表示に使う設定。comparing（加工前の表示）なら、向きと切り抜く範囲だけを残す。
 fn shown_settings(loaded: &Loaded, settings: EditSettings, comparing: bool) -> EditSettings {
     match (&loaded.original, comparing) {
@@ -514,6 +522,7 @@ pub fn run() {
             default_save_path,
             set_menu_checked,
             set_menu_enabled,
+            close_image,
             render_actual_size,
             save_image,
             open::take_pending_paths,

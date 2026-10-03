@@ -14,6 +14,10 @@ pub const MENU_EVENT: &str = "menu";
 pub const OPEN: &str = "open";
 /// 「ファイル > 保存…」
 pub const SAVE: &str = "save";
+/// 「編集 > 元に戻す」（設定の変更。入力欄の文字は画面が入力欄に任せる）
+pub const UNDO: &str = "undo";
+/// 「編集 > やり直す」
+pub const REDO: &str = "redo";
 /// 「編集 > 文字・透かし…」
 pub const TEXT: &str = "text";
 /// 「表示 > 100% で表示」（原寸で処理した保存結果を 1px = 1 画素で見る）
@@ -45,11 +49,18 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .close_window_with_text("閉じる")
         .build()?;
-    // 入力欄で使う標準の編集の項目（元に戻す・貼り付けなどは後の Issue で画像の操作に広げる）
+    // 入力欄で使う標準の編集の項目（貼り付けは後の Issue で画像の貼り付けに広げる）
     let text = MenuItemBuilder::with_id(TEXT, "文字・透かし…").accelerator("CmdOrCtrl+T").build(app)?;
+    // 設定の変更を戻す（旧版 FR-UI-43）。戻せないときは使えない状態にし、入力欄の ⌘Z は入力欄に届く
+    let undo =
+        MenuItemBuilder::with_id(UNDO, "元に戻す").accelerator("CmdOrCtrl+Z").enabled(false).build(app)?;
+    let redo = MenuItemBuilder::with_id(REDO, "やり直す")
+        .accelerator("CmdOrCtrl+Shift+Z")
+        .enabled(false)
+        .build(app)?;
     let edit = SubmenuBuilder::new(app, "編集")
-        .undo_with_text("取り消す")
-        .redo_with_text("やり直す")
+        .item(&undo)
+        .item(&redo)
         .separator()
         .cut_with_text("カット")
         .copy_with_text("コピー")

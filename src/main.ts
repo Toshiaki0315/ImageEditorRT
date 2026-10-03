@@ -3,13 +3,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { message, open, save } from "@tauri-apps/plugin-dialog";
+import { ask, message, open, save } from "@tauri-apps/plugin-dialog";
 import { bench, benchSave } from "./bench";
-import { CropController } from "./crop";
-import { OutputSize } from "./output";
+import { type AspectState, CropController } from "./crop";
+import { OutputSize, type SizeState } from "./output";
 import { TextDialog } from "./textDialog";
 import { ExifView } from "./exif";
 import { HistogramView } from "./histogram";
+import { HistoryRecorder, sameValue } from "./history";
 import { Panel } from "./panel";
 import { Preview } from "./preview";
 import { SaveOptionsPanel } from "./saveOptions";
@@ -47,6 +48,9 @@ const zoomGuide = document.getElementById("zoom-guide") as unknown as SVGSVGElem
 const frame = document.querySelector<HTMLElement>(".frame")!;
 const badge = $<HTMLElement>("badge");
 const beforeButton = $<HTMLButtonElement>("before");
+const resetButton = $<HTMLButtonElement>("reset");
+const DISCARD_TITLE = "未保存の変更";
+const DISCARD_QUESTION = "保存していない変更があります。破棄してよろしいですか？";
 /** 100% 表示で、設定の変更が落ち着いてから処理し直すまでの時間 (ms) */
 const ZOOM_DELAY_MS = 300;
 /** 画像の左上から「加工前」などの表示までの間隔 (px) */
@@ -72,6 +76,14 @@ let zoomGeneration = 0;
 /** 100% 表示を始めるときに表示の中央にする点（保存結果の画像の座標） */
 let zoomCenter: [number, number] | null = null;
 let zoomTimer: ReturnType<typeof setTimeout> | undefined;
+/** 最後に保存したときの設定（未保存の変更の判定に使う） */
+let savedSettings: EditSettings | null = null;
+/** スライダーをドラッグしている間（履歴に積むのを離すまで待つ） */
+let sliderDragging = false;
+
+/** アンドゥ／リドゥで戻す、設定パネルの状態（旧版の PanelState）。 */
+type Snapshot = { settings: EditSettings; aspect: AspectState; size: SizeState };
+let recorder: HistoryRecorder<Snapshot>;
 
 const preview = new Preview(stage, canvas, (error) => showError("プレビューを更新できません", error));
 const zoomView = new ZoomView(
@@ -89,7 +101,7 @@ const exifView = new ExifView($("page-exif"));
 let panel: Panel;
 let crop: CropController;
 let textDialog: TextDialog;
-const output = new OutputSize(settings, settingsChanged);
+const output = new OutputSize(settings, userChanged);
 const saveOptions = new SaveOptionsPanel(
   $<HTMLInputElement>("jpeg-quality"),
   $<HTMLOutputElement>("jpeg-quality-value"),
@@ -97,7 +109,13 @@ const saveOptions = new SaveOptionsPanel(
   $<HTMLInputElement>("keep-gps"),
 );
 
-/** 設定を変えたとき: プレビューとステータスバー（出力の大きさ）を更新する。 */
+/** 画面で設定を変えたとき: 履歴に積む（落ち着いてから）と、プレビューなどの更新。 */
+function userChanged() {
+  recorder?.changed();
+  settingsChanged();
+}
+
+/** 設定が変わったとき: プレビューとステータスバー（出力の大きさ）を更新する。 */
 function settingsChanged() {
   if (!loaded) return;
   // 出力の幅・高さは範囲・フレームなどで変わるので、先に合わせてからプレビューを描く
@@ -111,6 +129,91 @@ function settingsChanged() {
     clearTimeout(zoomTimer);
     zoomTimer = setTimeout(() => void renderZoom(), ZOOM_DELAY_MS);
   }
+}
+
+// --- 元に戻す／やり直す・リセット（旧版 FR-UI-42・43） --------------------------------
+
+/** 今の設定パネルの状態。出力の幅・高さは出力の欄の状態から決まるので、設定の側には持たない。 */
+function snapshot(): Snapshot {
+  return {
+    settings: { ...structuredClone(settings), width: null, height: null },
+    aspect: crop.aspectState(),
+    size: output.snapshot(),
+  };
+}
+
+/** 履歴の状態を設定パネルと設定に戻す（比の固定で範囲を直したりしない）。 */
+function restore(state: Snapshot) {
+  if (!loaded) return;
+  Object.assign(settings, structuredClone(state.settings));
+  crop.restore(state.aspect, [loaded.width, loaded.height]);
+  output.restore(state.size);
+  panel.show();
+  textDialog.show();
+  settingsChanged();
+}
+
+/** 入力欄で文字を編集中か（そのときの ⌘Z・⇧⌘Z は入力欄の文字に効かせる）。 */
+function isEditingText(): boolean {
+  const active = document.activeElement;
+  if (active instanceof HTMLTextAreaElement) return true;
+  return active instanceof HTMLInputElement && ["text", "number", "search"].includes(active.type);
+}
+
+function undo() {
+  if (isEditingText()) {
+    document.execCommand("undo");
+    return;
+  }
+  if (loaded && !saving) recorder.undo();
+}
+
+function redo() {
+  if (isEditingText()) {
+    document.execCommand("redo");
+    return;
+  }
+  if (loaded && !saving) recorder.redo();
+}
+
+/** 初期状態から設定を変えていて、その設定でまだ保存していなければ true。 */
+function hasUnsavedChanges(): boolean {
+  return loaded !== null && !sameValue(settings, defaultSettings()) && !sameValue(settings, savedSettings);
+}
+
+/** 未保存の変更があれば、破棄してよいかを確かめる。 */
+async function confirmDiscard(): Promise<boolean> {
+  if (!hasUnsavedChanges()) return true;
+  return ask(DISCARD_QUESTION, { title: DISCARD_TITLE, kind: "warning", okLabel: "破棄", cancelLabel: "キャンセル" });
+}
+
+/** リセット: 画像と設定を未読込の状態に戻す（未保存の変更があれば確かめる）。 */
+async function resetImage() {
+  if (!loaded || saving || opening || !(await confirmDiscard())) return;
+  setComparing(false);
+  fitToWindow();
+  await invoke("close_image");
+  loaded = null;
+  savedSettings = null;
+  notes = [];
+  preview.clear();
+  Object.assign(settings, defaultSettings());
+  panel.show();
+  preview.trimmed = false;
+  crop.reset(null);
+  output.reset(false);
+  textDialog.close();
+  textDialog.show();
+  textButton.disabled = true;
+  exifView.show(null);
+  tabs.setEnabled("exif", false);
+  histogramView.set(null);
+  placeholder.hidden = false;
+  saveButton.disabled = beforeButton.disabled = resetButton.disabled = true;
+  void updateGuide();
+  recorder.reset();
+  updateMenus();
+  void updateStatus();
 }
 
 // --- 加工前との比較（旧版 FR-UI-44） ------------------------------------------------
@@ -219,10 +322,21 @@ async function onPreviewDoubleClick(event: MouseEvent) {
   showActualSize([((event.clientX - rect.left) / rect.width) * width, ((event.clientY - rect.top) / rect.height) * height]);
 }
 
-/** メニューの「100% で表示」「画面に合わせる」を使える・使えないにする。 */
+/** メニューの項目を使える・使えないにする（前と同じなら送らない）。 */
+const menuEnabled = new Map<string, boolean>();
+function setMenuEnabled(id: string, enabled: boolean) {
+  if (menuEnabled.get(id) === enabled) return;
+  menuEnabled.set(id, enabled);
+  void invoke("set_menu_enabled", { id, enabled });
+}
+
+/** メニューの「元に戻す」「やり直す」「100% で表示」「画面に合わせる」を、今の状態に合わせる。 */
 function updateMenus() {
-  void invoke("set_menu_enabled", { id: "actual_size", enabled: loaded !== null && !zoomed });
-  void invoke("set_menu_enabled", { id: "fit", enabled: zoomed });
+  const editable = loaded !== null && !saving;
+  setMenuEnabled("undo", editable && (recorder?.canUndo() ?? false));
+  setMenuEnabled("redo", editable && (recorder?.canRedo() ?? false));
+  setMenuEnabled("actual_size", loaded !== null && !zoomed);
+  setMenuEnabled("fit", zoomed);
 }
 
 /** 左上の表示（「加工前」「100%」「更新中…」）をまとめて出す。 */
@@ -331,6 +445,11 @@ async function updateStatus(extra?: string) {
 async function openPath(path: string, openNotes: string[] = []) {
   if (opening || saving) return;
   opening = true;
+  // 未保存の変更があれば確かめ、キャンセルされたら開かない
+  if (!(await confirmDiscard())) {
+    opening = false;
+    return;
+  }
   try {
     const info = await invoke<OpenInfo>("open_path", { path });
     showLoaded(info, openNotes);
@@ -384,7 +503,9 @@ async function saveTo(path: string): Promise<"done" | "sameFile" | "failed"> {
   setSaving(true);
   void updateStatus(`保存中… ${name}`);
   try {
-    await invoke<string>("save_image", { path, settings, options: saveOptions.value() });
+    const saved = structuredClone(settings);
+    await invoke<string>("save_image", { path, settings: saved, options: saveOptions.value() });
+    savedSettings = saved;
     void updateStatus(`保存しました: ${name}`);
     return "done";
   } catch (error) {
@@ -408,7 +529,8 @@ async function saveTo(path: string): Promise<"done" | "sameFile" | "failed"> {
 /** 保存中は保存・開く・ドロップを受け付けない（画面は固まらない）。 */
 function setSaving(value: boolean) {
   saving = value;
-  saveButton.disabled = saving || !loaded;
+  saveButton.disabled = resetButton.disabled = saving || !loaded;
+  updateMenus();
 }
 
 function showLoaded(info: OpenInfo, openNotes: string[]) {
@@ -416,7 +538,8 @@ function showLoaded(info: OpenInfo, openNotes: string[]) {
   setComparing(false);
   fitToWindow();
   loaded = info;
-  beforeButton.disabled = false;
+  savedSettings = null;
+  beforeButton.disabled = resetButton.disabled = false;
   saveButton.disabled = false;
   Object.assign(settings, defaultSettings());
   panel.show();
@@ -431,6 +554,8 @@ function showLoaded(info: OpenInfo, openNotes: string[]) {
   tabs.setEnabled("exif", !info.exif.empty);
   notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
   settingsChanged();
+  // 読み込んだ状態を履歴の始まりにする
+  recorder.reset();
   updateMenus();
 }
 
@@ -454,7 +579,7 @@ function setupDrop() {
 async function setup() {
   [extensions, savableExtensions, formatsText] = await invoke<[string[], string[], string]>("supported_formats");
   const filters = await invoke<[FilterType, string][]>("filter_types");
-  panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, settingsChanged);
+  panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, userChanged);
   const ratios = await invoke<[AspectRatio, string][]>("aspect_ratios");
   const [frames, shapes] = await invoke<[[FrameKind, string][], [ShapeType, string][]]>("frame_shape_types");
   crop = new CropController(
@@ -463,7 +588,7 @@ async function setup() {
     ratios,
     frames,
     shapes,
-    settingsChanged,
+    userChanged,
     (trimmed) => {
       preview.trimmed = trimmed;
       settingsChanged();
@@ -471,7 +596,21 @@ async function setup() {
     () => output.rotate(),
   );
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
-  textDialog = new TextDialog(settings, fonts, positions, settingsChanged);
+  textDialog = new TextDialog(settings, fonts, positions, userChanged);
+  recorder = new HistoryRecorder<Snapshot>({
+    snapshot,
+    restore,
+    isAdjusting: () => sliderDragging || crop.isDragging(),
+    onUpdate: updateMenus,
+  });
+  // スライダーをドラッグしている間は履歴に積まない（離したら 1 回の操作として積む）
+  document.addEventListener("pointerdown", (event) => {
+    if (event.target instanceof HTMLInputElement && event.target.type === "range") sliderDragging = true;
+  });
+  for (const type of ["pointerup", "pointercancel"]) {
+    document.addEventListener(type, () => (sliderDragging = false));
+  }
+  resetButton.addEventListener("click", () => void resetImage());
   textButton = $<HTMLButtonElement>("text-button");
   textButton.addEventListener("click", () => {
     if (loaded) textDialog.open();
@@ -491,6 +630,8 @@ async function setup() {
     if (event.payload === "open") void openDialog();
     if (event.payload === "save") void saveDialog();
     if (event.payload === "text" && loaded) textDialog.open();
+    if (event.payload === "undo") undo();
+    if (event.payload === "redo") redo();
     if (event.payload === "actual_size") showActualSize();
     if (event.payload === "fit") fitToWindow();
     if (event.payload === "histogram") {

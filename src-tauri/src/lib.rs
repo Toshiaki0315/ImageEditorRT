@@ -20,6 +20,7 @@ use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
 use imageeditorrt_core::sample;
 use imageeditorrt_core::save::{self, SaveError, SaveOptions, SAME_FILE_MESSAGE};
 use imageeditorrt_core::shapes::ShapeType;
+use imageeditorrt_core::text::{TextFont, TextPosition};
 use imageeditorrt_core::transform::{AspectRatio, CropRect, OrientOp, Orientation};
 use serde::Serialize;
 use tauri::ipc::Response;
@@ -291,6 +292,15 @@ fn frame_shape_types() -> (Choices<FrameType>, Choices<ShapeType>) {
     )
 }
 
+/// 文字・透かしのフォントと位置の選択肢。
+#[tauri::command]
+fn text_options() -> (Choices<TextFont>, Choices<TextPosition>) {
+    (
+        TextFont::ALL.iter().map(|&f| (f, f.label())).collect(),
+        TextPosition::ALL.iter().map(|&p| (p, p.label())).collect(),
+    )
+}
+
 /// 実際に切り抜く範囲（フレーム・円の比に合わせた範囲。回転・反転した後の原寸画像の座標）。
 /// 切り抜かないなら None。画面で形の輪郭を重ねるのに使う。
 #[tauri::command]
@@ -423,6 +433,7 @@ pub fn run() {
             diorama_guide,
             aspect_ratios,
             frame_shape_types,
+            text_options,
             effective_crop,
             crop_drag,
             crop_spin,

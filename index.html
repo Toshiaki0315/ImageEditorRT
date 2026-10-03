@@ -81,5 +81,20 @@
       </aside>
     </main>
     <footer id="status" class="status">画像が読み込まれていません</footer>
+    <!-- 文字・透かし（開いたまま調整でき、変更はすぐプレビューに反映する） -->
+    <dialog id="text-dialog" class="text-dialog">
+      <h2>文字・透かし</h2>
+      <label class="row">文字 <textarea id="text-input" rows="3" placeholder="入れる文字（例: © 2026 Toshiaki）。改行もできます"></textarea></label>
+      <label class="row">フォント <select id="text-font"></select></label>
+      <label class="row">大きさ <input id="text-size" type="number" min="1" max="30" step="0.5" /><span>%</span></label>
+      <label class="row">色 <input id="text-color" type="color" /></label>
+      <label class="row">不透明度 <input id="text-opacity" type="range" min="0" max="100" step="1" /><output id="text-opacity-value"></output></label>
+      <label class="row">位置 <select id="text-position"></select></label>
+      <p class="note">大きさは写真の短辺に対する % です。「フレームの余白」はポラロイド・チェキの広い余白に入れます（フレームがなければ写真の下中央）。フレームの余白の文字は「トリミング実行」の表示で確認できます。</p>
+      <div class="buttons dialog-buttons">
+        <button type="button" id="text-clear">文字を消す</button>
+        <button type="button" id="text-close">閉じる</button>
+      </div>
+    </dialog>
   </body>
 </html>

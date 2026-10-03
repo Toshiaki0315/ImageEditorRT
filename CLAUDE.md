@@ -57,7 +57,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     shapes.rs             # 形（角丸・円）の切り抜き
     sample.rs             # 計測用の画像
     pyrandom.rs           # Python の random.Random と同じ乱数（経年劣化の粒子を旧版とそろえる）
-    text.rs               # 文字・透かし（ヒラギノなどを ab_glyph で描く）
+    text.rs               # 文字・透かし（フォント・9 か所とフレームの余白・大きさ・色・不透明度。ab_glyph で描く）
     encode.rs             # JPEG への書き出し（プレビューの計測用）
     save.rs               # 保存（形式・名前の決め方・元の画像への上書きの防止・EXIF を残す）
     exif_info.rs          # EXIF・GPS・MakerNote を表示用に読む
@@ -75,6 +75,7 @@ src/                      # 画面（TypeScript）
   preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
   panel.ts / tabs.ts / exif.ts   # 設定パネルのスライダー・タブ・EXIF の一覧
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）
+  textDialog.ts           # 「文字・透かし」のダイアログ（⌘T・「文字…」）
   output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）
   saveOptions.ts          # 「出力」タブの保存の設定（JPEG 品質・EXIF・GPS。localStorage に残す）
   types.ts                # Rust とやりとりする型

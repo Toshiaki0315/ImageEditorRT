@@ -14,10 +14,13 @@ on findElement(e, wantRole, wantTitle, depth)
 			end if
 		end try
 		if depth > 10 then return missing value
-		repeat with c in (UI elements of e)
-			set r to my findElement(c, wantRole, wantTitle, depth + 1)
-			if r is not missing value then return r
-		end repeat
+		-- 探している間にシートが開くなどして要素が変わっても止まらないよう、読めない要素は飛ばす
+		try
+			repeat with c in (UI elements of e)
+				set r to my findElement(c, wantRole, wantTitle, depth + 1)
+				if r is not missing value then return r
+			end repeat
+		end try
 		return missing value
 	end tell
 end findElement
@@ -28,9 +31,11 @@ on collectTexts(e, depth, out)
 			if role of e is "AXStaticText" then set end of out to (value of e as text)
 		end try
 		if depth < 10 then
-			repeat with c in (UI elements of e)
-				set out to my collectTexts(c, depth + 1, out)
-			end repeat
+			try
+				repeat with c in (UI elements of e)
+					set out to my collectTexts(c, depth + 1, out)
+				end repeat
+			end try
 		end if
 		return out
 	end tell

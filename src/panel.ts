@@ -45,6 +45,9 @@ const DETAIL: Slider[] = [
 /** 割合を「50%」のように表示する。 */
 export const percentText = (value: number) => `${value}%`;
 
+/** テイストの強さ（旧版にはない。元の写真とテイストをかけた写真を混ぜる）。テイストが「なし」のときは使えない。 */
+const STRENGTH: Slider[] = [{ key: "filterStrength", label: "強さ", min: 0, max: 100, initial: 100, text: percentText }];
+
 /** 「ジオラマ」タブのスライダー（旧版 FR-UI-62）。ぼかしの次に「帯の向き」を置く。 */
 const DIORAMA_BLUR: Slider[] = [{ key: "dioramaBlur", label: "ぼかし", min: 0, max: 100, initial: 0 }];
 const DIORAMA_BAND: Slider[] = [
@@ -77,6 +80,7 @@ export class Panel {
     for (const [value, label] of filters) this.filter.add(new Option(label, value));
     this.filter.addEventListener("change", () => {
       this.settings.filter = this.filter.value as FilterType;
+      this.updateStrength();
       this.onChange();
     });
     // 旧版と同じく、テイストの行に「文字…」のボタンを置く（⌘T と同じ）
@@ -96,6 +100,7 @@ export class Panel {
     presetButton.title = "加工の組み合わせを保存・呼び出し・削除します";
     row.append(this.filter, presetButton, textButton);
     adjustPage.append(heading, row);
+    this.build(adjustPage, STRENGTH);
     this.heading(adjustPage, "加工");
     this.build(adjustPage, COLOR);
     this.heading(adjustPage, "ディテール");
@@ -170,7 +175,7 @@ export class Panel {
   /** テイスト・色の調整・ディテールを既定値に戻す（旧版 FR-UI-54。確認は出さない）。 */
   resetAdjustments() {
     this.settings.filter = "none";
-    for (const slider of [...COLOR, ...DETAIL]) this.settings[slider.key] = slider.initial;
+    for (const slider of [...STRENGTH, ...COLOR, ...DETAIL]) this.settings[slider.key] = slider.initial;
     this.show();
     this.onChange();
   }
@@ -180,6 +185,12 @@ export class Panel {
     this.filter.value = this.settings.filter;
     this.direction.value = this.settings.dioramaDirection;
     for (const key of this.rows.keys()) this.showRow(key);
+    this.updateStrength();
+  }
+
+  /** テイストが「なし」のときは強さを使えない。 */
+  private updateStrength() {
+    this.rows.get("filterStrength")!.input.disabled = this.settings.filter === "none";
   }
 
   private showRow(key: NumberKey) {

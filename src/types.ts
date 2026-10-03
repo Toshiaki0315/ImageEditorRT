@@ -40,6 +40,8 @@ export type EditSettings = {
   height: number | null;
   keepAspect: boolean;
   filter: FilterType;
+  /** テイストの強さ 0〜100（%）。100 = テイストのまま */
+  filterStrength: number;
   vignette: number;
   aging: number;
   temperature: number;
@@ -76,6 +78,7 @@ export function defaultSettings(): EditSettings {
     height: null,
     keepAspect: true,
     filter: "none",
+    filterStrength: 100,
     vignette: 0,
     aging: 0,
     temperature: 6500,

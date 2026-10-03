@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::diorama::DioramaDirection;
 use crate::filters::FilterType;
 use crate::frames::FrameType;
-use crate::pipeline::EditSettings;
+use crate::pipeline::{EditSettings, FILTER_STRENGTH_FULL};
 use crate::shapes::ShapeType;
 use crate::text::{TextFont, TextPosition, TextSettings};
 
@@ -44,6 +44,9 @@ impl std::error::Error for PresetError {}
 pub struct Preset {
     pub name: String,
     pub filter: FilterType,
+    /// テイストの強さ（旧版にはない）。ファイルには既定（100%）以外のときだけ書く（旧版のファイルと同じ形を保つ）
+    #[serde(skip_serializing_if = "is_full_strength")]
+    pub filter_strength: u32,
     pub exposure: f64,
     pub brightness: i32,
     pub contrast: i32,
@@ -71,6 +74,7 @@ impl Preset {
         Self {
             name: name.to_string(),
             filter: s.filter,
+            filter_strength: s.filter_strength,
             exposure: s.exposure,
             brightness: s.brightness,
             contrast: s.contrast,
@@ -97,6 +101,7 @@ impl Preset {
     pub fn apply(&self, settings: &EditSettings) -> EditSettings {
         EditSettings {
             filter: self.filter,
+            filter_strength: self.filter_strength,
             exposure: self.exposure,
             brightness: self.brightness,
             contrast: self.contrast,
@@ -119,6 +124,10 @@ impl Preset {
             ..settings.clone()
         }
     }
+}
+
+fn is_full_strength(strength: &u32) -> bool {
+    *strength == FILTER_STRENGTH_FULL
 }
 
 /// Python の str.strip() が取り除く空白か（Rust の is_whitespace に加えて、区切りの制御文字 0x1C〜0x1F）。
@@ -321,6 +330,7 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
         let number = || if raw.is_boolean() { None } else { Some(raw) };
         match key.as_str() {
             "filter" => p.filter = enum_value(raw)?,
+            "filter_strength" => p.filter_strength = int_value::<u32>(number()?)?.min(FILTER_STRENGTH_FULL),
             "frame" => p.frame = enum_value(raw)?,
             "shape" => p.shape = enum_value(raw)?,
             "diorama_direction" => p.diorama_direction = enum_value(raw)?,
@@ -388,6 +398,31 @@ mod tests {
             (settings.width, settings.crop, settings.orientation)
         );
         assert_eq!(Preset::from_settings("P", &applied), preset);
+    }
+
+    #[test]
+    fn filter_strength_is_written_only_when_not_full() {
+        let full = Preset::from_settings(
+            "A",
+            &EditSettings { filter: FilterType::Sepia, ..EditSettings::default() },
+        );
+        assert!(!presets_json(std::slice::from_ref(&full)).contains("filter_strength"));
+        let half = Preset { filter_strength: 40, ..full.clone() };
+        let text = presets_json(std::slice::from_ref(&half));
+        assert!(text.contains("\"filter_strength\": 40"), "{text}");
+        // 読み直すと同じ。書いていなければ 100%、範囲の外は 100% に収める
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(preset_from_value(&value["presets"][0]), Some(half.clone()));
+        assert_eq!(preset_from_value(&serde_json::json!({"name": "B"})).unwrap().filter_strength, 100);
+        assert_eq!(
+            preset_from_value(&serde_json::json!({"name": "C", "filter_strength": 250}))
+                .unwrap()
+                .filter_strength,
+            100
+        );
+        assert_eq!(preset_from_value(&serde_json::json!({"name": "D", "filter_strength": -1})), None);
+        // 当てはめると強さも変わる
+        assert_eq!(half.apply(&EditSettings::default()).filter_strength, 40);
     }
 
     #[test]

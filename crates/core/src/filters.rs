@@ -4,11 +4,13 @@
 //! 元のまま残す。係数は旧版と同じ（旧版 §5.4）。
 
 use image::RgbaImage;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::adjust::{self, apply_lut, clip, curve_lut, s_curve, smoothstep, Lut};
 use crate::blur::{gaussian_blur, unsharp_mask};
 use crate::pillow::{self, blend, colorize_table, convert_l_matrix, luma, map_pixels, screen};
+use crate::PIXELS_PER_TASK;
 
 const SEPIA_FACTORS: [f64; 3] = [1.07, 0.74, 0.43];
 const HIGH_TONE_BRIGHTNESS: f64 = 1.2;
@@ -170,6 +172,32 @@ impl FilterType {
 }
 
 /// 画像にテイストをかける（なしなら何もしない）。ぼかしの半径は画像の短辺に比例させる。
+/// テイストを強さ strength（0〜100%）でかける: 元の写真とテイストをかけた写真を R・G・B ごとに混ぜる
+/// （四捨五入。アルファは元のまま）。100 以上は apply_filter と同じ、0 はテイストなし。
+pub fn apply_filter_with_strength(image: &mut RgbaImage, filter: FilterType, strength: u32) {
+    if filter == FilterType::None || strength == 0 {
+        return;
+    }
+    if strength >= 100 {
+        apply_filter(image, filter);
+        return;
+    }
+    let original = image.clone();
+    apply_filter(image, filter);
+    let (keep, take) = (100 - strength, strength);
+    image
+        .as_mut()
+        .par_chunks_exact_mut(4)
+        .zip(original.as_raw().par_chunks_exact(4))
+        .with_min_len(PIXELS_PER_TASK)
+        .for_each(|(out, before)| {
+            for c in 0..3 {
+                out[c] = ((u32::from(before[c]) * keep + u32::from(out[c]) * take + 50) / 100) as u8;
+            }
+            out[3] = before[3];
+        });
+}
+
 pub fn apply_filter(image: &mut RgbaImage, filter: FilterType) {
     match filter {
         FilterType::None => {}
@@ -348,6 +376,36 @@ fn scale_table(factor: f64) -> [u8; 256] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn strength_blends_with_the_original() {
+        let image = RgbaImage::from_fn(30, 20, |x, y| image::Rgba([(x * 8) as u8, (y * 12) as u8, 90, 200]));
+        let mut full = image.clone();
+        apply_filter(&mut full, FilterType::Sepia);
+        // 100% は今までと同じ、0% はテイストなし
+        let at = |strength| {
+            let mut out = image.clone();
+            apply_filter_with_strength(&mut out, FilterType::Sepia, strength);
+            out
+        };
+        assert_eq!(at(100), full);
+        assert_eq!(at(0), image);
+        // 途中は R・G・B を混ぜる（四捨五入）。アルファは元のまま
+        let half = at(50);
+        for ((h, o), f) in half.pixels().zip(image.pixels()).zip(full.pixels()) {
+            for c in 0..3 {
+                assert_eq!(u32::from(h[c]), (u32::from(o[c]) + u32::from(f[c])).div_ceil(2), "{c}");
+            }
+            assert_eq!(h[3], o[3]);
+        }
+        let quarter = at(25);
+        let p = (quarter.get_pixel(10, 5), image.get_pixel(10, 5), full.get_pixel(10, 5));
+        assert_eq!(u32::from(p.0[0]), (u32::from(p.1[0]) * 75 + u32::from(p.2[0]) * 25 + 50) / 100);
+        // テイストなしは強さによらず何もしない
+        let mut none = image.clone();
+        apply_filter_with_strength(&mut none, FilterType::None, 40);
+        assert_eq!(none, image);
+    }
 
     #[test]
     fn names_are_unique() {

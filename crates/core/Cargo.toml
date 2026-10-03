@@ -3,6 +3,7 @@ name = "imageeditorrt-core"
 description = "ImageEditorRT の画像処理・EXIF（Tauri に依存しない）"
 edition.workspace = true
 version.workspace = true
+license.workspace = true
 publish = false
 
 [lib]

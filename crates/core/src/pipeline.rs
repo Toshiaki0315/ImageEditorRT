@@ -5,8 +5,6 @@
 //! 周辺減光 → 経年劣化 → 文字。
 //! フレーム・形（#13）は、トリミングの後の比への切り抜きと、経年劣化の後にここへ足す。
 
-use std::path::Path;
-
 use image::{imageops, RgbaImage};
 use serde::{Deserialize, Serialize};
 
@@ -21,32 +19,11 @@ use crate::frames::{self, FRAME_COLOR};
 use crate::shapes;
 pub use crate::shapes::ShapeType;
 use crate::text;
+pub use crate::text::{TextFont, TextPosition, TextSettings};
 use crate::transform::{self, round_half_even, CropRect, Orientation, SizeError};
 
 /// プレビューの長辺（px）。
 pub const PREVIEW_MAX_SIDE: u32 = 1600;
-
-/// 文字・透かし（空なら描かない）。フォント・位置・色などは #15 で足す。
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct TextSettings {
-    pub text: String,
-    /// 写真の短辺に対する文字の大きさ (%)
-    pub size: f32,
-}
-
-impl Default for TextSettings {
-    fn default() -> Self {
-        Self { text: String::new(), size: 5.0 }
-    }
-}
-
-impl TextSettings {
-    /// 描く文字がないか。
-    pub fn is_empty(&self) -> bool {
-        self.text.trim().is_empty()
-    }
-}
 
 /// 編集設定。トリミング範囲は、回転・反転した後の原寸画像の座標で持つ。JSON では camelCase。
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -174,15 +151,37 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
 }
 
 /// 形で切り抜き、文字を描き、フレームを付ける（形の外側は、フレームがあればフレームの白、なければ透明）。
-/// 文字をフレームの余白に描くのは #15 で足す。
+///
+/// 文字は写真の上ならフレームの前に、フレームの余白ならフレームを付けた後にその余白へ描く
+/// （大きさの基準はどちらも写真の短辺。旧版 FR-TXT-05）。
 fn apply_shape_and_frame(mut image: RgbaImage, settings: &EditSettings) -> RgbaImage {
     let has_frame = settings.frame != FrameType::None;
     if settings.shape != ShapeType::Rectangle {
         let fill = has_frame.then_some(FRAME_COLOR);
         image = shapes::apply_shape(&image, settings.shape, settings.corner_radius, fill);
     }
-    draw_text(&mut image, &settings.text, None);
-    frames::add_frame(&image, settings.frame)
+    let on_margin = settings.text.position == TextPosition::FrameMargin && has_frame;
+    if !on_margin {
+        text::draw_text(&mut image, &photo_text(settings), None, None);
+    }
+    let photo_size = image.dimensions();
+    let mut framed = frames::add_frame(&image, settings.frame);
+    if on_margin {
+        if let Some((l, t, r, b)) = frames::margin_box(photo_size, settings.frame) {
+            let area = (i64::from(l), i64::from(t), i64::from(r), i64::from(b));
+            let reference = f64::from(photo_size.0.min(photo_size.1));
+            text::draw_text(&mut framed, &settings.text, Some(area), Some(reference));
+        }
+    }
+    framed
+}
+
+/// 写真の上に描く文字の設定（フレームがないのに「フレームの余白」なら下中央に描く）。
+fn photo_text(settings: &EditSettings) -> TextSettings {
+    match settings.text.position {
+        TextPosition::FrameMargin => TextSettings { position: TextPosition::Bottom, ..settings.text.clone() },
+        _ => settings.text.clone(),
+    }
 }
 
 /// プレビュー表示用の画像を返す（入力画像は変更しない）。
@@ -223,8 +222,13 @@ pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, t
     if trimmed {
         return apply_shape_and_frame(rendered, settings);
     }
-    // 全体表示ではフレーム・形は付けない（形は画面でマスクと輪郭を重ねて見せる）。文字は切り抜く範囲に描く
-    draw_text(&mut rendered, &settings.text, rect);
+    // 全体表示ではフレーム・形は付けない（形は画面でマスクと輪郭を重ねて見せる）。写真の上の文字は
+    // 切り抜く範囲（なければ全体）に描く。フレームの余白の文字は「トリミング実行」の表示で見える
+    let on_margin = settings.text.position == TextPosition::FrameMargin && settings.frame != FrameType::None;
+    if !on_margin {
+        let area = rect.map(|r| (r.x, r.y, r.right(), r.bottom()));
+        text::draw_text(&mut rendered, &photo_text(settings), area, None);
+    }
     rendered
 }
 
@@ -413,25 +417,6 @@ fn apply_diorama_and_filter(
     image
 }
 
-/// 文字を描く（area があればその範囲の右下。省略時は画像全体）。
-fn draw_text(image: &mut RgbaImage, settings: &TextSettings, area: Option<CropRect>) {
-    if settings.is_empty() {
-        return;
-    }
-    let Some(font) = text::load_font(Path::new(text::HIRAGINO_W3), 0) else { return };
-    let (color, opacity) = ([255, 255, 255], 0.8);
-    match area {
-        Some(r) => {
-            let mut region = transform::crop(image, r);
-            text::draw_text_bottom_right(&mut region, font, &settings.text, settings.size, color, opacity);
-            imageops::replace(image, &region, r.x, r.y);
-        }
-        None => {
-            text::draw_text_bottom_right(image, font, &settings.text, settings.size, color, opacity);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -532,6 +517,34 @@ mod tests {
         let guide = diorama_guide((200, 100), &vertical, 1.0);
         assert!(!guide.horizontal);
         assert!((guide.lines[1].0 - 0.4).abs() < 1e-9);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn text_goes_into_the_frame_margin() {
+        let black = RgbaImage::from_pixel(200, 200, Rgba([0, 0, 0, 255]));
+        let text = TextSettings {
+            text: "写真".into(),
+            position: TextPosition::FrameMargin,
+            color: [255, 0, 0],
+            opacity: 100,
+            size: 10.0,
+            ..TextSettings::default()
+        };
+        let settings =
+            EditSettings { frame: FrameType::Polaroid, text: text.clone(), ..EditSettings::default() };
+        let out = apply_edits(&black, &settings).unwrap();
+        // ポラロイドの写真の下の余白（白）に赤い文字が入る。写真（黒）の中には入らない
+        let (l, t, _, _) = frames::frame_margins(FrameType::Polaroid, (200, 200));
+        let red = |p: &Rgba<u8>| p[0] > 200 && p[1] < 80;
+        let in_margin = (t + 200..out.height()).flat_map(|y| (0..out.width()).map(move |x| (x, y)));
+        assert!(in_margin.filter(|&(x, y)| red(out.get_pixel(x, y))).count() > 50);
+        let in_photo = (t..t + 200).flat_map(|y| (l..l + 200).map(move |x| (x, y)));
+        assert_eq!(in_photo.filter(|&(x, y)| red(out.get_pixel(x, y))).count(), 0);
+        // フレームがなければ写真の下中央に描く
+        let plain = apply_edits(&black, &EditSettings { text, ..EditSettings::default() }).unwrap();
+        let bottom = (150..200).flat_map(|y| (50..150).map(move |x| (x, y)));
+        assert!(bottom.filter(|&(x, y)| red(plain.get_pixel(x, y))).count() > 50);
     }
 
     #[test]

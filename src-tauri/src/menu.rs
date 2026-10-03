@@ -11,6 +11,8 @@ pub const MENU_EVENT: &str = "menu";
 pub const OPEN: &str = "open";
 /// 「ファイル > 保存…」
 pub const SAVE: &str = "save";
+/// 「編集 > 文字・透かし…」
+pub const TEXT: &str = "text";
 
 /// メニューバーを作る。
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -35,6 +37,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .close_window_with_text("閉じる")
         .build()?;
     // 入力欄で使う標準の編集の項目（元に戻す・貼り付けなどは後の Issue で画像の操作に広げる）
+    let text = MenuItemBuilder::with_id(TEXT, "文字・透かし…").accelerator("CmdOrCtrl+T").build(app)?;
     let edit = SubmenuBuilder::new(app, "編集")
         .undo_with_text("取り消す")
         .redo_with_text("やり直す")
@@ -43,6 +46,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .copy_with_text("コピー")
         .paste_with_text("ペースト")
         .select_all_with_text("すべてを選択")
+        .separator()
+        .item(&text)
         .build()?;
     let view = SubmenuBuilder::new(app, "表示").fullscreen_with_text("フルスクリーンにする").build()?;
     let window = SubmenuBuilder::new(app, "ウインドウ")

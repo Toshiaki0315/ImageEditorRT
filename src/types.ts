@@ -55,7 +55,7 @@ export type EditSettings = {
   dioramaPosition: number;
   dioramaWidth: number;
   dioramaVivid: number;
-  text: { text: string; size: number };
+  text: TextSettings;
   frame: FrameKind;
   shape: ShapeType;
   cornerRadius: number;
@@ -91,7 +91,7 @@ export function defaultSettings(): EditSettings {
     dioramaPosition: 50,
     dioramaWidth: 20,
     dioramaVivid: 30,
-    text: { text: "", size: 5 },
+    text: defaultText(),
     frame: "none",
     shape: "rectangle",
     cornerRadius: 10,
@@ -129,3 +129,34 @@ export type AspectRatio = "free" | "square" | "ratio4x3" | "ratio3x2" | "ratio16
 
 /** 回転・反転の操作（Rust の transform::OrientOp）。 */
 export type OrientOp = "rotate_left" | "rotate_right" | "flip_horizontal" | "flip_vertical";
+
+/** 文字・透かしのフォント（Rust の text::TextFont。旧版のプリセットと同じ名前）。 */
+export type TextFont = "GOTHIC" | "GOTHIC_BOLD" | "MINCHO" | "MARU_GOTHIC" | "HELVETICA" | "TIMES";
+
+/** 文字を置く場所（Rust の text::TextPosition）。 */
+export type TextPosition =
+  | "top_left"
+  | "top"
+  | "top_right"
+  | "left"
+  | "center"
+  | "right"
+  | "bottom_left"
+  | "bottom"
+  | "bottom_right"
+  | "frame_margin";
+
+/** 文字・透かしの設定（Rust の text::TextSettings）。size は写真の短辺に対する %、opacity は %。 */
+export type TextSettings = {
+  text: string;
+  font: TextFont;
+  size: number;
+  color: [number, number, number];
+  opacity: number;
+  position: TextPosition;
+};
+
+/** 文字・透かしの既定値。 */
+export function defaultText(): TextSettings {
+  return { text: "", font: "GOTHIC", size: 5, color: [255, 255, 255], opacity: 80, position: "bottom_right" };
+}

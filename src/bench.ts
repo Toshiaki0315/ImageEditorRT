@@ -2,7 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { Preview, Timing } from "./preview";
-import { defaultSettings, type EditSettings } from "./types";
+import { defaultSettings, defaultText, type EditSettings } from "./types";
 
 /** 旧版のベンチマークの「重い設定」（Rust の Settings::heavy と同じ）。 */
 const HEAVY: EditSettings = {
@@ -19,7 +19,7 @@ const HEAVY: EditSettings = {
   filter: "hdr",
   vignette: 50,
   aging: 30,
-  text: { text: "© 2026 写真", size: 5 },
+  text: { ...defaultText(), text: "© 2026 写真" },
 };
 
 const fmt = (ms: number) => `${ms.toFixed(1)}ms`;

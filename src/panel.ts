@@ -79,7 +79,17 @@ export class Panel {
       this.settings.filter = this.filter.value as FilterType;
       this.onChange();
     });
-    adjustPage.append(heading, this.filter);
+    // 旧版と同じく、テイストの行に「文字…」のボタンを置く（⌘T と同じ）
+    const row = document.createElement("div");
+    row.className = "filter-row";
+    const textButton = document.createElement("button");
+    textButton.type = "button";
+    textButton.id = "text-button";
+    textButton.textContent = "文字…";
+    textButton.title = "文字・透かし（⌘T）";
+    textButton.disabled = true;
+    row.append(this.filter, textButton);
+    adjustPage.append(heading, row);
     this.heading(adjustPage, "加工");
     this.build(adjustPage, COLOR);
     this.heading(adjustPage, "ディテール");

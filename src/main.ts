@@ -7,6 +7,7 @@ import { message, open, save } from "@tauri-apps/plugin-dialog";
 import { bench, benchSave } from "./bench";
 import { CropController } from "./crop";
 import { OutputSize } from "./output";
+import { TextDialog } from "./textDialog";
 import { showExif } from "./exif";
 import { Panel } from "./panel";
 import { Preview } from "./preview";
@@ -21,6 +22,8 @@ import {
   type FrameKind,
   type OpenInfo,
   type ShapeType,
+  type TextFont,
+  type TextPosition,
 } from "./types";
 
 const NO_IMAGE_MESSAGE = "画像が読み込まれていません";
@@ -33,6 +36,8 @@ const stage = $<HTMLElement>("stage");
 const placeholder = $<HTMLElement>("placeholder");
 const status = $<HTMLElement>("status");
 const saveButton = $<HTMLButtonElement>("save");
+/** 「加工」タブの「文字…」のボタン（設定パネルを作った後に取る） */
+let textButton: HTMLButtonElement;
 const canvas = $<HTMLCanvasElement>("canvas");
 const guide = document.getElementById("guide") as unknown as SVGSVGElement;
 const SVG = "http://www.w3.org/2000/svg";
@@ -50,6 +55,7 @@ const preview = new Preview(stage, canvas, (error) => showError("プレビュー
 const tabs = new Tabs(document.querySelector(".side")!);
 let panel: Panel;
 let crop: CropController;
+let textDialog: TextDialog;
 const output = new OutputSize(settings, settingsChanged);
 const saveOptions = new SaveOptionsPanel(
   $<HTMLInputElement>("jpeg-quality"),
@@ -223,6 +229,8 @@ function showLoaded(info: OpenInfo, openNotes: string[]) {
   preview.show(info.previewWidth, info.previewHeight, info.hasAlpha);
   crop.reset([info.width, info.height]);
   output.reset(true);
+  textDialog.show();
+  textButton.disabled = false;
   showExif($("page-exif"), info.exif);
   tabs.setEnabled("exif", info.exif.entries.length > 0);
   notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
@@ -265,6 +273,12 @@ async function setup() {
     },
     () => output.rotate(),
   );
+  const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
+  textDialog = new TextDialog(settings, fonts, positions, settingsChanged);
+  textButton = $<HTMLButtonElement>("text-button");
+  textButton.addEventListener("click", () => {
+    if (loaded) textDialog.open();
+  });
   preview.onResize = () => {
     crop.draw();
     void updateGuide();
@@ -276,6 +290,7 @@ async function setup() {
   await listen<string>("menu", (event) => {
     if (event.payload === "open") void openDialog();
     if (event.payload === "save") void saveDialog();
+    if (event.payload === "text" && loaded) textDialog.open();
   });
   await listen<string[]>("open-paths", (event) => {
     if (!saving) openPaths(event.payload);

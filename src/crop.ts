@@ -3,7 +3,7 @@
 // 座標はどれも、回転・反転した後の原寸画像の座標（px）。
 
 import { invoke } from "@tauri-apps/api/core";
-import type { AspectRatio, CropRect, EditSettings, OrientOp, Orientation } from "./types";
+import type { AspectRatio, CropRect, EditSettings, FrameKind, OrientOp, Orientation, ShapeType } from "./types";
 
 type DragMode = "new" | "move" | "resize";
 type Drag = { mode: DragMode; anchor: [number, number]; start: CropRect | null };
@@ -14,6 +14,10 @@ const SVG = "http://www.w3.org/2000/svg";
 const HANDLE_SIZE = 8;
 const HANDLE_HIT = 10;
 const TRIM_TEXT = "トリミング実行";
+/** フレーム・円を選んでいるときに比のプルダウンに出す項目 */
+const FOLLOW = "follow";
+const FOLLOW_TEXT = "フレーム・円に合わせる";
+const CORNER_RADIUS_DEFAULT = 10;
 const EDIT_RANGE_TEXT = "範囲を編集";
 /** 縦向きを選べる比（自由と 1:1 には向きがない） */
 const HAS_ORIENTATION: AspectRatio[] = ["ratio4x3", "ratio3x2", "ratio16x9"];
@@ -31,6 +35,14 @@ export class CropController {
   private readonly portrait = $<HTMLInputElement>("portrait");
   private readonly trim = $<HTMLButtonElement>("trim");
   private readonly clear = $<HTMLButtonElement>("clear-crop");
+  private readonly frame = $<HTMLSelectElement>("frame");
+  private readonly shape = $<HTMLSelectElement>("shape");
+  private readonly corner = $<HTMLInputElement>("corner-radius");
+  private readonly cornerValue = $<HTMLOutputElement>("corner-radius-value");
+  /** フレーム・円で比を固定したときに覚えておく、比のプルダウンの選択 */
+  private chosenRatio: AspectRatio = "free";
+  /** 形をかける範囲（実際に切り抜く範囲。なければ画像全体） */
+  private shapeArea: CropRect | null = null;
   private readonly spins = {
     x: $<HTMLInputElement>("crop-x"),
     y: $<HTMLInputElement>("crop-y"),
@@ -46,11 +58,32 @@ export class CropController {
     private readonly settings: EditSettings,
     private readonly canvas: HTMLCanvasElement,
     ratios: [AspectRatio, string][],
+    frames: [FrameKind, string][],
+    shapes: [ShapeType, string][],
     private readonly onChange: () => void,
     private readonly onTrimChange: (trimmed: boolean) => void,
   ) {
     for (const [value, label] of ratios) this.aspect.add(new Option(label, value));
-    this.aspect.addEventListener("change", () => void this.aspectChanged());
+    const follow = new Option(FOLLOW_TEXT, FOLLOW);
+    follow.disabled = true;
+    this.aspect.add(follow);
+    for (const [value, label] of frames) this.frame.add(new Option(label, value));
+    for (const [value, label] of shapes) this.shape.add(new Option(label, value));
+    this.aspect.addEventListener("change", () => {
+      this.chosenRatio = this.aspect.value as AspectRatio;
+      void this.aspectChanged();
+    });
+    this.frame.addEventListener("change", () => {
+      this.settings.frame = this.frame.value as FrameKind;
+      void this.aspectChanged();
+    });
+    this.shape.addEventListener("change", () => {
+      this.settings.shape = this.shape.value as ShapeType;
+      void this.aspectChanged();
+    });
+    this.corner.addEventListener("input", () => this.setCorner(Number(this.corner.value)));
+    // ダブルクリックで既定値に戻す（旧版 FR-UI-53。角丸以外の形では操作できない）
+    this.corner.addEventListener("dblclick", () => this.setCorner(CORNER_RADIUS_DEFAULT));
     this.portrait.addEventListener("change", () => void this.aspectChanged());
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) {
       button.addEventListener("click", () => void this.orient(button.dataset.orient as OrientOp));
@@ -67,10 +100,12 @@ export class CropController {
     this.reset(null);
   }
 
-  /** 画像を開いたとき（size は原寸の大きさ）。向き・範囲・比・表示を初期状態に戻す。 */
+  /** 画像を開いたとき（size は原寸の大きさ）。向き・範囲・比・フレーム・形・表示を初期状態に戻す。 */
   reset(size: [number, number] | null) {
     this.size = size;
+    this.chosenRatio = "free";
     this.aspect.value = "free";
+    this.shapeArea = null;
     this.portrait.checked = false;
     this.setTrimmed(false, false);
     this.updateControls();
@@ -81,7 +116,7 @@ export class CropController {
     return this.trim.getAttribute("aria-pressed") === "true";
   }
 
-  /** プレビューの表示の大きさが変わったとき・描き直したとき、範囲の線を描き直す。 */
+  /** プレビューの表示の大きさが変わったとき・描き直したとき、範囲・形の線を描き直す。 */
   draw() {
     const active = this.size !== null && !this.isTrimmed() && !this.canvas.hidden;
     this.overlay.toggleAttribute("hidden", !active);
@@ -90,20 +125,31 @@ export class CropController {
     this.overlay.setAttribute("viewBox", `0 0 ${width} ${height}`);
     this.overlay.replaceChildren();
     const crop = this.settings.crop;
-    if (!crop) return;
-    const r = this.toScreen(crop);
-    // 範囲の外を暗くする（外側の四角から範囲をくり抜く）
+    const outline = this.shapeOutline();
+    if (!crop && !outline) return;
+    const r = crop ? this.toScreen(crop) : null;
+    // 範囲の外と形の外側を暗くする（形があれば形、なければ範囲の内側だけを明るく残す。旧版 FR-UI-58）
+    const hole = outline ?? (r ? `M${r.x} ${r.y}h${r.width}v${r.height}h${-r.width}Z` : "");
     const mask = document.createElementNS(SVG, "path");
     mask.setAttribute("class", "mask");
-    mask.setAttribute("d", `M0 0H${width}V${height}H0Z M${r.x} ${r.y}h${r.width}v${r.height}h${-r.width}Z`);
+    mask.setAttribute("d", `M0 0H${width}V${height}H0Z ${hole}`);
     this.overlay.append(mask);
-    // 枠（明るい写真でも暗い写真でも見えるよう、白い線の外側に黒い線）
+    // 枠と形の輪郭（明るい写真でも暗い写真でも見えるよう、白い線の外側に黒い線）
     for (const kind of ["edge-shadow", "edge"]) {
-      const rect = document.createElementNS(SVG, "rect");
-      rect.setAttribute("class", kind);
-      for (const [key, value] of Object.entries(r)) rect.setAttribute(key, String(value));
-      this.overlay.append(rect);
+      if (outline) {
+        const path = document.createElementNS(SVG, "path");
+        path.setAttribute("class", kind);
+        path.setAttribute("d", outline);
+        this.overlay.append(path);
+      }
+      if (r) {
+        const rect = document.createElementNS(SVG, "rect");
+        rect.setAttribute("class", kind);
+        for (const [key, value] of Object.entries(r)) rect.setAttribute(key, String(value));
+        this.overlay.append(rect);
+      }
     }
+    if (!r) return;
     for (const [cx, cy] of corners(r)) {
       const handle = document.createElementNS(SVG, "rect");
       handle.setAttribute("class", "handle");
@@ -115,10 +161,56 @@ export class CropController {
     }
   }
 
+  /** 形（角丸・円）の輪郭の SVG のパス（画面の座標）。矩形・半径 0 の角丸なら null。 */
+  private shapeOutline(): string | null {
+    if (!this.size) return null;
+    const area = this.toScreen(this.shapeArea ?? { x: 0, y: 0, width: this.size[0], height: this.size[1] });
+    const short = Math.min(area.width, area.height);
+    if (this.settings.shape === "circle") {
+      // 中央の、短辺を直径とする正円
+      const [cx, cy, radius] = [area.x + area.width / 2, area.y + area.height / 2, short / 2];
+      return `M${cx - radius} ${cy}a${radius} ${radius} 0 1 0 ${2 * radius} 0a${radius} ${radius} 0 1 0 ${-2 * radius} 0Z`;
+    }
+    if (this.settings.shape === "rounded" && this.settings.cornerRadius > 0) {
+      const r = (short * Math.min(this.settings.cornerRadius, 50)) / 100;
+      const { x, y, width, height } = area;
+      return (
+        `M${x + r} ${y}H${x + width - r}A${r} ${r} 0 0 1 ${x + width} ${y + r}V${y + height - r}` +
+        `A${r} ${r} 0 0 1 ${x + width - r} ${y + height}H${x + r}A${r} ${r} 0 0 1 ${x} ${y + height - r}` +
+        `V${y + r}A${r} ${r} 0 0 1 ${x + r} ${y}Z`
+      );
+    }
+    return null;
+  }
+
+  /** 形をかける範囲を Rust に聞いて覚え、線を描き直す。 */
+  private async refreshShapeArea() {
+    if (!this.size) return;
+    this.shapeArea = await invoke<CropRect | null>("effective_crop", { settings: this.settings, size: this.size });
+    this.draw();
+  }
+
+  private setCorner(value: number) {
+    this.settings.cornerRadius = value;
+    this.updateControls();
+    this.draw();
+    this.onChange();
+  }
+
   // --- 範囲・比・向き ----------------------------------------------------------
 
   private aspectChoice() {
-    return { ratio: this.aspect.value as AspectRatio, portrait: this.portrait.checked };
+    return {
+      ratio: this.chosenRatio,
+      portrait: this.portrait.checked,
+      frame: this.settings.frame,
+      shape: this.settings.shape,
+    };
+  }
+
+  /** フレーム・円を選んでいれば、比をそれに固定する（比のプルダウンは選べない）。 */
+  private locked(): boolean {
+    return this.settings.frame !== "none" || this.settings.shape === "circle";
   }
 
   /**
@@ -129,10 +221,11 @@ export class CropController {
     this.settings.crop = crop;
     this.updateControls(keepSpins && !crop);
     this.draw();
+    void this.refreshShapeArea();
     if (notify) this.onChange();
   }
 
-  /** 比・縦向きを変えたとき: 範囲があれば、その中央を新しい比に直す。 */
+  /** 比・縦向き・フレーム・形を変えたとき: 範囲があれば、その中央を新しい比に直す。 */
   private async aspectChanged() {
     this.updateControls();
     if (!this.size) return;
@@ -141,7 +234,7 @@ export class CropController {
       aspect: this.aspectChoice(),
       size: this.size,
     });
-    if (this.settings.crop) this.setCrop(crop);
+    this.setCrop(this.settings.crop ? crop : null);
   }
 
   private async spinEdited(field: keyof CropRect) {
@@ -176,6 +269,7 @@ export class CropController {
     this.size = result.size;
     const swaps = op === "rotate_left" || op === "rotate_right";
     if (swaps && !this.portrait.disabled) this.portrait.checked = !this.portrait.checked;
+    this.shapeArea = null;
     this.setCrop(result.crop);
   }
 
@@ -202,13 +296,23 @@ export class CropController {
       this.spins.width.max = String(this.size[0]);
       this.spins.height.max = String(this.size[1]);
     }
-    this.aspect.disabled = !loaded;
-    this.portrait.disabled = !loaded || !HAS_ORIENTATION.includes(this.aspect.value as AspectRatio);
+    // フレーム・円を選んでいるときは比をそれに固定し、プルダウンは「フレーム・円に合わせる」にする
+    const locked = this.locked();
+    this.aspect.value = locked ? FOLLOW : this.chosenRatio;
+    this.aspect.disabled = !loaded || locked;
+    this.portrait.disabled = !loaded || locked || !HAS_ORIENTATION.includes(this.chosenRatio);
+    this.frame.value = this.settings.frame;
+    this.shape.value = this.settings.shape;
+    this.frame.disabled = this.shape.disabled = !loaded;
+    this.corner.value = String(this.settings.cornerRadius);
+    this.cornerValue.textContent = `${this.settings.cornerRadius}%`;
+    this.corner.disabled = !loaded || this.settings.shape !== "rounded";
     this.clear.disabled = !loaded || !crop;
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) button.disabled = !loaded;
-    // 範囲がなくなったら全体の表示に戻す（フレーム・形は #13 で足す）
-    if (!crop && this.isTrimmed()) this.setTrimmed(false);
-    this.trim.disabled = !loaded || !crop;
+    // 範囲・フレーム・形（矩形以外）のどれもなければ「トリミング実行」は押せず、全体の表示に戻す
+    const canTrim = loaded && (crop !== null || this.settings.frame !== "none" || this.settings.shape !== "rectangle");
+    if (!canTrim && this.isTrimmed()) this.setTrimmed(false);
+    this.trim.disabled = !canTrim;
   }
 
   // --- プレビュー上のドラッグ ----------------------------------------------------

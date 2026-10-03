@@ -1,0 +1,66 @@
+[
+ {
+  "blur": 80,
+  "direction": "horizontal",
+  "position": 50,
+  "width": 20,
+  "vivid": 30,
+  "area": null,
+  "file": "case_0.png"
+ },
+ {
+  "blur": 100,
+  "direction": "vertical",
+  "position": 30,
+  "width": 10,
+  "vivid": 0,
+  "area": null,
+  "file": "case_1.png"
+ },
+ {
+  "blur": 40,
+  "direction": "horizontal",
+  "position": 70,
+  "width": 40,
+  "vivid": 100,
+  "area": null,
+  "file": "case_2.png"
+ },
+ {
+  "blur": 60,
+  "direction": "vertical",
+  "position": 50,
+  "width": 0,
+  "vivid": 60,
+  "area": null,
+  "file": "case_3.png"
+ },
+ {
+  "blur": 70,
+  "direction": "horizontal",
+  "position": 40,
+  "width": 30,
+  "vivid": 50,
+  "area": [
+   20,
+   10,
+   140,
+   100
+  ],
+  "file": "case_4.png"
+ },
+ {
+  "blur": 90,
+  "direction": "vertical",
+  "position": 60,
+  "width": 20,
+  "vivid": 20,
+  "area": [
+   30,
+   0,
+   100,
+   120
+  ],
+  "file": "case_5.png"
+ }
+]

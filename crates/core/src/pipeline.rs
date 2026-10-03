@@ -11,7 +11,9 @@ use image::{imageops, RgbaImage};
 use serde::{Deserialize, Serialize};
 
 use crate::adjust::{self, Lut};
-use crate::effects::{self, Diorama};
+pub use crate::diorama::DioramaDirection;
+use crate::diorama::{self, DioramaSettings};
+use crate::effects;
 use crate::filters;
 pub use crate::filters::FilterType;
 use crate::text;
@@ -72,6 +74,7 @@ pub struct EditSettings {
     pub denoise: u32,
     /// ジオラマ風（ぼかし 0 = なし）。位置・幅は写真の高さに対する %
     pub diorama_blur: u32,
+    pub diorama_direction: DioramaDirection,
     pub diorama_position: u32,
     pub diorama_width: u32,
     pub diorama_vivid: u32,
@@ -98,6 +101,7 @@ impl Default for EditSettings {
             blur: 0,
             denoise: 0,
             diorama_blur: 0,
+            diorama_direction: DioramaDirection::Horizontal,
             diorama_position: 50,
             diorama_width: 20,
             diorama_vivid: 30,
@@ -127,9 +131,11 @@ impl EditSettings {
         }
     }
 
-    fn diorama(&self) -> Diorama {
-        Diorama {
+    /// ジオラマ風の加工の設定をまとめて返す。
+    pub fn diorama(&self) -> DioramaSettings {
+        DioramaSettings {
             blur: self.diorama_blur,
+            direction: self.diorama_direction,
             position: self.diorama_position,
             width: self.diorama_width,
             vivid: self.diorama_vivid,
@@ -149,7 +155,7 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
 
     let reference = f64::from(image.width().min(image.height()));
     let image = apply_detail(apply_basic_adjustments(image, settings), settings, reference, None);
-    let image = apply_diorama_and_filter(image, settings, reference as f32, None);
+    let image = apply_diorama_and_filter(image, settings, None);
     let mut image = image;
     adjust::vignette(&mut image, settings.vignette);
     adjust::aging(&mut image, settings.aging);
@@ -174,7 +180,8 @@ pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, t
     // シャープの半径の下限は保存時の写真に対するものなので、保存する写真の短辺も渡す
     let output = saved_photo_short_side(image.dimensions(), settings, factor);
     let adjusted = apply_detail(apply_basic_adjustments(image, settings), settings, reference, output);
-    let mut rendered = apply_diorama_and_filter(adjusted, settings, reference as f32, rect);
+    // ジオラマの帯は写真（実際に切り抜く範囲）に対する位置に置き、全体表示では外側にも続ける
+    let mut rendered = apply_diorama_and_filter(adjusted, settings, rect);
     if trimmed {
         if let Some(r) = rect.take() {
             rendered = transform::crop(&rendered, r);
@@ -193,6 +200,43 @@ pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, t
     adjust::aging(&mut rendered, settings.aging);
     draw_text(&mut rendered, &settings.text, rect);
     rendered
+}
+
+/// プレビューに重ねる、ジオラマのピントの帯のガイドの線。
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DioramaGuide {
+    /// 横の帯なら true（線は横に引く）
+    pub horizontal: bool,
+    /// 線の位置（表示している画像の高さ（縦の帯なら幅）に対する割合）と、実線かどうか。
+    /// 実線はくっきり残す範囲の端、破線はぼけきる位置。写真の範囲の外にも続ける
+    pub lines: Vec<(f64, bool)>,
+}
+
+/// 全体表示のプレビューに重ねるジオラマのガイド。帯の位置は、実際に切り抜く範囲（なければ全体）に対する。
+///
+/// preview_size は回転・反転する前のプレビューの大きさ、factor は原寸に対する縮小率。
+pub fn diorama_guide(preview_size: (u32, u32), settings: &EditSettings, factor: f64) -> DioramaGuide {
+    let size = settings.orientation.size(preview_size);
+    let scaled = scale_settings(settings, factor);
+    let area = effective_crop(size, scaled.crop).unwrap_or(CropRect::whole(size));
+    let horizontal = settings.diorama_direction == DioramaDirection::Horizontal;
+    let (start, length, total) = if horizontal {
+        (area.y as f64, area.height as f64, f64::from(size.1))
+    } else {
+        (area.x as f64, area.width as f64, f64::from(size.0))
+    };
+    let band = diorama::diorama_band(&settings.diorama());
+    let at = |fraction: f64| (start + fraction * length) / total;
+    DioramaGuide {
+        horizontal,
+        lines: vec![
+            (at(band.blur_start), false),
+            (at(band.sharp_start), true),
+            (at(band.sharp_end), true),
+            (at(band.blur_end), false),
+        ],
+    }
 }
 
 /// 画像を処理せずに、apply_edits の出力の大きさを求める。
@@ -316,11 +360,11 @@ fn apply_detail(
 fn apply_diorama_and_filter(
     mut image: RgbaImage,
     settings: &EditSettings,
-    reference: f32,
     area: Option<CropRect>,
 ) -> RgbaImage {
     if settings.diorama_blur > 0 {
-        image = effects::diorama(&image, settings.diorama(), reference, area);
+        // ぼかしの半径の基準は写真の範囲（なければ画像全体）の短辺
+        image = diorama::diorama(&image, &settings.diorama(), area, None);
     }
     // テイストのぼかしの半径は、旧版と同じく画像そのもの（プレビューでは表示している全体）の短辺に比例させる
     filters::apply_filter(&mut image, settings.filter);
@@ -421,6 +465,31 @@ mod tests {
         let (preview, factor) = make_preview(&image, 60);
         assert_eq!(preview.dimensions(), (60, 40));
         assert_eq!(factor, 0.5);
+    }
+
+    #[test]
+    fn diorama_guide_follows_crop() {
+        // 原寸 400×200 を 0.5 倍にしたプレビュー（200×100）。範囲は原寸で y = 40〜120
+        let settings = EditSettings {
+            diorama_position: 50,
+            diorama_width: 20,
+            crop: Some(CropRect::new(0, 40, 400, 80)),
+            ..EditSettings::default()
+        };
+        let guide = diorama_guide((200, 100), &settings, 0.5);
+        assert!(guide.horizontal);
+        let solid: Vec<f64> = guide.lines.iter().filter(|l| l.1).map(|l| l.0).collect();
+        // 範囲（プレビューで y = 20〜60）の 40%〜60% → y = 36〜44 → 高さ 100 に対して 0.36〜0.44
+        assert!((solid[0] - 0.36).abs() < 1e-9 && (solid[1] - 0.44).abs() < 1e-9, "{solid:?}");
+        // 縦の帯・90° 回転: 幅は回転後のもの
+        let vertical = EditSettings {
+            diorama_direction: DioramaDirection::Vertical,
+            orientation: Orientation::new(90, false),
+            ..EditSettings::default()
+        };
+        let guide = diorama_guide((200, 100), &vertical, 1.0);
+        assert!(!guide.horizontal);
+        assert!((guide.lines[1].0 - 0.4).abs() < 1e-9);
     }
 
     #[test]

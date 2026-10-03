@@ -10,7 +10,7 @@ import { Panel } from "./panel";
 import { Preview } from "./preview";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
-import { defaultSettings, type EditSettings, type FilterType, type OpenInfo } from "./types";
+import { defaultSettings, type DioramaGuide, type EditSettings, type FilterType, type OpenInfo } from "./types";
 
 const NO_IMAGE_MESSAGE = "画像が読み込まれていません";
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
@@ -22,6 +22,9 @@ const stage = $<HTMLElement>("stage");
 const placeholder = $<HTMLElement>("placeholder");
 const status = $<HTMLElement>("status");
 const saveButton = $<HTMLButtonElement>("save");
+const canvas = $<HTMLCanvasElement>("canvas");
+const guide = document.getElementById("guide") as unknown as SVGSVGElement;
+const SVG = "http://www.w3.org/2000/svg";
 
 const settings: EditSettings = defaultSettings();
 let notes: string[] = [];
@@ -32,7 +35,7 @@ let extensions: string[] = [];
 let savableExtensions: string[] = [];
 let formatsText = "";
 
-const preview = new Preview(stage, $<HTMLCanvasElement>("canvas"), (error) => showError("プレビューを更新できません", error));
+const preview = new Preview(stage, canvas, (error) => showError("プレビューを更新できません", error));
 const tabs = new Tabs(document.querySelector(".side")!);
 let panel: Panel;
 const saveOptions = new SaveOptionsPanel(
@@ -47,6 +50,34 @@ function settingsChanged() {
   if (!loaded) return;
   preview.request(settings);
   void updateStatus();
+  void updateGuide();
+}
+
+/** 「ジオラマ」タブを開いている間、プレビューにピントの帯のガイドを重ねる（ぼかしが 0 でも出す）。 */
+async function updateGuide() {
+  if (!loaded || tabs.selected() !== "diorama") {
+    guide.toggleAttribute("hidden", true);
+    return;
+  }
+  const result = await invoke<DioramaGuide>("diorama_guide", { settings });
+  const { width, height } = canvas;
+  guide.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  guide.replaceChildren();
+  for (const [fraction, solid] of result.lines) {
+    const position = fraction * (result.horizontal ? height : width);
+    // 影を下に描いてから線を描く（実線: くっきり残す範囲の端、破線: ぼけきる位置）
+    for (const kind of ["shadow", "line"]) {
+      const line = document.createElementNS(SVG, "line");
+      const [x1, y1, x2, y2] = result.horizontal ? [0, position, width, position] : [position, 0, position, height];
+      line.setAttribute("x1", String(x1));
+      line.setAttribute("y1", String(y1));
+      line.setAttribute("x2", String(x2));
+      line.setAttribute("y2", String(y2));
+      line.setAttribute("class", solid ? kind : `${kind} dashed`);
+      guide.append(line);
+    }
+  }
+  guide.toggleAttribute("hidden", false);
 }
 
 function extensionOf(path: string): string {
@@ -178,6 +209,7 @@ function showLoaded(info: OpenInfo, openNotes: string[]) {
   notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
   void updateStatus();
   preview.request(settings);
+  void updateGuide();
 }
 
 /** ドロップ: 対応形式のときだけハイライトし、受け付ける（旧版 FR-UI-02）。 */
@@ -203,6 +235,7 @@ async function setup() {
   panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, settingsChanged);
   saveButton.addEventListener("click", () => void saveDialog());
   tabs.setEnabled("exif", false);
+  tabs.onSelect = () => void updateGuide();
   setupDrop();
   await listen<string>("menu", (event) => {
     if (event.payload === "open") void openDialog();

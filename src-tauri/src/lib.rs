@@ -260,6 +260,17 @@ async fn save_image(
     Ok(name)
 }
 
+/// 全体表示のプレビューに重ねる、ジオラマのピントの帯のガイドの線。
+#[tauri::command]
+fn diorama_guide(
+    settings: EditSettings,
+    state: State<'_, AppState>,
+) -> Result<pipeline::DioramaGuide, String> {
+    let loaded = state.0.lock().map_err(|e| e.to_string())?;
+    let preview = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
+    Ok(pipeline::diorama_guide(preview.dimensions(), &settings, loaded.factor))
+}
+
 /// 設定をかけたときの出力の大きさ（ステータスバーに出す）。大きさの指定が範囲外ならエラー。
 #[tauri::command]
 fn output_size(settings: EditSettings, state: State<'_, AppState>) -> Result<(u32, u32), String> {
@@ -319,6 +330,7 @@ pub fn run() {
             filter_types,
             render_preview,
             output_size,
+            diorama_guide,
             default_save_path,
             save_image,
             open::take_pending_paths,

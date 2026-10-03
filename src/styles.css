@@ -104,7 +104,46 @@ button:disabled {
   color: var(--accent);
 }
 
-/* 大きさは main.ts でエリアに収まるよう決める */
+/* 大きさは main.ts でエリアに収まるよう決める（ガイドはプレビューにぴったり重ねる） */
+.frame {
+  position: relative;
+  line-height: 0;
+}
+
+.guide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.guide line {
+  vector-effect: non-scaling-stroke;
+}
+
+.guide .shadow {
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 3;
+}
+
+.guide .line {
+  /* 旧版と同じ色（明るい写真でも暗い写真でも見えるよう、影を付ける） */
+  stroke: rgb(255, 204, 0);
+  stroke-width: 1.5;
+}
+
+.guide .dashed {
+  stroke-dasharray: 6 4;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .preview.transparent {
   /* 透過部分は市松模様（白と薄い灰色、1 マス 8px）の上に重ねる */
   background-color: #ffffff;
@@ -170,6 +209,10 @@ button:disabled {
 
 .row input[type="range"] {
   width: 100%;
+}
+
+.row select {
+  grid-column: 2 / 4;
 }
 
 .row output {

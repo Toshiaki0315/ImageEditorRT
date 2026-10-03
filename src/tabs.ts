@@ -8,6 +8,9 @@ const DEFAULT_TAB: TabName = "adjust";
 export class Tabs {
   private readonly buttons: HTMLButtonElement[];
   private remembered: TabName;
+  private current: TabName = DEFAULT_TAB;
+  /** 開いているタブが変わったときに呼ぶ */
+  onSelect: (name: TabName) => void = () => {};
 
   constructor(root: HTMLElement) {
     this.buttons = [...root.querySelectorAll<HTMLButtonElement>(".tab")];
@@ -32,13 +35,21 @@ export class Tabs {
     }
   }
 
+  /** 開いているタブ。 */
+  selected(): TabName {
+    return this.current;
+  }
+
   private select(name: TabName) {
     if (this.button(name).disabled) name = DEFAULT_TAB;
+    const changed = name !== this.current;
+    this.current = name;
     for (const button of this.buttons) {
       const selected = button.dataset.tab === name;
       button.setAttribute("aria-selected", String(selected));
       document.getElementById(`page-${button.dataset.tab}`)!.hidden = !selected;
     }
+    if (changed) this.onSelect(name);
   }
 
   private button(name: TabName): HTMLButtonElement {

@@ -49,7 +49,8 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     blur.rs               # ガウスぼかし・アンシャープマスク（Pillow と画素まで同じ）
     pillow.rs             # 旧版が使っていた Pillow の処理（ImageEnhance・blend・screen など）を同じ丸め方で
     filters.rs            # テイスト（フィルター 23 種）
-    effects.rs            # ぼかしを使う加工（ディテール・ジオラマ）
+    effects.rs            # ディテール（シャープ・ぼかし・ノイズ除去）
+    diorama.rs            # ジオラマ風（ミニチュア風・ティルトシフト）
     sample.rs             # 計測用の画像
     pyrandom.rs           # Python の random.Random と同じ乱数（経年劣化の粒子を旧版とそろえる）
     text.rs               # 文字・透かし（ヒラギノなどを ab_glyph で描く）

@@ -11,7 +11,11 @@
     <main class="layout">
       <section id="stage" class="stage">
         <div id="placeholder" class="placeholder">ここに画像をドロップしてください</div>
-        <canvas id="canvas" class="preview" hidden></canvas>
+        <div class="frame">
+          <canvas id="canvas" class="preview" hidden></canvas>
+          <!-- ジオラマのピントの帯のガイド（「ジオラマ」タブを開いている間だけ） -->
+          <svg id="guide" class="guide" hidden preserveAspectRatio="none" viewBox="0 0 1 1"></svg>
+        </div>
       </section>
       <aside class="side">
         <nav class="tabs" role="tablist">

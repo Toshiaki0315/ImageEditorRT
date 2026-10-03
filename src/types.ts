@@ -51,6 +51,7 @@ export type EditSettings = {
   blur: number;
   denoise: number;
   dioramaBlur: number;
+  dioramaDirection: "horizontal" | "vertical";
   dioramaPosition: number;
   dioramaWidth: number;
   dioramaVivid: number;
@@ -77,6 +78,7 @@ export function defaultSettings(): EditSettings {
     blur: 0,
     denoise: 0,
     dioramaBlur: 0,
+    dioramaDirection: "horizontal",
     dioramaPosition: 50,
     dioramaWidth: 20,
     dioramaVivid: 30,
@@ -106,3 +108,6 @@ export type OpenInfo = {
   resizeMs: number;
   exif: ExifInfo;
 };
+
+/** Rust の pipeline::DioramaGuide（線の位置は表示している画像に対する割合、と実線かどうか）。 */
+export type DioramaGuide = { horizontal: boolean; lines: [number, boolean][] };

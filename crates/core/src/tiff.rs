@@ -427,3 +427,140 @@ pub fn insert_exif_into_jpeg(jpeg: &[u8], exif: &[u8]) -> Option<Vec<u8>> {
     out.extend_from_slice(jpeg.get(i..)?);
     Some(out)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// order のバイト順で IFD を 1 つ持つ TIFF を作る（entries は (タグ, 型, 個数, 値の 4 バイト)）。
+    fn tiff_with_ifd(order: Order, count: u16, entries: &[(u16, u16, u32, [u8; 4])]) -> Vec<u8> {
+        let mut data = order.mark().to_vec();
+        data.extend_from_slice(&order.put_u16(42));
+        data.extend_from_slice(&order.put_u32(8));
+        data.extend_from_slice(&order.put_u16(count));
+        for &(tag, kind, n, raw) in entries {
+            data.extend_from_slice(&order.put_u16(tag));
+            data.extend_from_slice(&order.put_u16(kind));
+            data.extend_from_slice(&order.put_u32(n));
+            data.extend_from_slice(&raw);
+        }
+        data.extend_from_slice(&order.put_u32(0));
+        data
+    }
+
+    #[test]
+    fn finds_the_tiff_block() {
+        let tiff = tiff_with_ifd(Order::Little, 0, &[]);
+        assert_eq!(tiff_block(&tiff), Some(&tiff[..]));
+        let with_header = [EXIF_HEADER, &tiff[..]].concat();
+        assert_eq!(tiff_block(&with_header), Some(&tiff[..]));
+        assert_eq!(tiff_block(b"II*\0"), None); // 短すぎる
+        assert_eq!(tiff_block(b"XX*\0\x08\0\0\0"), None); // バイト順の印が違う
+    }
+
+    #[test]
+    fn reads_ifds_in_both_byte_orders() {
+        for order in [Order::Little, Order::Big] {
+            let mut raw = [0u8; 4];
+            raw[..2].copy_from_slice(&order.put_u16(6));
+            let tiff = tiff_with_ifd(order, 1, &[(TAG_ORIENTATION, SHORT, 1, raw)]);
+            let entries = read_ifd(&tiff, 8, order).unwrap();
+            assert_eq!((entries[0].tag, entries[0].kind, entries[0].count), (TAG_ORIENTATION, SHORT, 1));
+            assert_eq!(order.u16(entries[0].value(&tiff, order, 0).unwrap()), 6);
+        }
+    }
+
+    #[test]
+    fn rejects_broken_ifds() {
+        let order = Order::Little;
+        let good = (TAG_ORIENTATION, SHORT, 1, [1, 0, 0, 0]);
+        // 個数が 0・多すぎる・データの外まで続く
+        assert_eq!(read_ifd(&tiff_with_ifd(order, 0, &[]), 8, order), None);
+        assert_eq!(read_ifd(&tiff_with_ifd(order, MAX_IFD_ENTRIES + 1, &[good]), 8, order), None);
+        assert_eq!(read_ifd(&tiff_with_ifd(order, 5, &[good]), 8, order), None);
+        // IFD の位置がデータの外
+        assert_eq!(read_ifd(&tiff_with_ifd(order, 1, &[good]), 10_000, order), None);
+        // 最初の項目から型が変なら IFD ではない。2 つ目からの変な型は読み飛ばす
+        assert_eq!(read_ifd(&tiff_with_ifd(order, 1, &[(1, 99, 1, [0; 4])]), 8, order), None);
+        let entries = read_ifd(&tiff_with_ifd(order, 2, &[good, (2, 99, 1, [0; 4])]), 8, order).unwrap();
+        assert_eq!(entries.len(), 1);
+    }
+
+    #[test]
+    fn values_outside_the_data_are_none() {
+        let order = Order::Little;
+        let entry = IfdEntry { tag: 1, kind: LONG, count: 4, raw: order.put_u32(100) };
+        assert_eq!(entry.value(&[0u8; 50], order, 0), None);
+        assert_eq!(entry.value(&[7u8; 200], order, 0), Some(&[7u8; 16][..]));
+        // 基準をずらして読む（MakerNote の先頭が基準の形式など）
+        assert_eq!(entry.value(&[7u8; 200], order, 90), None);
+        // 個数がとても大きくても、あふれずに None
+        let huge = IfdEntry { tag: 1, kind: 12, count: u32::MAX, raw: [0; 4] };
+        assert_eq!(huge.value(&[0u8; 8], order, 0), None);
+    }
+
+    #[test]
+    fn writes_and_reads_back_with_the_maker_note_in_place() {
+        for order in [Order::Little, Order::Big] {
+            let mut block = ExifBlock::empty(order);
+            block.set_short(false, TAG_ORIENTATION, 1);
+            block.set_long(true, TAG_PIXEL_X, 4000);
+            block.ifd0.insert(0x010F, Value { kind: 2, count: 6, data: b"Canon\0".to_vec() });
+            let note = (0..40u8).collect::<Vec<_>>();
+            block.maker_note = Some((100, note.clone()));
+            let bytes = block.to_bytes(true);
+            let back = ExifBlock::parse(&bytes).unwrap();
+            assert_eq!(back.order, order);
+            assert_eq!(back.ifd0, block.ifd0);
+            assert_eq!(back.exif, block.exif);
+            // MakerNote は元と同じ位置（中の値の位置がずれない）。IFD はその後ろから
+            assert_eq!(back.maker_note, Some((100, note)));
+            let tiff = tiff_block(&bytes).unwrap();
+            assert!(order.u32(&tiff[4..8]) >= 140);
+            // MakerNote を残さないときは、Exif IFD に MakerNote の項目を書かない
+            let without = ExifBlock::parse(&block.to_bytes(false)).unwrap();
+            assert_eq!((without.maker_note, without.exif), (None, block.exif.clone()));
+        }
+    }
+
+    #[test]
+    fn inserts_exif_into_jpeg_replacing_the_old_one() {
+        let exif = ExifBlock::empty(Order::Big).to_bytes(false);
+        // SOI・APP0（JFIF）・古い APP1（Exif）・残り
+        let mut jpeg = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x04, 0xAA, 0xBB];
+        let old = [b"Exif\0\0".as_slice(), b"old"].concat();
+        jpeg.extend_from_slice(&[0xFF, 0xE1]);
+        jpeg.extend_from_slice(&((old.len() + 2) as u16).to_be_bytes());
+        jpeg.extend_from_slice(&old);
+        jpeg.extend_from_slice(&[0xFF, 0xDB, 0x01, 0x02]);
+        let out = insert_exif_into_jpeg(&jpeg, &exif).unwrap();
+        assert_eq!(&out[..4], &[0xFF, 0xD8, 0xFF, 0xE1]);
+        assert_eq!(&out[6..6 + exif.len()], &exif[..]);
+        let rest = &out[6 + exif.len()..];
+        assert_eq!(rest, &[0xFF, 0xE0, 0x00, 0x04, 0xAA, 0xBB, 0xFF, 0xDB, 0x01, 0x02]); // 古い Exif は消える
+        assert_eq!(insert_exif_into_jpeg(b"not a jpeg", &exif), None);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn writes_uncompressed_tiff_images() {
+        // 不透明な画素で比べる（半透明は読み込み側〔ImageIO〕がアルファを掛けて戻すので、少しずれる）
+        let pixels: Vec<u8> = (0..2 * 3 * 4).map(|i| if i % 4 == 3 { 255 } else { (i * 10) as u8 }).collect();
+        let mut block = ExifBlock::empty(Order::Little);
+        block.set_short(false, TAG_ORIENTATION, 1);
+        let tiff = block.to_tiff_image(2, 3, 4, &pixels);
+        let decoded = crate::decode::decode_file(&tiff).unwrap();
+        assert_eq!(decoded.image.dimensions(), (2, 3));
+        assert_eq!(decoded.image.as_raw(), &pixels);
+        // アルファは残る（RGBA のまま書く）
+        let translucent: Vec<u8> =
+            pixels.iter().enumerate().map(|(i, &v)| if i % 4 == 3 { 100 } else { v }).collect();
+        let decoded = crate::decode::decode_file(&block.to_tiff_image(2, 3, 4, &translucent)).unwrap();
+        assert!(decoded.image.pixels().all(|p| p[3] == 100));
+        // RGB（3 チャンネル）でも書ける
+        let rgb: Vec<u8> = (0..2 * 3 * 3).map(|i| (i * 9) as u8).collect();
+        let decoded = crate::decode::decode_file(&block.to_tiff_image(2, 3, 3, &rgb)).unwrap();
+        let back: Vec<u8> = decoded.image.pixels().flat_map(|p| [p[0], p[1], p[2]]).collect();
+        assert_eq!(back, rgb);
+    }
+}

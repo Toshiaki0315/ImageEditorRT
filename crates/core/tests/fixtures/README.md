@@ -17,3 +17,4 @@
 | `filters/*` | テイスト（フィルター 23 種）の期待値。旧版の `core/filters.py` で作ったもの（`filters/make.py`）。画素まで一致することを確かめる |
 | `detail/*` | ディテール（シャープ・ぼかし・ノイズ除去）と、保存・縮小プレビューの流れの期待値。旧版の `core/effects.py`・`core/pipeline.py` で作ったもの（`detail/make.py`）。画素まで一致することを確かめる |
 | `diorama/*` | ジオラマ風の期待値（横・縦の帯、写真の範囲あり・なし、保存とプレビューの流れ）。旧版の `core/diorama.py`・`core/pipeline.py` で作ったもの（`diorama/make.py`）。画素まで一致することを確かめる |
+| `frame/*` | フレーム・形の期待値（マスク・切り抜き・余白・実際に切り抜く範囲・保存とプレビューの流れ）。旧版の `core/frames.py`・`core/shapes.py`・`core/pipeline.py` で作ったもの（`frame/make.py`）。画素まで一致することを確かめる |

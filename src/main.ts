@@ -17,7 +17,9 @@ import {
   type DioramaGuide,
   type EditSettings,
   type FilterType,
+  type FrameKind,
   type OpenInfo,
+  type ShapeType,
 } from "./types";
 
 const NO_IMAGE_MESSAGE = "画像が読み込まれていません";
@@ -245,7 +247,8 @@ async function setup() {
   const filters = await invoke<[FilterType, string][]>("filter_types");
   panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, settingsChanged);
   const ratios = await invoke<[AspectRatio, string][]>("aspect_ratios");
-  crop = new CropController(settings, canvas, ratios, settingsChanged, (trimmed) => {
+  const [frames, shapes] = await invoke<[[FrameKind, string][], [ShapeType, string][]]>("frame_shape_types");
+  crop = new CropController(settings, canvas, ratios, frames, shapes, settingsChanged, (trimmed) => {
     preview.trimmed = trimmed;
     settingsChanged();
   });

@@ -14,9 +14,11 @@ use imageeditorrt_core::decode::{self, DecodeError};
 use imageeditorrt_core::exif_info::{raw_exif, read_exif_info, ExifInfo};
 use imageeditorrt_core::filters::FilterType;
 use imageeditorrt_core::formats::{self, Format};
+use imageeditorrt_core::frames::FrameType;
 use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
 use imageeditorrt_core::sample;
 use imageeditorrt_core::save::{self, SaveError, SaveOptions, SAME_FILE_MESSAGE};
+use imageeditorrt_core::shapes::ShapeType;
 use imageeditorrt_core::transform::{AspectRatio, CropRect, OrientOp, Orientation};
 use serde::Serialize;
 use tauri::ipc::Response;
@@ -276,6 +278,25 @@ fn diorama_guide(
     Ok(pipeline::diorama_guide(preview.dimensions(), &settings, loaded.factor))
 }
 
+/// 画面のプルダウンの選択肢（JSON の名前と表示名）。
+type Choices<T> = Vec<(T, &'static str)>;
+
+/// フレームと形の選択肢。
+#[tauri::command]
+fn frame_shape_types() -> (Choices<FrameType>, Choices<ShapeType>) {
+    (
+        FrameType::ALL.iter().map(|&f| (f, f.label())).collect(),
+        ShapeType::ALL.iter().map(|&s| (s, s.label())).collect(),
+    )
+}
+
+/// 実際に切り抜く範囲（フレーム・円の比に合わせた範囲。回転・反転した後の原寸画像の座標）。
+/// 切り抜かないなら None。画面で形の輪郭を重ねるのに使う。
+#[tauri::command]
+fn effective_crop(settings: EditSettings, size: (u32, u32)) -> Option<CropRect> {
+    pipeline::effective_crop(size, settings.crop, settings.frame, settings.shape)
+}
+
 /// トリミングの比の選択肢（JSON の名前と表示名）。
 #[tauri::command]
 fn aspect_ratios() -> Vec<(AspectRatio, String)> {
@@ -380,6 +401,8 @@ pub fn run() {
             output_size,
             diorama_guide,
             aspect_ratios,
+            frame_shape_types,
+            effective_crop,
             crop_drag,
             crop_spin,
             crop_fit,

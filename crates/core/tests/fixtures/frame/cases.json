@@ -1,0 +1,573 @@
+{
+ "masks": [
+  {
+   "size": [
+    90,
+    60
+   ],
+   "shape": "rounded",
+   "radius": 10,
+   "file": "mask_rounded_90x60_10.png"
+  },
+  {
+   "size": [
+    90,
+    60
+   ],
+   "shape": "rounded",
+   "radius": 50,
+   "file": "mask_rounded_90x60_50.png"
+  },
+  {
+   "size": [
+    90,
+    60
+   ],
+   "shape": "rounded",
+   "radius": 0,
+   "file": null
+  },
+  {
+   "size": [
+    90,
+    60
+   ],
+   "shape": "circle",
+   "radius": 10,
+   "file": "mask_circle_90x60_10.png"
+  },
+  {
+   "size": [
+    51,
+    80
+   ],
+   "shape": "circle",
+   "radius": 10,
+   "file": "mask_circle_51x80_10.png"
+  },
+  {
+   "size": [
+    33,
+    33
+   ],
+   "shape": "rounded",
+   "radius": 23,
+   "file": "mask_rounded_33x33_23.png"
+  },
+  {
+   "size": [
+    200,
+    7
+   ],
+   "shape": "rounded",
+   "radius": 40,
+   "file": "mask_rounded_200x7_40.png"
+  },
+  {
+   "size": [
+    9,
+    9
+   ],
+   "shape": "circle",
+   "radius": 0,
+   "file": "mask_circle_9x9_0.png"
+  }
+ ],
+ "images": [
+  "shape_rounded_clear.png",
+  "shape_circle_fill.png",
+  "shape_rounded_fill_opaque.png",
+  "frame_polaroid.png",
+  "frame_instax_tall.png",
+  "frame_instax_wide.png"
+ ],
+ "margins": [
+  {
+   "frame": "polaroid",
+   "size": [
+    90,
+    60
+   ],
+   "margins": [
+    3,
+    5,
+    3,
+    17
+   ],
+   "aspect": [
+    79,
+    79
+   ],
+   "framed": [
+    96,
+    82
+   ],
+   "margin_box": [
+    3,
+    65,
+    93,
+    82
+   ]
+  },
+  {
+   "frame": "polaroid",
+   "size": [
+    50,
+    80
+   ],
+   "margins": [
+    3,
+    4,
+    3,
+    14
+   ],
+   "aspect": [
+    79,
+    79
+   ],
+   "framed": [
+    56,
+    98
+   ],
+   "margin_box": [
+    3,
+    84,
+    53,
+    98
+   ]
+  },
+  {
+   "frame": "polaroid",
+   "size": [
+    79,
+    79
+   ],
+   "margins": [
+    5,
+    6,
+    5,
+    22
+   ],
+   "aspect": [
+    79,
+    79
+   ],
+   "framed": [
+    89,
+    107
+   ],
+   "margin_box": [
+    5,
+    85,
+    84,
+    107
+   ]
+  },
+  {
+   "frame": "polaroid",
+   "size": [
+    1,
+    1
+   ],
+   "margins": [
+    1,
+    1,
+    1,
+    1
+   ],
+   "aspect": [
+    79,
+    79
+   ],
+   "framed": [
+    3,
+    3
+   ],
+   "margin_box": [
+    1,
+    2,
+    2,
+    3
+   ]
+  },
+  {
+   "frame": "polaroid",
+   "size": [
+    4000,
+    3000
+   ],
+   "margins": [
+    171,
+    228,
+    171,
+    835
+   ],
+   "aspect": [
+    79,
+    79
+   ],
+   "framed": [
+    4342,
+    4063
+   ],
+   "margin_box": [
+    171,
+    3228,
+    4171,
+    4063
+   ]
+  },
+  {
+   "frame": "polaroid",
+   "size": [
+    3000,
+    4000
+   ],
+   "margins": [
+    171,
+    228,
+    171,
+    835
+   ],
+   "aspect": [
+    79,
+    79
+   ],
+   "framed": [
+    3342,
+    5063
+   ],
+   "margin_box": [
+    171,
+    4228,
+    3171,
+    5063
+   ]
+  },
+  {
+   "frame": "instax_mini",
+   "size": [
+    90,
+    60
+   ],
+   "margins": [
+    8,
+    5,
+    23,
+    5
+   ],
+   "aspect": [
+    62,
+    46
+   ],
+   "framed": [
+    121,
+    70
+   ],
+   "margin_box": [
+    98,
+    5,
+    121,
+    65
+   ]
+  },
+  {
+   "frame": "instax_mini",
+   "size": [
+    50,
+    80
+   ],
+   "margins": [
+    4,
+    7,
+    4,
+    19
+   ],
+   "aspect": [
+    46,
+    62
+   ],
+   "framed": [
+    58,
+    106
+   ],
+   "margin_box": [
+    4,
+    87,
+    54,
+    106
+   ]
+  },
+  {
+   "frame": "instax_mini",
+   "size": [
+    79,
+    79
+   ],
+   "margins": [
+    5,
+    8,
+    5,
+    22
+   ],
+   "aspect": [
+    46,
+    62
+   ],
+   "framed": [
+    89,
+    109
+   ],
+   "margin_box": [
+    5,
+    87,
+    84,
+    109
+   ]
+  },
+  {
+   "frame": "instax_mini",
+   "size": [
+    1,
+    1
+   ],
+   "margins": [
+    1,
+    1,
+    1,
+    1
+   ],
+   "aspect": [
+    46,
+    62
+   ],
+   "framed": [
+    3,
+    3
+   ],
+   "margin_box": [
+    1,
+    2,
+    2,
+    3
+   ]
+  },
+  {
+   "frame": "instax_mini",
+   "size": [
+    4000,
+    3000
+   ],
+   "margins": [
+    419,
+    258,
+    1129,
+    258
+   ],
+   "aspect": [
+    62,
+    46
+   ],
+   "framed": [
+    5548,
+    3516
+   ],
+   "margin_box": [
+    4419,
+    258,
+    5548,
+    3258
+   ]
+  },
+  {
+   "frame": "instax_mini",
+   "size": [
+    3000,
+    4000
+   ],
+   "margins": [
+    258,
+    419,
+    258,
+    1129
+   ],
+   "aspect": [
+    46,
+    62
+   ],
+   "framed": [
+    3516,
+    5548
+   ],
+   "margin_box": [
+    258,
+    4419,
+    3258,
+    5548
+   ]
+  }
+ ],
+ "crops": [
+  {
+   "size": [
+    400,
+    300
+   ],
+   "crop": null,
+   "frame": "polaroid",
+   "shape": "rectangle",
+   "result": [
+    50,
+    0,
+    300,
+    300
+   ]
+  },
+  {
+   "size": [
+    400,
+    300
+   ],
+   "crop": [
+    10,
+    20,
+    200,
+    100
+   ],
+   "frame": "instax_mini",
+   "shape": "rectangle",
+   "result": [
+    42,
+    20,
+    135,
+    100
+   ]
+  },
+  {
+   "size": [
+    300,
+    400
+   ],
+   "crop": null,
+   "frame": "instax_mini",
+   "shape": "rectangle",
+   "result": [
+    1,
+    0,
+    297,
+    400
+   ]
+  },
+  {
+   "size": [
+    400,
+    300
+   ],
+   "crop": null,
+   "frame": "none",
+   "shape": "circle",
+   "result": [
+    50,
+    0,
+    300,
+    300
+   ]
+  },
+  {
+   "size": [
+    400,
+    300
+   ],
+   "crop": [
+    0,
+    0,
+    100,
+    250
+   ],
+   "frame": "none",
+   "shape": "circle",
+   "result": [
+    0,
+    75,
+    100,
+    100
+   ]
+  },
+  {
+   "size": [
+    400,
+    300
+   ],
+   "crop": [
+    5,
+    5,
+    50,
+    40
+   ],
+   "frame": "none",
+   "shape": "rounded",
+   "result": [
+    5,
+    5,
+    50,
+    40
+   ]
+  }
+ ],
+ "flows": [
+  {
+   "frame": "polaroid",
+   "shape": "rounded",
+   "radius": 20,
+   "crop": [
+    5,
+    5,
+    70,
+    50
+   ],
+   "width": 60,
+   "output": [
+    66,
+    82
+   ]
+  },
+  {
+   "frame": "instax_mini",
+   "shape": "circle",
+   "radius": 10,
+   "crop": null,
+   "width": null,
+   "output": [
+    112,
+    70
+   ]
+  },
+  {
+   "frame": "none",
+   "shape": "circle",
+   "radius": 10,
+   "crop": [
+    10,
+    0,
+    70,
+    60
+   ],
+   "width": null,
+   "output": [
+    60,
+    60
+   ]
+  },
+  {
+   "frame": "none",
+   "shape": "rounded",
+   "radius": 35,
+   "crop": null,
+   "width": 45,
+   "output": [
+    45,
+    30
+   ]
+  }
+ ]
+}

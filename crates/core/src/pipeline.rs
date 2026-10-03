@@ -16,6 +16,10 @@ use crate::diorama::{self, DioramaSettings};
 use crate::effects;
 use crate::filters;
 pub use crate::filters::FilterType;
+pub use crate::frames::FrameType;
+use crate::frames::{self, FRAME_COLOR};
+use crate::shapes;
+pub use crate::shapes::ShapeType;
 use crate::text;
 use crate::transform::{self, round_half_even, CropRect, Orientation, SizeError};
 
@@ -79,6 +83,10 @@ pub struct EditSettings {
     pub diorama_width: u32,
     pub diorama_vivid: u32,
     pub text: TextSettings,
+    pub frame: FrameType,
+    pub shape: ShapeType,
+    /// 角丸の半径（短辺に対する % 0〜50）
+    pub corner_radius: u32,
 }
 
 impl Default for EditSettings {
@@ -106,6 +114,9 @@ impl Default for EditSettings {
             diorama_width: 20,
             diorama_vivid: 30,
             text: TextSettings::default(),
+            frame: FrameType::None,
+            shape: ShapeType::Rectangle,
+            corner_radius: shapes::CORNER_RADIUS_DEFAULT,
         }
     }
 }
@@ -146,7 +157,7 @@ impl EditSettings {
 /// 原画像に編集をかけた新しい画像を返す（原画像は変更しない）。保存に使う。
 pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<RgbaImage, SizeError> {
     let mut image = settings.orientation.transpose(original);
-    if let Some(rect) = effective_crop(image.dimensions(), settings.crop) {
+    if let Some(rect) = effective_crop(image.dimensions(), settings.crop, settings.frame, settings.shape) {
         image = transform::crop(&image, rect);
     }
     let size =
@@ -159,8 +170,19 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
     let mut image = image;
     adjust::vignette(&mut image, settings.vignette);
     adjust::aging(&mut image, settings.aging);
+    Ok(apply_shape_and_frame(image, settings))
+}
+
+/// 形で切り抜き、文字を描き、フレームを付ける（形の外側は、フレームがあればフレームの白、なければ透明）。
+/// 文字をフレームの余白に描くのは #15 で足す。
+fn apply_shape_and_frame(mut image: RgbaImage, settings: &EditSettings) -> RgbaImage {
+    let has_frame = settings.frame != FrameType::None;
+    if settings.shape != ShapeType::Rectangle {
+        let fill = has_frame.then_some(FRAME_COLOR);
+        image = shapes::apply_shape(&image, settings.shape, settings.corner_radius, fill);
+    }
     draw_text(&mut image, &settings.text, None);
-    Ok(image)
+    frames::add_frame(&image, settings.frame)
 }
 
 /// プレビュー表示用の画像を返す（入力画像は変更しない）。
@@ -170,11 +192,11 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
 ///
 /// - trimmed = false: 元の画角全体を表示する。周辺減光はトリミング範囲を基準にその中だけにかけ、
 ///   文字もトリミング範囲に描く（範囲はいつでも選び直せる）
-/// - trimmed = true: 切り抜いた範囲だけを表示する（範囲がなければ全体）
+/// - trimmed = true: 切り抜いた範囲だけを表示し、形とフレームも付けて完成形を見せる（範囲がなければ全体）
 pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, trimmed: bool) -> RgbaImage {
     let image = settings.orientation.transpose(image);
     let scaled = scale_settings(settings, factor);
-    let mut rect = effective_crop(image.dimensions(), scaled.crop);
+    let mut rect = effective_crop(image.dimensions(), scaled.crop, settings.frame, settings.shape);
     // ディテール・ジオラマの半径は、保存時と同じく実際に切り抜く範囲（なければ全体）の短辺を基準にする
     let reference = rect.map_or(f64::from(image.width().min(image.height())), |r| r.short_side() as f64);
     // シャープの半径の下限は保存時の写真に対するものなので、保存する写真の短辺も渡す
@@ -198,6 +220,10 @@ pub fn render_preview(image: &RgbaImage, settings: &EditSettings, factor: f64, t
     }
     // 経年劣化は画素ごとの色の変化と固定模様の粒子なので、表示範囲全体にかける
     adjust::aging(&mut rendered, settings.aging);
+    if trimmed {
+        return apply_shape_and_frame(rendered, settings);
+    }
+    // 全体表示ではフレーム・形は付けない（形は画面でマスクと輪郭を重ねて見せる）。文字は切り抜く範囲に描く
     draw_text(&mut rendered, &settings.text, rect);
     rendered
 }
@@ -219,7 +245,8 @@ pub struct DioramaGuide {
 pub fn diorama_guide(preview_size: (u32, u32), settings: &EditSettings, factor: f64) -> DioramaGuide {
     let size = settings.orientation.size(preview_size);
     let scaled = scale_settings(settings, factor);
-    let area = effective_crop(size, scaled.crop).unwrap_or(CropRect::whole(size));
+    let area =
+        effective_crop(size, scaled.crop, settings.frame, settings.shape).unwrap_or(CropRect::whole(size));
     let horizontal = settings.diorama_direction == DioramaDirection::Horizontal;
     let (start, length, total) = if horizontal {
         (area.y as f64, area.height as f64, f64::from(size.1))
@@ -242,17 +269,32 @@ pub fn diorama_guide(preview_size: (u32, u32), settings: &EditSettings, factor: 
 /// 画像を処理せずに、apply_edits の出力の大きさを求める。
 pub fn output_size(original_size: (u32, u32), settings: &EditSettings) -> Result<(u32, u32), SizeError> {
     let mut size = settings.orientation.size(original_size);
-    if let Some(rect) = effective_crop(size, settings.crop) {
+    if let Some(rect) = effective_crop(size, settings.crop, settings.frame, settings.shape) {
         size = (rect.width as u32, rect.height as u32);
     }
-    transform::fit_size(size, settings.width, settings.height, settings.keep_aspect)
+    let size = transform::fit_size(size, settings.width, settings.height, settings.keep_aspect)?;
+    Ok(frames::framed_size(size, settings.frame))
 }
 
 /// 実際に切り抜く範囲を返す（size の画像の座標）。切り抜かないなら None。
 ///
-/// トリミング範囲は画像内に収まるよう補正する。フレーム・円の比への切り抜きは #13 で足す。
-pub fn effective_crop(size: (u32, u32), crop: Option<CropRect>) -> Option<CropRect> {
-    transform::clamp_crop(crop?, size)
+/// トリミング範囲は画像内に収まるよう補正する。フレームがあるときは、トリミング範囲（なければ
+/// 画像全体）をフレームの写真部分の縦横比になるよう中央で切り抜く。フレームがなく形が円のときは、
+/// 中央を正方形に切り抜く（フレームがあるときの円は写真部分の中に描くので、写真部分の比のまま）。
+pub fn effective_crop(
+    size: (u32, u32),
+    crop: Option<CropRect>,
+    frame: FrameType,
+    shape: ShapeType,
+) -> Option<CropRect> {
+    let rect = crop.and_then(|c| transform::clamp_crop(c, size));
+    let base = rect.unwrap_or(CropRect::whole(size));
+    let base_size = (base.width as u32, base.height as u32);
+    let aspect = frames::window_aspect(frame, base_size).or_else(|| shapes::shape_aspect(shape));
+    match aspect {
+        Some(aspect) => Some(transform::fit_aspect(base, aspect)),
+        None => rect,
+    }
 }
 
 /// 縮小プレビュー用に、トリミング範囲と出力の大きさを factor 倍に換算した設定を返す。
@@ -328,7 +370,7 @@ fn saved_photo_short_side(preview_size: (u32, u32), settings: &EditSettings, fac
         round_half_even(f64::from(preview_size.1) / factor) as u32,
     );
     let mut size = original;
-    if let Some(rect) = effective_crop(original, settings.crop) {
+    if let Some(rect) = effective_crop(original, settings.crop, settings.frame, settings.shape) {
         size = (rect.width as u32, rect.height as u32);
     }
     let (width, height) =

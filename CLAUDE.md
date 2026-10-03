@@ -52,6 +52,8 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     filters.rs            # テイスト（フィルター 23 種）
     effects.rs            # ディテール（シャープ・ぼかし・ノイズ除去）
     diorama.rs            # ジオラマ風（ミニチュア風・ティルトシフト）
+    frames.rs             # フレーム（ポラロイド・チェキ）
+    shapes.rs             # 形（角丸・円）の切り抜き
     sample.rs             # 計測用の画像
     pyrandom.rs           # Python の random.Random と同じ乱数（経年劣化の粒子を旧版とそろえる）
     text.rs               # 文字・透かし（ヒラギノなどを ab_glyph で描く）

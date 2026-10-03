@@ -29,7 +29,14 @@
         </nav>
         <div id="page-adjust" class="page" role="tabpanel"></div>
         <div id="page-crop" class="page" role="tabpanel" hidden>
-          <p class="todo">フレーム・形は #13 で作ります</p>
+          <h2>フレーム・形</h2>
+          <label class="row">フレーム <select id="frame"></select></label>
+          <label class="row">形 <select id="shape"></select></label>
+          <label class="row">
+            角丸
+            <input id="corner-radius" type="range" min="0" max="50" step="1" title="ダブルクリックで 10% に戻す" />
+            <output id="corner-radius-value"></output>
+          </label>
           <h2>回転・反転</h2>
           <div class="buttons">
             <button type="button" data-orient="rotate_left">左に回転</button>

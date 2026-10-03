@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::frames::{window_aspect, FrameType};
+use crate::shapes::ShapeType;
 use crate::transform::{
     aspect_drag_rect, clamp_crop, constrain_rect, fit_aspect, oriented, round_half_even, transform_rect,
     AspectRatio, CropRect, OrientOp, Orientation, MIN_SIZE,
@@ -22,25 +24,45 @@ pub enum DragMode {
     Resize,
 }
 
-/// 範囲に保たせる縦横比の指定。
+/// 範囲に保たせる縦横比の指定（比のプルダウン・縦向き・フレーム・形）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AspectChoice {
     pub ratio: AspectRatio,
     /// 縦向き（4:3 などを 3:4 にする）
     pub portrait: bool,
+    #[serde(default)]
+    pub frame: FrameType,
+    #[serde(default)]
+    pub shape: ShapeType,
 }
 
 impl AspectChoice {
-    /// 縦横比 (幅, 高さ)。自由なら None。フレーム・円の比は #13 で足す。
-    pub fn aspect(self) -> Option<(f64, f64)> {
+    /// フレーム・円に合わせて比を固定しているか（比のプルダウンは選べない。旧版 FR-UI-36）。
+    pub fn locked(self) -> bool {
+        self.frame != FrameType::None || self.shape == ShapeType::Circle
+    }
+
+    /// size の範囲に保たせる縦横比 (幅, 高さ)。フレームがあれば写真部分の比（チェキは範囲の形に合わせて
+    /// 縦横どちらにもなる）、フレームなしの円は 1:1、それ以外は比のプルダウンの選択（自由なら None）。
+    pub fn aspect(self, size: (u32, u32)) -> Option<(f64, f64)> {
+        if self.frame != FrameType::None {
+            return window_aspect(self.frame, size);
+        }
+        if self.shape == ShapeType::Circle {
+            return Some((1.0, 1.0));
+        }
         self.ratio.ratio(self.portrait)
     }
 
-    /// 向き（横長・縦長）をドラッグの形に合わせるか（フレームの比のとき。#13 で使う）。
-    fn free_orientation(self) -> bool {
-        false
+    /// 向き（横長・縦長）をドラッグの形に合わせるか（写真部分が正方形でないフレームのとき）。
+    fn free_orientation(self, size: (u32, u32)) -> bool {
+        self.frame != FrameType::None && self.aspect(size).is_some_and(|(w, h)| w != h)
     }
+}
+
+fn size_of(rect: CropRect) -> (u32, u32) {
+    (rect.width.max(0) as u32, rect.height.max(0) as u32)
 }
 
 /// 2 点を対角とする範囲。
@@ -76,9 +98,11 @@ pub fn drag(
         let start = start?;
         return Some(move_rect(start, point.0 - anchor.0, point.1 - anchor.1, size));
     }
-    let Some(ratio) = aspect.aspect() else { return Some(rect_from_points(anchor, point)) };
+    // 比は今の範囲（新規なら画像全体）の形から決める
+    let range = start.map_or(size, size_of);
+    let Some(ratio) = aspect.aspect(range) else { return Some(rect_from_points(anchor, point)) };
     // 向きを自由にするときは、大きさの変更は元の範囲の向き、新規はドラッグの方向に合わせる
-    let ratio = if aspect.free_orientation() {
+    let ratio = if aspect.free_orientation(range) {
         let landscape = match (mode, start) {
             (DragMode::Resize, Some(start)) => start.width >= start.height,
             _ => (point.0 - anchor.0).abs() >= (point.1 - anchor.1).abs(),
@@ -116,7 +140,8 @@ pub fn spin_edit(
     size: (u32, u32),
 ) -> Option<CropRect> {
     let CropRect { mut x, mut y, mut width, mut height } = values;
-    if let Some((aw, ah)) = aspect.aspect() {
+    let range = previous.and_then(|p| clamp_crop(p, size)).map_or(size, size_of);
+    if let Some((aw, ah)) = aspect.aspect(range) {
         match field {
             SpinField::Width if width > 0 => {
                 height = round_half_even(width as f64 * ah / aw).max(i64::from(MIN_SIZE))
@@ -143,7 +168,7 @@ pub fn spin_edit(
 /// 比（または縦向き）を変えたとき: 範囲があれば、その中央を新しい比に直す。なければ何もしない。
 pub fn fit_to_aspect(rect: Option<CropRect>, aspect: AspectChoice, size: (u32, u32)) -> Option<CropRect> {
     let rect = clamp_crop(rect?, size)?;
-    Some(match aspect.aspect() {
+    Some(match aspect.aspect(size_of(rect)) {
         Some(ratio) => fit_aspect(rect, ratio),
         None => rect,
     })
@@ -174,9 +199,14 @@ pub fn orient(orientation: Orientation, op: OrientOp, crop: Option<CropRect>, si
 mod tests {
     use super::*;
 
-    const FREE: AspectChoice = AspectChoice { ratio: AspectRatio::Free, portrait: false };
-    const SQUARE: AspectChoice = AspectChoice { ratio: AspectRatio::Square, portrait: false };
-    const R4X3: AspectChoice = AspectChoice { ratio: AspectRatio::Ratio4x3, portrait: false };
+    const fn choice(ratio: AspectRatio) -> AspectChoice {
+        AspectChoice { ratio, portrait: false, frame: FrameType::None, shape: ShapeType::Rectangle }
+    }
+    const FREE: AspectChoice = choice(AspectRatio::Free);
+    const SQUARE: AspectChoice = choice(AspectRatio::Square);
+    const R4X3: AspectChoice = choice(AspectRatio::Ratio4x3);
+    const INSTAX: AspectChoice = AspectChoice { frame: FrameType::InstaxMini, ..FREE };
+    const CIRCLE: AspectChoice = AspectChoice { shape: ShapeType::Circle, ..FREE };
 
     #[test]
     fn new_drag_in_any_direction() {
@@ -240,6 +270,23 @@ mod tests {
         let rect = fit_to_aspect(Some(CropRect::new(0, 0, 100, 50)), SQUARE, (200, 200));
         assert_eq!(rect, Some(CropRect::new(25, 0, 50, 50)));
         assert_eq!(fit_to_aspect(None, SQUARE, (200, 200)), None);
+    }
+
+    #[test]
+    fn frame_and_circle_lock_the_aspect() {
+        assert!(INSTAX.locked() && CIRCLE.locked() && !R4X3.locked());
+        assert_eq!(CIRCLE.aspect((300, 100)), Some((1.0, 1.0)));
+        // チェキの写真部分は 46:62。横長の範囲なら 62:46
+        assert_eq!(INSTAX.aspect((100, 300)), Some((46.0, 62.0)));
+        assert_eq!(INSTAX.aspect((300, 100)), Some((62.0, 46.0)));
+        // 新規のドラッグは、ドラッグの方向で向きを決める
+        let wide = drag(DragMode::New, (0, 0), (200, 50), None, INSTAX, (400, 400)).unwrap();
+        assert!(wide.width > wide.height, "{wide:?}");
+        let tall = drag(DragMode::New, (0, 0), (50, 200), None, INSTAX, (400, 400)).unwrap();
+        assert!(tall.height > tall.width, "{tall:?}");
+        // 比を変えたとき（フレームを選んだとき）は範囲の中央を写真部分の比に直す
+        let fitted = fit_to_aspect(Some(CropRect::new(0, 0, 100, 300)), CIRCLE, (400, 400));
+        assert_eq!(fitted, Some(CropRect::new(0, 100, 100, 100)));
     }
 
     #[test]

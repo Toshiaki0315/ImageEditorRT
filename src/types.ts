@@ -56,7 +56,16 @@ export type EditSettings = {
   dioramaWidth: number;
   dioramaVivid: number;
   text: { text: string; size: number };
+  frame: FrameKind;
+  shape: ShapeType;
+  cornerRadius: number;
 };
+
+/** フレーム（Rust の frames::FrameType）。 */
+export type FrameKind = "none" | "polaroid" | "instax_mini";
+
+/** 写真の形（Rust の shapes::ShapeType）。 */
+export type ShapeType = "rectangle" | "rounded" | "circle";
 
 /** 既定の設定（Rust の EditSettings::default と同じ）。 */
 export function defaultSettings(): EditSettings {
@@ -83,6 +92,9 @@ export function defaultSettings(): EditSettings {
     dioramaWidth: 20,
     dioramaVivid: 30,
     text: { text: "", size: 5 },
+    frame: "none",
+    shape: "rectangle",
+    cornerRadius: 10,
   };
 }
 

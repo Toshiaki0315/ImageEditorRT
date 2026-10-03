@@ -174,11 +174,13 @@ fn filter_types() -> Vec<(FilterType, &'static str)> {
 async fn render_preview(
     settings: EditSettings,
     trimmed: bool,
+    comparing: bool,
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
     let (image, render_time) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let image = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
+        let settings = shown_settings(&loaded, settings, comparing);
         let start = Instant::now();
         (pipeline::render_preview_with_histogram(image, &settings, loaded.factor, trimmed), start.elapsed())
     };
@@ -193,6 +195,48 @@ async fn render_preview(
     body.extend_from_slice(&pixels);
     body.extend_from_slice(&histogram);
     Ok(Response::new(body))
+}
+
+/// 表示に使う設定。comparing（加工前の表示）なら、向きと切り抜く範囲だけを残す。
+fn shown_settings(loaded: &Loaded, settings: EditSettings, comparing: bool) -> EditSettings {
+    match (&loaded.original, comparing) {
+        (Some(original), true) => pipeline::before_settings(original.dimensions(), &settings),
+        _ => settings,
+    }
+}
+
+/// 100% 表示: 原寸で処理した保存結果（comparing なら加工前）を返す（処理は別のスレッド）。
+///
+/// 返すバイト列: 先頭 8 バイトが幅・高さ（u32 リトルエンディアン）、その後ろが RGBA の画素。
+#[tauri::command]
+async fn render_actual_size(
+    settings: EditSettings,
+    comparing: bool,
+    state: State<'_, AppState>,
+) -> Result<Response, String> {
+    let (original, settings) = {
+        let loaded = state.0.lock().map_err(|e| e.to_string())?;
+        let original = loaded.original.clone().ok_or("画像が読み込まれていません")?;
+        let settings = shown_settings(&loaded, settings, comparing);
+        (original, settings)
+    };
+    let image = tauri::async_runtime::spawn_blocking(move || pipeline::apply_edits(&original, &settings))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    let (width, height) = image.dimensions();
+    let pixels = image.into_raw();
+    let mut body = Vec::with_capacity(8 + pixels.len());
+    body.extend_from_slice(&width.to_le_bytes());
+    body.extend_from_slice(&height.to_le_bytes());
+    body.extend_from_slice(&pixels);
+    Ok(Response::new(body))
+}
+
+/// メニューの項目を使える・使えないにする（100% で表示・画面に合わせる）。
+#[tauri::command]
+fn set_menu_enabled(id: String, enabled: bool, app: AppHandle) -> Result<(), String> {
+    menu::set_enabled(&app, &id, enabled).map_err(|e| e.to_string())
 }
 
 /// メニューのチェックの付く項目の状態を変える（環境設定に残した状態に合わせる）。
@@ -277,14 +321,20 @@ async fn save_image(
 }
 
 /// プレビューに重ねる、ジオラマのピントの帯のガイドの線。trimmed（切り抜いた範囲だけの表示）なら
-/// 表示している写真そのものに対する位置。
+/// 表示している写真そのものに対する位置。zoomed（100% 表示）なら保存結果の写真の部分に対する位置。
 #[tauri::command]
 fn diorama_guide(
     settings: EditSettings,
     trimmed: bool,
+    zoomed: bool,
     state: State<'_, AppState>,
 ) -> Result<pipeline::DioramaGuide, String> {
     let loaded = state.0.lock().map_err(|e| e.to_string())?;
+    if zoomed {
+        let original = loaded.original.as_ref().ok_or("画像が読み込まれていません")?;
+        return pipeline::actual_size_diorama_guide(original.dimensions(), &settings)
+            .map_err(|e| e.to_string());
+    }
     let preview = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
     let settings = if trimmed { EditSettings { crop: None, ..settings } } else { settings };
     Ok(pipeline::diorama_guide(preview.dimensions(), &settings, loaded.factor))
@@ -463,6 +513,8 @@ pub fn run() {
             crop_orient,
             default_save_path,
             set_menu_checked,
+            set_menu_enabled,
+            render_actual_size,
             save_image,
             open::take_pending_paths,
             bench_mode,

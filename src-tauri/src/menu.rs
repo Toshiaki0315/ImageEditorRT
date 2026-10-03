@@ -3,7 +3,8 @@
 //! 画面で処理する項目は、"menu" のイベントで項目の ID を画面に送る。
 
 use tauri::menu::{
-    AboutMetadataBuilder, CheckMenuItemBuilder, Menu, MenuEvent, MenuItemBuilder, SubmenuBuilder,
+    AboutMetadataBuilder, CheckMenuItemBuilder, Menu, MenuEvent, MenuItemBuilder, MenuItemKind,
+    SubmenuBuilder,
 };
 use tauri::{AppHandle, Emitter, Runtime};
 
@@ -15,6 +16,10 @@ pub const OPEN: &str = "open";
 pub const SAVE: &str = "save";
 /// 「編集 > 文字・透かし…」
 pub const TEXT: &str = "text";
+/// 「表示 > 100% で表示」（原寸で処理した保存結果を 1px = 1 画素で見る）
+pub const ACTUAL_SIZE: &str = "actual_size";
+/// 「表示 > 画面に合わせる」（100% 表示から戻る）
+pub const FIT: &str = "fit";
 /// 「表示 > ヒストグラム」（チェックの付く項目。状態は画面が環境設定に残し、set_menu_checked で合わせる）
 pub const HISTOGRAM: &str = "histogram";
 
@@ -57,7 +62,19 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .accelerator("CmdOrCtrl+Shift+H")
         .checked(true)
         .build(app)?;
+    // 画像を開くまで・100% 表示の間などは画面が使えない状態にする（set_menu_enabled）
+    let actual_size = MenuItemBuilder::with_id(ACTUAL_SIZE, "100% で表示")
+        .accelerator("CmdOrCtrl+1")
+        .enabled(false)
+        .build(app)?;
+    let fit = MenuItemBuilder::with_id(FIT, "画面に合わせる")
+        .accelerator("CmdOrCtrl+0")
+        .enabled(false)
+        .build(app)?;
     let view = SubmenuBuilder::new(app, "表示")
+        .item(&actual_size)
+        .item(&fit)
+        .separator()
         .item(&histogram)
         .separator()
         .fullscreen_with_text("フルスクリーンにする")
@@ -76,15 +93,31 @@ pub fn on_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
 
 /// チェックの付く項目の状態を変える（画面の環境設定に合わせる）。
 pub fn set_checked<R: Runtime>(app: &AppHandle<R>, id: &str, checked: bool) -> tauri::Result<()> {
-    let Some(menu) = app.menu() else { return Ok(()) };
+    match find(app, id)? {
+        Some(item) => item.as_check_menuitem().map_or(Ok(()), |c| c.set_checked(checked)),
+        None => Ok(()),
+    }
+}
+
+/// 項目を使える・使えないにする。
+pub fn set_enabled<R: Runtime>(app: &AppHandle<R>, id: &str, enabled: bool) -> tauri::Result<()> {
+    match find(app, id)? {
+        Some(item) => match (item.as_menuitem(), item.as_check_menuitem()) {
+            (Some(m), _) => m.set_enabled(enabled),
+            (_, Some(c)) => c.set_enabled(enabled),
+            _ => Ok(()),
+        },
+        None => Ok(()),
+    }
+}
+
+/// サブメニューの中から ID の項目を探す。
+fn find<R: Runtime>(app: &AppHandle<R>, id: &str) -> tauri::Result<Option<MenuItemKind<R>>> {
+    let Some(menu) = app.menu() else { return Ok(None) };
     for item in menu.items()? {
-        if let Some(sub) = item.as_submenu() {
-            if let Some(found) = sub.get(id) {
-                if let Some(check) = found.as_check_menuitem() {
-                    check.set_checked(checked)?;
-                }
-            }
+        if let Some(found) = item.as_submenu().and_then(|sub| sub.get(id)) {
+            return Ok(Some(found));
         }
     }
-    Ok(())
+    Ok(None)
 }

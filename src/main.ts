@@ -14,6 +14,7 @@ import { Panel } from "./panel";
 import { Preview } from "./preview";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
+import { ZoomView } from "./zoom";
 import {
   defaultSettings,
   type AspectRatio,
@@ -41,6 +42,15 @@ const saveButton = $<HTMLButtonElement>("save");
 let textButton: HTMLButtonElement;
 const canvas = $<HTMLCanvasElement>("canvas");
 const guide = document.getElementById("guide") as unknown as SVGSVGElement;
+const zoomGuide = document.getElementById("zoom-guide") as unknown as SVGSVGElement;
+/** 全体表示のプレビュー（canvas・範囲の選択・ガイド）。100% 表示の間は隠す */
+const frame = document.querySelector<HTMLElement>(".frame")!;
+const badge = $<HTMLElement>("badge");
+const beforeButton = $<HTMLButtonElement>("before");
+/** 100% 表示で、設定の変更が落ち着いてから処理し直すまでの時間 (ms) */
+const ZOOM_DELAY_MS = 300;
+/** 画像の左上から「加工前」などの表示までの間隔 (px) */
+const BADGE_MARGIN = 8;
 const SVG = "http://www.w3.org/2000/svg";
 
 const settings: EditSettings = defaultSettings();
@@ -51,8 +61,27 @@ let saving = false;
 let extensions: string[] = [];
 let savableExtensions: string[] = [];
 let formatsText = "";
+/** 加工前を表示中か（\ キーか「加工前」ボタンを押している間） */
+let comparing = false;
+/** 100% 表示中か（原寸の処理が終わるまでは前の表示のまま） */
+let zoomed = false;
+/** 100% 表示の原寸の処理中か */
+let zoomPending = false;
+/** 100% 表示の依頼の番号（古い依頼の結果は表示しない） */
+let zoomGeneration = 0;
+/** 100% 表示を始めるときに表示の中央にする点（保存結果の画像の座標） */
+let zoomCenter: [number, number] | null = null;
+let zoomTimer: ReturnType<typeof setTimeout> | undefined;
 
 const preview = new Preview(stage, canvas, (error) => showError("プレビューを更新できません", error));
+const zoomView = new ZoomView(
+  stage,
+  $<HTMLElement>("zoom"),
+  $<HTMLElement>("zoom-image"),
+  $<HTMLCanvasElement>("zoom-canvas"),
+);
+zoomView.onMove = () => placeBadge();
+zoomView.onDoubleClick = () => fitToWindow();
 const histogramView = new HistogramView($<HTMLCanvasElement>("histogram"));
 preview.onHistogram = (histogram) => histogramView.set(loaded ? histogram : null);
 const tabs = new Tabs(document.querySelector(".side")!);
@@ -77,16 +106,175 @@ function settingsChanged() {
     void updateStatus();
     void updateGuide();
   });
+  if (zoomed) {
+    // 100% 表示中は、変更が落ち着いてから原寸で処理し直す
+    clearTimeout(zoomTimer);
+    zoomTimer = setTimeout(() => void renderZoom(), ZOOM_DELAY_MS);
+  }
 }
 
-/** 「ジオラマ」タブを開いている間、プレビューにピントの帯のガイドを重ねる（ぼかしが 0 でも出す）。 */
-async function updateGuide() {
-  if (!loaded || tabs.selected() !== "diorama") {
-    guide.toggleAttribute("hidden", true);
-    return;
+// --- 加工前との比較（旧版 FR-UI-44） ------------------------------------------------
+
+/** 加工前の表示を切り替える（押している間だけ true）。設定は変えない。 */
+function setComparing(value: boolean) {
+  value = value && loaded !== null;
+  if (value === comparing) return;
+  comparing = value;
+  preview.comparing = value;
+  updateBadge();
+  void updateGuide();
+  preview.request(settings);
+  if (zoomed) void renderZoom();
+}
+
+/** \ キー（JIS 配列の ¥ キーも）。どの入力欄にフォーカスがあっても効き、文字としては入らない。 */
+function isCompareKey(event: KeyboardEvent): boolean {
+  return event.key === "\\" || event.key === "¥" || event.code === "Backslash" || event.code === "IntlYen";
+}
+
+function setupCompare() {
+  for (const type of ["keydown", "keyup"] as const) {
+    window.addEventListener(
+      type,
+      (event) => {
+        if (!loaded || !isCompareKey(event) || event.metaKey || event.ctrlKey) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.repeat) setComparing(type === "keydown");
+      },
+      true,
+    );
   }
-  const result = await invoke<DioramaGuide>("diorama_guide", { settings, trimmed: preview.trimmed });
-  const { width, height } = canvas;
+  // キーを押したまま別のウィンドウに切り替えると離したことが届かないので、ここで戻す
+  window.addEventListener("blur", () => setComparing(false));
+  beforeButton.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    beforeButton.setPointerCapture(event.pointerId);
+    setComparing(true);
+  });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    beforeButton.addEventListener(type, () => setComparing(false));
+  }
+}
+
+// --- 100% 表示（旧版 FR-UI-48） -----------------------------------------------------
+
+/** 100% 表示にする。center は表示の中央にしたい点（保存結果の画像の座標。省略時は画像の中央）。 */
+function showActualSize(center: [number, number] | null = null) {
+  if (!loaded) return;
+  zoomed = true;
+  zoomCenter = center;
+  void renderZoom();
+  updateMenus();
+}
+
+/** 画面に合わせた表示に戻す。 */
+function fitToWindow() {
+  if (!zoomed) return;
+  zoomed = false;
+  zoomGeneration += 1; // 処理中の結果は使わない
+  zoomPending = false;
+  clearTimeout(zoomTimer);
+  zoomCenter = null;
+  zoomView.hide();
+  frame.hidden = false;
+  preview.fit();
+  updateBadge();
+  void updateGuide();
+  updateMenus();
+}
+
+/** 今の設定（加工前の表示中なら加工前）で原寸の処理を始め、終わったら表示する。 */
+async function renderZoom() {
+  clearTimeout(zoomTimer);
+  if (!zoomed || !loaded) return;
+  const generation = ++zoomGeneration;
+  zoomPending = true;
+  updateBadge();
+  try {
+    const buffer = await invoke<ArrayBuffer>("render_actual_size", { settings, comparing });
+    if (generation !== zoomGeneration) return; // 古い依頼の結果（設定がその後変わった）
+    const header = new DataView(buffer, 0, 8);
+    const width = header.getUint32(0, true);
+    const height = header.getUint32(4, true);
+    zoomView.show(width, height, new Uint8ClampedArray(buffer, 8, width * height * 4), zoomCenter);
+    zoomCenter = null;
+    frame.hidden = true;
+    zoomPending = false;
+    updateBadge();
+    void updateGuide();
+  } catch (error) {
+    if (generation !== zoomGeneration) return;
+    fitToWindow();
+    await showError("100% で表示できません", error);
+  }
+}
+
+/** 「トリミング実行」の表示でダブルクリックした点を中央にして 100% 表示にする（通常の表示では範囲の解除に使うので切り替えない）。 */
+async function onPreviewDoubleClick(event: MouseEvent) {
+  if (!loaded || zoomed || !preview.trimmed) return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+  const [width, height] = await invoke<[number, number]>("output_size", { settings });
+  showActualSize([((event.clientX - rect.left) / rect.width) * width, ((event.clientY - rect.top) / rect.height) * height]);
+}
+
+/** メニューの「100% で表示」「画面に合わせる」を使える・使えないにする。 */
+function updateMenus() {
+  void invoke("set_menu_enabled", { id: "actual_size", enabled: loaded !== null && !zoomed });
+  void invoke("set_menu_enabled", { id: "fit", enabled: zoomed });
+}
+
+/** 左上の表示（「加工前」「100%」「更新中…」）をまとめて出す。 */
+function updateBadge() {
+  const parts: string[] = [];
+  if (comparing) parts.push("加工前");
+  if (zoomed) {
+    parts.push("100%");
+    if (zoomPending) parts.push("更新中…");
+  }
+  badge.textContent = parts.join(" ・ ");
+  badge.hidden = parts.length === 0;
+  placeBadge();
+}
+
+/** 表示している画像の左上に置く（100% 表示で画像が左上にはみ出していても、見える位置に出す）。 */
+function placeBadge() {
+  if (badge.hidden) return;
+  let origin = { x: 0, y: 0 };
+  const zoomRect = zoomView.rect();
+  if (zoomRect) {
+    origin = zoomRect;
+  } else if (!canvas.hidden) {
+    const stageRect = stage.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
+    origin = { x: rect.left - stageRect.left, y: rect.top - stageRect.top };
+  }
+  badge.style.left = `${Math.round(Math.max(origin.x, 0)) + BADGE_MARGIN}px`;
+  badge.style.top = `${Math.round(Math.max(origin.y, 0)) + BADGE_MARGIN}px`;
+}
+
+/**
+ * 「ジオラマ」タブを開いている間、プレビューにピントの帯のガイドを重ねる（ぼかしが 0 でも出す）。
+ * 加工前の表示中は出さない。100% 表示では保存結果の写真の部分に対する位置に出す。
+ */
+async function updateGuide() {
+  const zoomCanvas = zoomView.active ? $<HTMLCanvasElement>("zoom-canvas") : null;
+  const shown = loaded !== null && tabs.selected() === "diorama" && !comparing;
+  guide.toggleAttribute("hidden", true);
+  zoomGuide.toggleAttribute("hidden", true);
+  if (!shown) return;
+  const result = await invoke<DioramaGuide>("diorama_guide", {
+    settings,
+    trimmed: preview.trimmed,
+    zoomed: zoomCanvas !== null,
+  });
+  drawGuide(zoomCanvas ? zoomGuide : guide, result, zoomCanvas ?? canvas);
+}
+
+/** ガイドの線を svg に描く（大きさは target の画素の数に合わせる）。 */
+function drawGuide(guide: SVGSVGElement, result: DioramaGuide, target: HTMLCanvasElement) {
+  const { width, height } = target;
   guide.setAttribute("viewBox", `0 0 ${width} ${height}`);
   guide.replaceChildren();
   for (const [fraction, solid] of result.lines) {
@@ -224,7 +412,11 @@ function setSaving(value: boolean) {
 }
 
 function showLoaded(info: OpenInfo, openNotes: string[]) {
+  // 画像を読み込んだら、加工後・画面に合わせた表示に戻す
+  setComparing(false);
+  fitToWindow();
   loaded = info;
+  beforeButton.disabled = false;
   saveButton.disabled = false;
   Object.assign(settings, defaultSettings());
   panel.show();
@@ -239,6 +431,7 @@ function showLoaded(info: OpenInfo, openNotes: string[]) {
   tabs.setEnabled("exif", !info.exif.empty);
   notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
   settingsChanged();
+  updateMenus();
 }
 
 /** ドロップ: 対応形式のときだけハイライトし、受け付ける（旧版 FR-UI-02）。 */
@@ -286,7 +479,10 @@ async function setup() {
   preview.onResize = () => {
     crop.draw();
     void updateGuide();
+    placeBadge();
   };
+  canvas.addEventListener("dblclick", (event) => void onPreviewDoubleClick(event));
+  setupCompare();
   saveButton.addEventListener("click", () => void saveDialog());
   tabs.setEnabled("exif", false);
   tabs.onSelect = () => void updateGuide();
@@ -295,6 +491,8 @@ async function setup() {
     if (event.payload === "open") void openDialog();
     if (event.payload === "save") void saveDialog();
     if (event.payload === "text" && loaded) textDialog.open();
+    if (event.payload === "actual_size") showActualSize();
+    if (event.payload === "fit") fitToWindow();
     if (event.payload === "histogram") {
       histogramView.setShown(!histogramView.shown);
       void invoke("set_menu_checked", { id: "histogram", checked: histogramView.shown });

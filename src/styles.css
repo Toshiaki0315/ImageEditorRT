@@ -142,6 +142,48 @@ button:disabled {
   stroke-width: 1;
 }
 
+/* 100% 表示: 表示エリア全体で受けて、ドラッグ・スクロールで画像を動かす */
+.zoom {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  background: var(--stage);
+}
+
+.zoom.dragging {
+  cursor: grabbing;
+}
+
+.zoom[hidden] {
+  display: none;
+}
+
+.zoom-image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  line-height: 0;
+}
+
+/* 左上の「加工前」「100%」などの表示（マウス操作は下に通す） */
+.badge {
+  position: absolute;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.63);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.badge[hidden] {
+  display: none;
+}
+
 /* マウス操作は下に通す（範囲のドラッグを妨げない） */
 .histogram {
   position: absolute;
@@ -188,8 +230,9 @@ button:disabled {
   line-height: 1.5;
 }
 
-.preview.transparent {
-  /* 透過部分は市松模様（白と薄い灰色、1 マス 8px）の上に重ねる */
+.preview.transparent,
+.zoom-image canvas {
+  /* 透過部分は市松模様（白と薄い灰色、1 マス 8px）の上に重ねる（100% 表示は形の外側も透明になるのでいつも） */
   background-color: #ffffff;
   background-image: conic-gradient(#dcdcdc 25%, transparent 0 50%, #dcdcdc 0 75%, transparent 0);
   background-size: 16px 16px;

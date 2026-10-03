@@ -1,0 +1,41 @@
+{
+  "orientation": {
+    "rotation": 0,
+    "mirror": false
+  },
+  "crop": null,
+  "width": null,
+  "height": null,
+  "keepAspect": true,
+  "filter": "none",
+  "vignette": 0,
+  "aging": 0,
+  "temperature": 6500,
+  "saturation": 0,
+  "brightness": 0,
+  "contrast": 0,
+  "exposure": 0.0,
+  "sharpen": 0,
+  "blur": 0,
+  "denoise": 0,
+  "dioramaBlur": 0,
+  "dioramaDirection": "horizontal",
+  "dioramaPosition": 50,
+  "dioramaWidth": 20,
+  "dioramaVivid": 30,
+  "text": {
+    "text": "",
+    "font": "GOTHIC",
+    "size": 5.0,
+    "color": [
+      255,
+      255,
+      255
+    ],
+    "opacity": 80,
+    "position": "bottom_right"
+  },
+  "frame": "none",
+  "shape": "rectangle",
+  "cornerRadius": 10
+}

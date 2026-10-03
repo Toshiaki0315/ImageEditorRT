@@ -2,6 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { dom, preview, state, tabs, zoomView } from "./app";
+import { isCompareKey } from "./keys";
 import { updateMenus } from "./menus";
 import { readRawImage } from "./protocol";
 import { showError } from "./status";
@@ -39,11 +40,6 @@ export function setComparing(value: boolean) {
   void updateGuide();
   preview.request(state.settings);
   if (zoomed) void renderZoom();
-}
-
-/** \ キー（JIS 配列の ¥ キーも）。 */
-export function isCompareKey(event: KeyboardEvent): boolean {
-  return event.key === "\\" || event.key === "¥" || event.code === "Backslash" || event.code === "IntlYen";
 }
 
 /** \ キー・「加工前」ボタン。キーはどの入力欄にフォーカスがあっても効き、文字としては入らない。 */

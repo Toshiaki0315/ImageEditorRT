@@ -10,6 +10,14 @@ type SizeResult = { state: SizeState; base: [number, number]; width: number | nu
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+/**
+ * 履歴に積む欄の状態。手で変えていなければ幅・高さはトリミング後の大きさに従うので持たない
+ * （読み込み直後に欄の値が埋まっても、変更とみなさない）。
+ */
+export function sizeSnapshot(state: SizeState): SizeState {
+  return state.edited ? { ...state } : { ...state, width: 1, height: 1 };
+}
+
 const initialState = (): SizeState => ({ width: 1, height: 1, edited: false, last: "width", keepAspect: true });
 
 export class OutputSize {
@@ -20,10 +28,12 @@ export class OutputSize {
   private readonly keepAspect = $<HTMLInputElement>("keep-aspect");
 
   /** @param onChange 欄を変えたとき（出力の大きさの表示などを更新する） */
-  constructor(
-    private readonly settings: EditSettings,
-    private readonly onChange: () => void,
-  ) {
+  private readonly settings: EditSettings;
+  private readonly onChange: () => void;
+
+  constructor(settings: EditSettings, onChange: () => void) {
+    this.settings = settings;
+    this.onChange = onChange;
     // 旧版の数値の欄と同じく、入力のたびに反映する
     this.width.addEventListener("input", () => this.edited("width", this.width));
     this.height.addEventListener("input", () => this.edited("height", this.height));
@@ -50,7 +60,7 @@ export class OutputSize {
 
   /** 履歴に積む状態。手で変えていなければ幅・高さはトリミング後の大きさに従うので持たない。 */
   snapshot(): SizeState {
-    return this.state.edited ? { ...this.state } : { ...this.state, width: 1, height: 1 };
+    return sizeSnapshot(this.state);
   }
 
   /** 履歴の状態に戻す（欄の値は次の refresh で合わせる）。 */

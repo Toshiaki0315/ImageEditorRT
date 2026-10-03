@@ -1,5 +1,7 @@
 // プレビューの右下に重ねるヒストグラム（R・G・B を半透明で、輝度を灰色で重ねる。旧版 FR-UI-46）。
 
+import type { Histogram } from "./protocol";
+
 const BINS = 256;
 const GRAPH_WIDTH = BINS; // 横は 1 段階 1px
 const GRAPH_HEIGHT = 90;
@@ -15,14 +17,6 @@ const CHANNEL_COLORS = [
 /** 表示するかを残す環境設定のキー。 */
 const STORAGE_KEY = "view.histogram";
 
-/** R・G・B・輝度の順に 256 個ずつの画素数。 */
-export type Histogram = Uint32Array[];
-
-/** プレビューの応答の末尾（R・G・B・輝度の順に 256 個ずつの u32 リトルエンディアン）を読む。 */
-export function readHistogram(buffer: ArrayBuffer, offset: number): Histogram {
-  const view = new DataView(buffer, offset, 4 * BINS * 4);
-  return [0, 1, 2, 3].map((c) => Uint32Array.from({ length: BINS }, (_, i) => view.getUint32((c * BINS + i) * 4, true)));
-}
 
 /**
  * 高さの基準にする値: すべてのチャンネルの、両端（0・255）を除いた最大の画素数（最小 1）。
@@ -41,7 +35,10 @@ export class HistogramView {
   /** 表示する設定か（メニュー「表示 > ヒストグラム」。環境設定に残す。既定は表示） */
   shown: boolean;
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  private readonly canvas: HTMLCanvasElement;
+
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
     let saved: string | null = null;
     try {
       saved = localStorage.getItem(STORAGE_KEY);

@@ -99,7 +99,8 @@ src/                      # 画面（TypeScript）
   presetsUi.ts            # 「プリセット ▾」のメニュー・保存・当てはめ・削除
   menus.ts                # メニューの項目の ID（Rust と同じ）と使える・使えない
   status.ts               # ステータスバー・エラーの知らせ・想定外のエラー
-  protocol.ts             # Rust から画素を受け取るバイト列の読み方
+  protocol.ts             # Rust から画素・ヒストグラムを受け取るバイト列の読み方
+  keys.ts                 # キーの判定（\ キー・¥ キー）
   preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
   zoom.ts                 # 100% 表示（1px = 1 画素、ドラッグ・スクロールで動かす）
   batchDialog.ts          # まとめて処理のダイアログと進み具合
@@ -164,6 +165,7 @@ docs/decisions.md         # 作り直しの中で決めたこと（色の空間�
 
 - **EXIF を書き直すと MakerNote が壊れることがある。** MakerNote の中の値の位置がずれるため。保存では必ず `tiff::ExifBlock`（MakerNote を元の位置に置き直す）を通す。
 - **JPEG は透過を持てない。** 透過のある画像を JPEG で保存するときは、白い背景に合成する。
+- **画面のテスト（`npm test`）は Node の型を外す読み込みで動かす。** テストで読み込むファイルには、コンストラクタの引数でのフィールドの宣言（`constructor(private readonly x: T)`）・enum など、型を外すだけでは動かない書き方を使わない。中で別のファイルを読み込むときは `import type` にする（拡張子なしの読み込みは Node では解決できない）。
 - **プレビューの計測は、画面が見えていないと止まる。** `IMAGEEDITORRT_BENCH=1` を付けて起動すると計測できるが、ウィンドウが隠れていたり画面がスリープしていたりすると WebView の描画（`requestAnimationFrame`）が止まり、計測が進まない。
 - **ImageIO は macOS 専用。** `decode.rs` は `#[cfg(target_os = "macos")]` で囲む。CI も macOS で動かす。
 - **フォントのパスは日本語を含む。**（`/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc`）

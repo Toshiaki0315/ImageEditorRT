@@ -27,6 +27,11 @@ ImageEditorRT は、Python + PyQt6 版の [ImageEditor](https://github.com/Toshi
 npm install                                   # 依存インストール（初回・package.json を変えたとき）
 npx tauri dev                                 # 開発用に起動
 npx tauri build --bundles app                 # .app を作る（target/release/bundle/macos/ImageEditorRT.app）
+make dev / make app / make dmg                # 開発用に起動 / .app を作る / .dmg を作る（Makefile）
+scripts/build_app.sh [--install]              # .app を作って署名・起動確認（--install で /Applications に入れる）
+scripts/build_dmg.sh                          # .app からディスクイメージを作る（.app と /Applications へのリンク）
+scripts/bench.sh                              # 受け渡しを含めた速さと NFR-01・02 の判定
+npm test                                      # 画面（TypeScript）のテスト（tests-ts/）
 cargo test --workspace                        # Rust のテスト
 cargo fmt --all                               # 整形（確認だけなら --check）
 cargo clippy --workspace --all-targets -- -D warnings   # Lint
@@ -75,6 +80,7 @@ src-tauri/                # Tauri のアプリ本体（コマンドで core を�
   src/open.rs             # コマンドライン引数・Finder・Dock から開く
   src/batch.rs            # まとめて処理（進み具合のイベント・中止）
   src/clipboard.rs        # クリップボード（NSPasteboard）を読む（貼り付け。書き換えない）
+  src/diagnostics.rs      # 想定外のエラーのログ（~/Library/Logs/ImageEditorRT/）と起動確認（--smoke-test）
   src/presets.rs          # プリセットの一覧・保存・削除・当てはめと「プリセット ▾」のメニュー
   tauri.conf.json
 src/                      # 画面（TypeScript）

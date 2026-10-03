@@ -127,3 +127,11 @@
 - 文字・数値の入力欄では、対応形式のファイルか「文字がなく画像がある」ときだけ画像を開き、ほかは入力欄に文字を貼り付ける（`insertText` で入れるので、入力欄の ⌘Z で戻せる）。
 - クリップボードは Rust で NSPasteboard を読む（`src-tauri/src/clipboard.rs`。objc2-app-kit・objc2-foundation は Tauri がすでに使っている版）。テストでは本物のクリップボードを書き換えない。
 - 貼り付けた画像の保存の初期値は `~/ピクチャ/クリップボード_<日時>.png`（ピクチャがなければホーム。同じ名前があれば `_2` …。名前の決め方は `save::pasted_save_path`、日時は画面のこの Mac の時刻）。まとめて処理の一覧には入れない。
+
+## 仕上げ（#24）
+
+- アイコンは旧版と同じ絵（`scripts/make_icon.py` で 1024px の PNG を描き、`npx tauri icon` で各サイズを作る）。作ったものはリポジトリに入れてあるので、ビルドに Python は要らない。
+- ビルドとインストールは `scripts/build_app.sh`（旧版の `build_app.sh` と同じ流れ）: ビルド → ad-hoc 署名 → 起動確認（`--smoke-test`。画面を出さずに、作った PNG と `sips` で作った HEIC を読めるか）→ `--install` なら /Applications に入れて Launch Services に登録。起動中なら入れ替えずに止まる（作業中の画像が失われないよう、アプリは終了させない）。
+- 想定外のエラー（旧版 NFR-04）: Rust のパニックはパニックのフックでログ（`~/Library/Logs/ImageEditorRT/imageeditorrt.log`。日時は UTC）に書き、"unexpected-error" のイベントで画面に知らせる。画面の想定外のエラー（`error`・`unhandledrejection`）もログに書く。どちらもダイアログで知らせ、アプリは終わらせない。
+- 速さの判定（旧版 NFR-01・02）: `scripts/bench.sh`（計測モード）の最後に出す。NFR-01 は 12MP（4000×3000）の JPEG を開いてプレビューを描き終えるまで、NFR-02 は重い設定のプレビュー更新（受け渡し・描画を含む）の最大。M4 の Mac で NFR-01 は 84ms、NFR-02 は 29ms（どちらも OK）。
+- `make dev`・`make app`・`make dmg`（`Makefile`）。dmg は Tauri の dmg の作り方（Finder を AppleScript で動かして見た目を整える）を使わず、`.app` と /Applications へのリンクを入れたフォルダを `diskutil image create from`（古い macOS では `hdiutil create`）で固める（画面の操作がいらず、CI などでも止まらない）。署名は ad-hoc なので、ほかの Mac では Gatekeeper に止められる。

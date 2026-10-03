@@ -21,3 +21,4 @@
 | `makernote_makers/*.tiff` | 主なメーカー（Canon・Nikon・Sony・Apple・Fujifilm・Olympus・Casio・DJI）の MakerNote を入れた EXIF（TIFF の部分だけ）。19 通り。`makernote_makers/make.py` で旧版のテスト部品を使って作ったもの |
 | `makernote_makers/expected.json` | 上の EXIF を旧版の `core/exif_info.py`（exifread）で読んだ結果（MakerNote の項目・形式の名前・UserComment の有無） |
 | `histogram/cases.json` | ヒストグラムの期待値（切り抜き・形・フレーム・文字・トリミング実行の表示の組み合わせ 7 通り）。旧版の `core/pipeline.py` の `render_preview_with_histogram` で数えたもの（`histogram/make.py`。画像は `frame/` のもの） |
+| `presets/*.json` | プリセットの読み書きのテスト用。`saved.json` は旧版の `save_presets` で書いたファイル、ほかは壊れた項目・壊れたファイル。`expected.json` は旧版の `load_presets` で読んだ結果（`presets/make.py`） |

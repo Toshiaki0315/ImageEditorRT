@@ -3,6 +3,7 @@
 
 mod menu;
 mod open;
+mod presets;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -488,6 +489,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .manage(presets::PresetStore::default())
         .manage(open::Pending::from_args(std::env::args_os().skip(1)))
         .menu(menu::build)
         .on_menu_event(menu::on_event)
@@ -526,6 +528,13 @@ pub fn run() {
             render_actual_size,
             save_image,
             open::take_pending_paths,
+            presets::load_presets,
+            presets::default_preset_name,
+            presets::check_preset_name,
+            presets::save_preset,
+            presets::delete_preset,
+            presets::apply_preset,
+            presets::show_preset_menu,
             bench_mode,
             bench_save_path,
             log,

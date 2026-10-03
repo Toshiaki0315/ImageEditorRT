@@ -88,7 +88,13 @@ export class Panel {
     textButton.textContent = "文字…";
     textButton.title = "文字・透かし（⌘T）";
     textButton.disabled = true;
-    row.append(this.filter, textButton);
+    // 名前付きの加工の組み合わせ（旧版 FR-UI-59）。押すとメニューを出す
+    const presetButton = document.createElement("button");
+    presetButton.type = "button";
+    presetButton.id = "preset-button";
+    presetButton.textContent = "プリセット ▾";
+    presetButton.title = "加工の組み合わせを保存・呼び出し・削除します";
+    row.append(this.filter, presetButton, textButton);
     adjustPage.append(heading, row);
     this.heading(adjustPage, "加工");
     this.build(adjustPage, COLOR);

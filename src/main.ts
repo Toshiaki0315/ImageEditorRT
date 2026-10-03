@@ -13,6 +13,7 @@ import { ExifView } from "./exif";
 import { HistogramView } from "./histogram";
 import { HistoryRecorder, sameValue } from "./history";
 import { Panel } from "./panel";
+import { type ClipboardContents, pasteAction, pasteStamp } from "./paste";
 import { Preview } from "./preview";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
@@ -52,6 +53,7 @@ const beforeButton = $<HTMLButtonElement>("before");
 const resetButton = $<HTMLButtonElement>("reset");
 const DISCARD_TITLE = "未保存の変更";
 const DISCARD_QUESTION = "保存していない変更があります。破棄してよろしいですか？";
+const NOTHING_TO_PASTE_MESSAGE = "クリップボードに画像がありません";
 /** 100% 表示で、設定の変更が落ち着いてから処理し直すまでの時間 (ms) */
 const ZOOM_DELAY_MS = 300;
 /** 画像の左上から「加工前」などの表示までの間隔 (px) */
@@ -588,6 +590,46 @@ async function openPath(path: string, openNotes: string[] = []) {
   }
 }
 
+/**
+ * 編集 > ペースト（⌘V）: クリップボードの画像を開く。Finder でコピーしたファイルならそのファイルを開く。
+ * 文字・数値の入力欄では、文字があれば入力欄に貼り付ける（旧版 FR-UI-64）。
+ */
+async function paste() {
+  const editing = isEditingText();
+  if (!editing && (saving || opening)) return;
+  const contents = await invoke<ClipboardContents>("clipboard_contents");
+  const action = pasteAction(contents, editing, isSupported);
+  if (action.kind === "text") {
+    const text = await invoke<string | null>("clipboard_text");
+    // 入力欄の取り消し（⌘Z）でも戻せるよう、入力として入れる
+    if (text) document.execCommand("insertText", false, text);
+    return;
+  }
+  if (saving || opening) return;
+  if (action.kind === "files") openPaths(action.paths);
+  if (action.kind === "image") await openClipboardImage();
+  if (action.kind === "nothing") notify(NOTHING_TO_PASTE_MESSAGE);
+}
+
+/** クリップボードの画像を、元のファイルのない画像として開く（未保存の変更があれば確かめる）。 */
+async function openClipboardImage() {
+  opening = true;
+  try {
+    if (!(await confirmDiscard())) return;
+    showLoaded(await invoke<OpenInfo>("open_clipboard_image"), []);
+  } catch (error) {
+    await showError("画像を貼り付けられません", error);
+  } finally {
+    opening = false;
+  }
+}
+
+/** ステータスバーで知らせる（画像がなければ、知らせる文だけを出す）。 */
+function notify(text: string) {
+  if (loaded) void updateStatus(text);
+  else status.textContent = text;
+}
+
 /** ドロップ・Finder などから届いたファイル。複数なら先頭の 1 枚だけを開く（旧版 FR-UI-03）。 */
 function openPaths(paths: string[]) {
   if (paths.length === 0) return;
@@ -611,7 +653,8 @@ type SaveFailure = { kind: "sameFile" | "extension" | "other"; message: string }
 /** 保存: ダイアログで保存先を選び、原寸で処理して書き出す（処理は Rust の別のスレッド）。 */
 async function saveDialog() {
   if (!loaded || saving) return;
-  const defaultPath = (await invoke<string | null>("default_save_path")) ?? `${loaded.name}_edited.png`;
+  const stamp = pasteStamp(new Date());
+  const defaultPath = (await invoke<string | null>("default_save_path", { stamp })) ?? `${loaded.name}_edited.png`;
   // 元の画像と同じファイルが選ばれたら、知らせてダイアログを開き直す（旧版 FR-IO-11）
   for (;;) {
     const path = await save({
@@ -769,6 +812,7 @@ async function setup() {
     if (event.payload === "save") void saveDialog();
     if (event.payload === "text" && loaded) textDialog.open();
     onPresetMenu(event.payload);
+    if (event.payload === "paste") void paste();
     if (event.payload === "undo") undo();
     if (event.payload === "redo") redo();
     if (event.payload === "actual_size") showActualSize();

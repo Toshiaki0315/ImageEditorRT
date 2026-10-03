@@ -26,3 +26,8 @@ image = { version = "0.25", default-features = false }
 tauri-plugin-dialog = "2.8.1"
 rayon = "1"
 
+# クリップボード（NSPasteboard）を読む（Tauri がすでに使っている版）
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPasteboard", "NSPasteboardItem"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSString", "NSURL"] }
+

@@ -141,3 +141,7 @@
 - 旧版にはない動き（ユーザーの希望で足した）。⌘Q（メニューの「ImageEditorRT を終了」を独自の項目にした）・ウィンドウを閉じる（赤いボタン・⌘W）・Dock の「終了」などで、未保存の変更（初期状態とも最後に保存した設定とも違う）があれば、開く・リセットのときと同じ確認（「終了」「キャンセル」）を出す。変更がなければそのまま終わる。
 - ウィンドウを閉じる求めは画面で止め（`onCloseRequested`）、Dock などからの終了の求め（`RunEvent::ExitRequested`）は Rust で止めて "quit-requested" のイベントで画面に知らせる。画面が確かめた後に `quit_app` で終わる。
 - 保存中・まとめて処理中は、ファイルが途中で切れないよう終了しない（終わってから終了してもらう）。
+
+## 既定値の一致のテスト（#51）
+
+- 編集設定の既定値は Rust（`EditSettings::default()`）と TypeScript（`defaultSettings()`・`defaultText()`）に二重に書いている。両方が `tests-ts/fixtures/default-settings.json` と同じかを、それぞれのテスト（`crates/core/tests/default_settings.rs`・`tests-ts/defaults.test.ts`）で確かめる。既定値を変えるときは、両方とこのファイルをそろえる。

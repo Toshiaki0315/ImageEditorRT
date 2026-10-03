@@ -22,6 +22,8 @@ failures=0
 cleanup() {
     if [[ -n "$PID" ]] && kill -0 "$PID" 2>/dev/null; then kill "$PID" 2>/dev/null || true; fi
     pkill -f "tauri dev" 2>/dev/null || true
+    # 開発版の画面を配っていた Vite も止める（このリポジトリのものだけ）
+    pkill -f "$PWD/node_modules/.bin/vite" 2>/dev/null || true
     rm -rf "$WORK"
 }
 trap cleanup EXIT

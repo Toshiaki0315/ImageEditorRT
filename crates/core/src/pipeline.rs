@@ -23,6 +23,11 @@ use crate::text;
 pub use crate::text::{TextFont, TextPosition, TextSettings};
 use crate::transform::{self, round_half_even, CropRect, Orientation, SizeError};
 
+/// テイストの強さの既定（100% = テイストのまま）。
+pub const FILTER_STRENGTH_FULL: u32 = 100;
+/// テイストの強さの上限（%）。100% を超えるとテイストによる変化を強める。
+pub const FILTER_STRENGTH_MAX: u32 = 200;
+
 /// プレビューの長辺（px）。
 pub const PREVIEW_MAX_SIDE: u32 = 1600;
 
@@ -36,6 +41,9 @@ pub struct EditSettings {
     pub height: Option<u32>,
     pub keep_aspect: bool,
     pub filter: FilterType,
+    /// テイストの強さ 0〜200（%）。元の写真とテイストをかけた写真を混ぜる（100 = テイストのまま、100 を超えると
+    /// 変化を強める。旧版にはない）
+    pub filter_strength: u32,
     /// 周辺減光 0〜100（0 = なし）
     pub vignette: u32,
     /// 経年劣化 0〜100（0 = なし）
@@ -76,6 +84,7 @@ impl Default for EditSettings {
             height: None,
             keep_aspect: true,
             filter: FilterType::None,
+            filter_strength: FILTER_STRENGTH_FULL,
             vignette: 0,
             aging: 0,
             temperature: adjust::TEMPERATURE_NEUTRAL,
@@ -473,7 +482,7 @@ fn apply_diorama_and_filter(
         image = diorama::diorama(&image, &settings.diorama(), area, None);
     }
     // テイストのぼかしの半径は、旧版と同じく画像そのもの（プレビューでは表示している全体）の短辺に比例させる
-    filters::apply_filter(&mut image, settings.filter);
+    filters::apply_filter_with_strength(&mut image, settings.filter, settings.filter_strength);
     image
 }
 

@@ -8,6 +8,7 @@
   "height": null,
   "keepAspect": true,
   "filter": "none",
+  "filterStrength": 100,
   "vignette": 0,
   "aging": 0,
   "temperature": 6500,

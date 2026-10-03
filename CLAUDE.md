@@ -70,6 +70,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     save.rs               # 保存（形式・名前の決め方・元の画像への上書きの防止・EXIF を残す）
     exif_info.rs          # EXIF・GPS・MakerNote を表示用に読む
     exifread_note.rs      # 主なメーカーの MakerNote を exifread と同じに読む（表は exifread_tables.rs、自動生成）
+    pyfmt.rs              # Python の値の表示（str・repr）を真似る（exifread の表示を旧版と同じにする）
     makernote.rs          # exifread も読まない MakerNote（ペンタックス・リコー・Samsung）を読む
     tiff.rs               # EXIF の IFD の読み書き（保存時に MakerNote を元の位置に置き直す）
   examples/bench.rs       # ベンチマーク

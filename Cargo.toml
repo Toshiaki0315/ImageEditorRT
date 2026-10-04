@@ -5,6 +5,7 @@ members = ["crates/core", "src-tauri"]
 [workspace.package]
 edition = "2021"
 version = "0.1.0"
+license = "MIT"
 
 # Tauri の推奨（アプリを小さく・速くする）
 [profile.release]

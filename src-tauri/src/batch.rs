@@ -42,6 +42,13 @@ pub struct Finished {
     message: String,
 }
 
+/// 1 枚の処理で想定外のエラー（パニック）が起きても、その画像を「処理できなかった画像」にして残りを続ける
+/// （パニックの中身はパニックのフックがログに書く）。
+fn guarded(process: impl FnOnce() -> Result<PathBuf, String>) -> Result<PathBuf, String> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(process))
+        .unwrap_or_else(|_| Err("予期しないエラー（詳しくはログ）".to_string()))
+}
+
 /// 開いている画像のファイル（一覧に最初から入れておく。ファイルがなければ None）。
 #[tauri::command]
 pub fn batch_current_source(state: State<'_, AppState>) -> Result<Option<String>, String> {
@@ -89,7 +96,7 @@ pub async fn run_batch(
             save_pool().install(|| {
                 batch::run_batch(
                     &sources,
-                    |source| batch::process_image(source, &out_dir, &options),
+                    |source| guarded(|| batch::process_image(source, &out_dir, &options)),
                     |done, source| {
                         let name =
                             source.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -114,4 +121,17 @@ pub async fn run_batch(
 #[tauri::command]
 pub fn cancel_batch(state: State<'_, BatchState>) {
     state.0.store(true, Ordering::SeqCst);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_panic_becomes_a_failure_of_that_image() {
+        assert_eq!(guarded(|| Ok(PathBuf::from("a.png"))), Ok(PathBuf::from("a.png")));
+        assert_eq!(guarded(|| Err("読めません".into())), Err("読めません".to_string()));
+        // パニックの表示（テストの出力）は既定のフックに任せる
+        assert_eq!(guarded(|| panic!("壊れた画像")), Err("予期しないエラー（詳しくはログ）".to_string()));
+    }
 }

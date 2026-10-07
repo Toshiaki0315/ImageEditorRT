@@ -3,6 +3,7 @@
     "rotation": 0,
     "mirror": false
   },
+  "straighten": 0.0,
   "crop": null,
   "width": null,
   "height": null,

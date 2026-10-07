@@ -1,9 +1,14 @@
 //! 回転・反転・トリミング・リサイズ（旧版の core/transform.py を移したもの）。
 
 use image::{imageops, RgbaImage};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::resize;
+use crate::PIXELS_PER_TASK;
+
+/// 水平の補正の角度の上限（度）。
+pub const STRAIGHTEN_MAX: f64 = 45.0;
 
 /// 幅・高さの下限と上限（px）。
 pub const MIN_SIZE: u32 = 1;
@@ -311,6 +316,70 @@ impl Orientation {
     }
 }
 
+/// 水平の補正: 画像を中心で degrees 度（正は時計回り、±45° まで）回し、四隅に余白が出ないよう
+/// 拡大して、元と同じ大きさの新しい画像を返す（旧版にはない）。0° なら複製を返す。
+///
+/// 大きさが変わらないので、トリミング範囲・出力の大きさはそのまま使える。画素は双線形で補間する
+/// （アルファを掛けた値で補間し、透明な画素の色がにじまないようにする）。
+pub fn straighten(image: &RgbaImage, degrees: f64) -> RgbaImage {
+    let degrees = degrees.clamp(-STRAIGHTEN_MAX, STRAIGHTEN_MAX);
+    let (width, height) = image.dimensions();
+    if degrees == 0.0 || width == 0 || height == 0 {
+        return image.clone();
+    }
+    let (sin, cos) = degrees.to_radians().sin_cos();
+    let scale = straighten_scale((width, height), degrees);
+    // 出力の画素から元の画素への逆の変換: 中心からの位置を -θ 回して 1/scale 倍する
+    let (a, b) = (cos / scale, sin / scale);
+    let (cx, cy) = (f64::from(width) / 2.0, f64::from(height) / 2.0);
+    let source = image.as_raw();
+    let stride = width as usize * 4;
+    let fetch = |x: i64, y: i64| -> [f64; 4] {
+        let x = x.clamp(0, i64::from(width) - 1) as usize;
+        let y = y.clamp(0, i64::from(height) - 1) as usize;
+        let p = &source[y * stride + x * 4..y * stride + x * 4 + 4];
+        let alpha = f64::from(p[3]) / 255.0;
+        [f64::from(p[0]) * alpha, f64::from(p[1]) * alpha, f64::from(p[2]) * alpha, f64::from(p[3])]
+    };
+    let mut out = vec![0u8; source.len()];
+    let rows_per_task = (PIXELS_PER_TASK / width as usize).max(1);
+    out.par_chunks_mut(stride).with_min_len(rows_per_task).enumerate().for_each(|(y, row)| {
+        let dy = y as f64 + 0.5 - cy;
+        for (x, pixel) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            let dx = x as f64 + 0.5 - cx;
+            let sx = a * dx + b * dy + cx - 0.5;
+            let sy = -b * dx + a * dy + cy - 0.5;
+            let (x0, y0) = (sx.floor(), sy.floor());
+            let (fx, fy) = (sx - x0, sy - y0);
+            let (x0, y0) = (x0 as i64, y0 as i64);
+            let (p00, p10, p01, p11) =
+                (fetch(x0, y0), fetch(x0 + 1, y0), fetch(x0, y0 + 1), fetch(x0 + 1, y0 + 1));
+            let mix = |i: usize| {
+                let top = p00[i] + (p10[i] - p00[i]) * fx;
+                let bottom = p01[i] + (p11[i] - p01[i]) * fx;
+                top + (bottom - top) * fy
+            };
+            let alpha = mix(3);
+            pixel[3] = alpha.round().clamp(0.0, 255.0) as u8;
+            if alpha > 0.0 {
+                let unpremultiply = 255.0 / alpha;
+                for (i, channel) in pixel.iter_mut().take(3).enumerate() {
+                    *channel = (mix(i) * unpremultiply).round().clamp(0.0, 255.0) as u8;
+                }
+            }
+        }
+    });
+    RgbaImage::from_raw(width, height, out).expect("大きさは元と同じ")
+}
+
+/// 水平の補正で、四隅に余白が出ないために拡大する倍率（size の画像を degrees 度回すとき）。
+pub fn straighten_scale((width, height): (u32, u32), degrees: f64) -> f64 {
+    let (sin, cos) = degrees.clamp(-STRAIGHTEN_MAX, STRAIGHTEN_MAX).to_radians().sin_cos();
+    let (width, height) = (f64::from(width.max(1)), f64::from(height.max(1)));
+    // 回して拡大した画像が、元の長方形の四隅を覆う条件: W·cos + H·sin ≤ sW かつ W·sin + H·cos ≤ sH
+    cos + sin.abs() * (width / height).max(height / width)
+}
+
 /// size の画像上の範囲を、画像に op をかけた後の同じ部分を指す範囲に変換する。
 pub fn transform_rect(rect: CropRect, (width, height): (u32, u32), op: OrientOp) -> CropRect {
     let (width, height) = (i64::from(width), i64::from(height));
@@ -385,5 +454,66 @@ mod tests {
         let rotated = Orientation::new(90, true).transpose(&image);
         assert_eq!(rotated.dimensions(), (2, 3));
         assert!(rotated.pixels().any(|p| p.0 == [1, 2, 3, 40]));
+    }
+
+    #[test]
+    fn straighten_zero_is_a_copy() {
+        let image = RgbaImage::from_fn(5, 4, |x, y| image::Rgba([x as u8 * 40, y as u8 * 50, 7, 255]));
+        assert_eq!(straighten(&image, 0.0), image);
+    }
+
+    #[test]
+    fn straighten_keeps_size_and_fills_the_corners() {
+        let image = RgbaImage::from_pixel(120, 80, image::Rgba([10, 200, 30, 255]));
+        for degrees in [-45.0, -10.0, 3.5, 45.0, 90.0] {
+            let out = straighten(&image, degrees);
+            assert_eq!(out.dimensions(), (120, 80));
+            // 四隅にも元の画素が来る（透明な余白はできない）
+            assert!(out.pixels().all(|p| p.0 == [10, 200, 30, 255]), "{degrees}");
+        }
+        assert!((straighten_scale((120, 80), 0.0) - 1.0).abs() < 1e-12);
+        assert_eq!(straighten_scale((120, 80), 10.0), straighten_scale((80, 120), -10.0));
+    }
+
+    #[test]
+    fn straighten_levels_a_tilted_line() {
+        // 右上がりに 10° 傾いた線（左が低い）を、時計回りに 10° 回すと水平になる
+        let (width, height) = (201u32, 201u32);
+        let tilt = 10f64.to_radians();
+        let image = RgbaImage::from_fn(width, height, |x, y| {
+            let (dx, dy) = (f64::from(x) - 100.0, f64::from(y) - 100.0);
+            // 中心を通り、x が増えると y が減る（画面で右上がり）線からの距離
+            let distance = (dx * tilt.sin() + dy * tilt.cos()).abs();
+            if distance < 2.0 {
+                image::Rgba([0, 0, 0, 255])
+            } else {
+                image::Rgba([255, 255, 255, 255])
+            }
+        });
+        let out = straighten(&image, 10.0);
+        let dark_rows = |x: u32| (0..height).filter(|&y| out.get_pixel(x, y)[0] < 128).collect::<Vec<_>>();
+        let (left, right) = (dark_rows(40), dark_rows(160));
+        assert!(!left.is_empty() && !right.is_empty());
+        let mean = |rows: &[u32]| rows.iter().map(|&y| f64::from(y)).sum::<f64>() / rows.len() as f64;
+        assert!((mean(&left) - mean(&right)).abs() <= 1.0, "{left:?} {right:?}");
+        // 逆向きに回すと、もっと傾く
+        let worse = straighten(&image, -10.0);
+        let rows =
+            |x: u32| (0..height).filter(|&y| worse.get_pixel(x, y)[0] < 128).map(f64::from).sum::<f64>();
+        assert!(rows(160) < rows(40));
+    }
+
+    #[test]
+    fn straighten_does_not_bleed_transparent_colors() {
+        // 透明な部分の色（赤）が、不透明な部分の境目ににじまない
+        let image = RgbaImage::from_fn(60, 60, |x, _| {
+            if x < 30 {
+                image::Rgba([255, 0, 0, 0])
+            } else {
+                image::Rgba([0, 0, 255, 255])
+            }
+        });
+        let out = straighten(&image, 7.0);
+        assert!(out.pixels().filter(|p| p[3] > 0).all(|p| p[0] == 0 && p[2] == 255));
     }
 }

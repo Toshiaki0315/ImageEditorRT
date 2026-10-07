@@ -1,6 +1,6 @@
 //! 編集設定 (EditSettings) と、それを画像にかける処理の流れ（旧版の core/pipeline.py を移したもの）。
 //!
-//! 処理順（旧版 §5.1）: 回転・反転 → トリミング → リサイズ → 露出 → 明るさ → コントラスト →
+//! 処理順（旧版 §5.1）: 回転・反転 →（水平の補正）→ トリミング → リサイズ → 露出 → 明るさ → コントラスト →
 //! 色温度 → 彩度 → ディテール（ノイズ除去 → ぼかし → シャープ） → ジオラマ → フィルター →
 //! 周辺減光 → 経年劣化 → 文字。
 //! フレーム・形（#13）は、トリミングの後の比への切り抜きと、経年劣化の後にここへ足す。
@@ -36,6 +36,9 @@ pub const PREVIEW_MAX_SIDE: u32 = 1600;
 #[serde(default, rename_all = "camelCase")]
 pub struct EditSettings {
     pub orientation: Orientation,
+    /// 水平の補正 -45〜45（度、正は時計回り、0 = なし）。回転・反転の後に回し、余白が出ないよう拡大する
+    /// （大きさは変わらない。旧版にはない）
+    pub straighten: f64,
     pub crop: Option<CropRect>,
     pub width: Option<u32>,
     pub height: Option<u32>,
@@ -79,6 +82,7 @@ impl Default for EditSettings {
     fn default() -> Self {
         Self {
             orientation: Orientation::default(),
+            straighten: 0.0,
             crop: None,
             width: None,
             height: None,
@@ -141,9 +145,18 @@ impl EditSettings {
     }
 }
 
+/// 回転・反転し、水平の補正をかけた画像を返す（大きさは回転・反転した後のもの）。
+fn orient(image: &RgbaImage, settings: &EditSettings) -> RgbaImage {
+    let image = settings.orientation.transpose(image);
+    if settings.straighten == 0.0 {
+        return image;
+    }
+    transform::straighten(&image, settings.straighten)
+}
+
 /// 原画像に編集をかけた新しい画像を返す（原画像は変更しない）。保存に使う。
 pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<RgbaImage, SizeError> {
-    let mut image = settings.orientation.transpose(original);
+    let mut image = orient(original, settings);
     if let Some(rect) = effective_crop(image.dimensions(), settings.crop, settings.frame, settings.shape) {
         image = transform::crop(&image, rect);
     }
@@ -216,7 +229,7 @@ pub fn render_preview_with_histogram(
     factor: f64,
     trimmed: bool,
 ) -> (RgbaImage, Histogram) {
-    let image = settings.orientation.transpose(image);
+    let image = orient(image, settings);
     let scaled = scale_settings(settings, factor);
     let mut rect = effective_crop(image.dimensions(), scaled.crop, settings.frame, settings.shape);
     // ディテール・ジオラマの半径は、保存時と同じく実際に切り抜く範囲（なければ全体）の短辺を基準にする
@@ -338,7 +351,7 @@ pub fn output_size(original_size: (u32, u32), settings: &EditSettings) -> Result
     Ok(frames::framed_size(size, settings.frame))
 }
 
-/// 加工前の表示（旧版 FR-UI-44）の設定: 向きと、実際に切り抜く範囲だけを残す。
+/// 加工前の表示（旧版 FR-UI-44）の設定: 向き（水平の補正を含む）と、実際に切り抜く範囲だけを残す。
 ///
 /// 色の調整・テイスト・ディテール・ジオラマ・周辺減光・経年劣化・形・フレーム・文字・リサイズは外す。
 /// フレーム・円の比に合わせた範囲も、そのままの範囲で見比べられるよう切り抜く範囲として残す。
@@ -346,7 +359,12 @@ pub fn output_size(original_size: (u32, u32), settings: &EditSettings) -> Result
 pub fn before_settings(original_size: (u32, u32), settings: &EditSettings) -> EditSettings {
     let size = settings.orientation.size(original_size);
     let crop = effective_crop(size, settings.crop, settings.frame, settings.shape);
-    EditSettings { orientation: settings.orientation, crop, ..EditSettings::default() }
+    EditSettings {
+        orientation: settings.orientation,
+        straighten: settings.straighten,
+        crop,
+        ..EditSettings::default()
+    }
 }
 
 /// 実際に切り抜く範囲を返す（size の画像の座標）。切り抜かないなら None。
@@ -679,5 +697,22 @@ mod tests {
         let settings = EditSettings { width: Some(0), ..EditSettings::default() };
         assert!(apply_edits(&sample(), &settings).is_err());
         assert!(output_size((10, 10), &settings).is_err());
+    }
+
+    #[test]
+    fn straighten_keeps_the_size_and_is_kept_for_before() {
+        let image = sample();
+        let settings = EditSettings { straighten: 5.0, ..EditSettings::default() };
+        let out = apply_edits(&image, &settings).unwrap();
+        assert_eq!(out.dimensions(), image.dimensions());
+        assert_ne!(out, image);
+        assert_eq!(output_size(image.dimensions(), &settings).unwrap(), image.dimensions());
+        // プレビュー（縮小なし）は保存と同じ。加工前の表示でも補正は残す
+        assert_eq!(render_preview(&image, &settings, 1.0, false), out);
+        assert_eq!(before_settings(image.dimensions(), &settings), settings);
+        // 回転・反転の後にかける（90° 回した画像を回す）
+        let rotated = EditSettings { orientation: Orientation::new(90, false), ..settings.clone() };
+        let expected = transform::straighten(&Orientation::new(90, false).transpose(&image), 5.0);
+        assert_eq!(apply_edits(&image, &rotated).unwrap(), expected);
     }
 }

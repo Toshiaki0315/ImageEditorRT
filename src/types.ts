@@ -35,6 +35,8 @@ export type FilterType =
 /** Rust の pipeline::EditSettings。 */
 export type EditSettings = {
   orientation: Orientation;
+  /** 水平の補正 -45〜45（度、正は時計回り）。回転・反転の後に回し、余白が出ないよう拡大する */
+  straighten: number;
   crop: CropRect | null;
   width: number | null;
   height: number | null;
@@ -73,6 +75,7 @@ export type ShapeType = "rectangle" | "rounded" | "circle";
 export function defaultSettings(): EditSettings {
   return {
     orientation: { rotation: 0, mirror: false },
+    straighten: 0,
     crop: null,
     width: null,
     height: null,

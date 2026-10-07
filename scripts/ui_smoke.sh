@@ -88,6 +88,9 @@ ax click "$PID" "加工" >/dev/null
 
 ax click "$PID" "投稿加工" >/dev/null; sleep 0.5
 check "投稿加工のタブ（強さのスライダー）" "50" "$(ax slider "$PID" "強さ" 0 2>&1)"
+ax click "$PID" "文字を見つけて隠す" >/dev/null
+wait_for 30 sh -c "osascript '$LIB' texts $PID | grep -q '文字'" || true
+check "文字を見つけて隠す（ステータスバー）" "文字" "$(ax texts "$PID" | grep '文字' || true)"
 ax click "$PID" "加工" >/dev/null
 
 ax click "$PID" "一覧…" >/dev/null

@@ -17,6 +17,9 @@ type Drag =
   | { mode: "move"; anchor: Point; start: CropRect }
   | { mode: "resize"; anchor: Point };
 
+/** 自動で見つけて隠すもの（顔・文字）。 */
+export type FindTarget = "faces" | "text";
+
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 export class PrivacyPanel {
@@ -25,11 +28,11 @@ export class PrivacyPanel {
   private readonly strengthValue = $<HTMLOutputElement>("region-strength-value");
   private readonly deleteButton = $<HTMLButtonElement>("region-delete");
   private readonly clearButton = $<HTMLButtonElement>("region-clear");
-  private readonly facesButton = $<HTMLButtonElement>("detect-faces");
-  /** 顔の認識（スタンプで覆う範囲を返す。見つからなければ空、認識できなければ null） */
-  detectFaces: () => Promise<CropRect[] | null> = async () => [];
-  /** 顔の認識の結果を知らせる */
-  onFaces: (count: number, kind: RegionKind) => void = () => {};
+  private readonly findButtons = { faces: $<HTMLButtonElement>("detect-faces"), text: $<HTMLButtonElement>("detect-text") };
+  /** 顔・文字の認識（隠す範囲を返す。見つからなければ空、認識できなければ null） */
+  find: (target: FindTarget) => Promise<CropRect[] | null> = async () => [];
+  /** 顔・文字の認識の結果を知らせる */
+  onFound: (target: FindTarget, count: number, kind: RegionKind) => void = () => {};
   private readonly toolButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-region-tool]")];
   private readonly stampButtons: HTMLButtonElement[] = [];
   /** 新しく置くスタンプの絵文字（スタンプを選んでいないときに選ぶ） */
@@ -83,7 +86,9 @@ export class PrivacyPanel {
       this.selected = null;
       this.changed();
     });
-    this.facesButton.addEventListener("click", () => void this.coverFaces());
+    for (const [target, button] of Object.entries(this.findButtons)) {
+      button.addEventListener("click", () => void this.coverFound(target as FindTarget));
+    }
     this.overlay.addEventListener("pointerdown", (e) => this.pointerDown(e));
     this.overlay.addEventListener("pointermove", (e) => this.pointerMove(e));
     this.overlay.addEventListener("pointerup", (e) => this.pointerUp(e));
@@ -126,7 +131,7 @@ export class PrivacyPanel {
     }
     this.deleteButton.disabled = region === null;
     this.clearButton.disabled = this.settings.regions.length === 0;
-    this.facesButton.disabled = !loaded;
+    for (const button of Object.values(this.findButtons)) button.disabled = !loaded;
     this.draw();
   }
 
@@ -185,24 +190,24 @@ export class PrivacyPanel {
   }
 
   /**
-   * 顔を見つけて、それぞれをタブに出ている隠し方（ぼかし・モザイク・スタンプ）・強さ・絵文字で隠す
+   * 顔・文字を見つけて、それぞれをタブに出ている隠し方（ぼかし・モザイク・スタンプ）・強さ・絵文字で隠す
    * （範囲を選んでいればその範囲の設定。足した範囲は手で足したものと同じく直せる）。
    */
-  private async coverFaces() {
+  private async coverFound(target: FindTarget) {
     const region = this.current();
     const kind = region?.kind ?? this.tool;
     const strength = region?.strength ?? this.nextStrength;
     const stamp = region?.kind === "stamp" ? region.stamp : this.nextStamp;
-    this.facesButton.disabled = true;
+    for (const button of Object.values(this.findButtons)) button.disabled = true;
     try {
-      const faces = await this.detectFaces();
-      if (faces === null) return;
-      if (faces.length > 0) {
-        for (const rect of faces) this.settings.regions.push({ kind, rect, strength, stamp });
+      const found = await this.find(target);
+      if (found === null) return;
+      if (found.length > 0) {
+        for (const rect of found) this.settings.regions.push({ kind, rect, strength, stamp });
         this.selected = null;
         this.changed();
       }
-      this.onFaces(faces.length, kind);
+      this.onFound(target, found.length, kind);
     } finally {
       this.show();
     }

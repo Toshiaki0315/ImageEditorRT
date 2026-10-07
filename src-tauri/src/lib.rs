@@ -60,6 +60,7 @@ pub fn run() {
             image::render_preview,
             image::filter_thumbnails,
             image::detect_faces,
+            image::detect_text,
             image::auto_straighten,
             image::render_actual_size,
             image::close_image,

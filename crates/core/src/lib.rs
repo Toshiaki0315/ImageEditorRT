@@ -40,5 +40,7 @@ pub mod sample;
 pub mod save;
 pub mod shapes;
 pub mod text;
+#[cfg(target_os = "macos")]
+pub mod text_regions;
 pub mod tiff;
 pub mod transform;

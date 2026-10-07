@@ -15,6 +15,8 @@ pub mod effects;
 pub mod encode;
 pub mod exif_info;
 pub mod exifread_note;
+#[cfg(target_os = "macos")]
+pub mod faces;
 #[rustfmt::skip]
 mod exifread_tables;
 pub mod filters;

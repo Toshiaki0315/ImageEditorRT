@@ -59,6 +59,7 @@ pub fn run() {
             image::open_path,
             image::render_preview,
             image::filter_thumbnails,
+            image::detect_faces,
             image::render_actual_size,
             image::close_image,
             image::diorama_guide,

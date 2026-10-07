@@ -25,6 +25,11 @@ export class PrivacyPanel {
   private readonly strengthValue = $<HTMLOutputElement>("region-strength-value");
   private readonly deleteButton = $<HTMLButtonElement>("region-delete");
   private readonly clearButton = $<HTMLButtonElement>("region-clear");
+  private readonly facesButton = $<HTMLButtonElement>("detect-faces");
+  /** 顔の認識（スタンプで覆う範囲を返す。見つからなければ空、認識できなければ null） */
+  detectFaces: () => Promise<CropRect[] | null> = async () => [];
+  /** 顔の認識の結果を知らせる */
+  onFaces: (count: number) => void = () => {};
   private readonly toolButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-region-tool]")];
   private readonly stampButtons: HTMLButtonElement[] = [];
   /** 新しく置くスタンプの絵文字（スタンプを選んでいないときに選ぶ） */
@@ -78,6 +83,7 @@ export class PrivacyPanel {
       this.selected = null;
       this.changed();
     });
+    this.facesButton.addEventListener("click", () => void this.stampFaces());
     this.overlay.addEventListener("pointerdown", (e) => this.pointerDown(e));
     this.overlay.addEventListener("pointermove", (e) => this.pointerMove(e));
     this.overlay.addEventListener("pointerup", (e) => this.pointerUp(e));
@@ -120,6 +126,7 @@ export class PrivacyPanel {
     }
     this.deleteButton.disabled = region === null;
     this.clearButton.disabled = this.settings.regions.length === 0;
+    this.facesButton.disabled = !loaded;
     this.draw();
   }
 
@@ -175,6 +182,24 @@ export class PrivacyPanel {
       return;
     }
     this.show();
+  }
+
+  /** 顔を見つけて、それぞれに次に置くスタンプを置く（置いたスタンプは手で置いたものと同じく直せる）。 */
+  private async stampFaces() {
+    this.facesButton.disabled = true;
+    try {
+      const faces = await this.detectFaces();
+      if (faces === null) return;
+      if (faces.length > 0) {
+        for (const rect of faces) this.settings.regions.push({ kind: "stamp", rect, strength: this.nextStrength, stamp: this.nextStamp });
+        this.tool = "stamp";
+        this.selected = null;
+        this.changed();
+      }
+      this.onFaces(faces.length);
+    } finally {
+      this.show();
+    }
   }
 
   /** スタンプの絵文字（選んでいるスタンプ、なければ次に置くスタンプ）。 */

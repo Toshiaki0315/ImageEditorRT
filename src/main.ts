@@ -25,10 +25,10 @@ import { MENU, setMenuChecked } from "./menus";
 import { Panel } from "./panel";
 import { PrivacyPanel } from "./privacy";
 import { loadPresets, onPresetMenu, showPresetMenu } from "./presetsUi";
-import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
+import { catchUnexpectedErrors, notify, reportUnexpected, showError } from "./status";
 import { TasteGallery } from "./tasteGallery";
 import { TextDialog } from "./textDialog";
-import type { AspectRatio, FilterType, FrameKind, OpenInfo, ShapeType, TextFont, TextPosition } from "./types";
+import type { AspectRatio, CropRect, FilterType, FrameKind, OpenInfo, ShapeType, TextFont, TextPosition } from "./types";
 import { fitToWindow, onPreviewDoubleClick, placeBadge, setupCompare, showActualSize, updateGuide } from "./view";
 
 catchUnexpectedErrors();
@@ -79,6 +79,13 @@ async function createParts() {
   );
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
+  parts.privacy.detectFaces = () =>
+    invoke<CropRect[]>("detect_faces", { settings: state.settings }).catch((error) => {
+      void showError("顔を認識できません", error);
+      return null;
+    });
+  parts.privacy.onFaces = (count) =>
+    notify(count > 0 ? `顔を ${count} 個見つけて、スタンプを置きました` : "顔が見つかりませんでした");
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
   parts.textButton = $<HTMLButtonElement>("text-button");

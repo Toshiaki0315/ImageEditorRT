@@ -23,3 +23,7 @@ fast_image_resize = { version = "6.1.0", default-features = false, features = ["
 objc2-core-foundation = "0.3"
 objc2-core-graphics = "0.3"
 objc2-image-io = "0.3"
+# 顔の自動認識（投稿加工のスタンプ）に macOS の Vision を使う
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSDictionary", "NSError", "NSObject", "NSString"] }
+objc2-vision = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation", "objc2-core-graphics", "VNRequestHandler", "VNRequest", "VNDetectFaceRectanglesRequest", "VNObservation", "VNTypes"] }

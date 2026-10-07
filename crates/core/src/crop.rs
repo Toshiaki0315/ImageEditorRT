@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::frames::{window_aspect, FrameType};
+use crate::privacy::Region;
 use crate::shapes::ShapeType;
 use crate::transform::{
     aspect_drag_rect, clamp_crop, constrain_rect, fit_aspect, oriented, round_half_even, transform_rect,
@@ -175,22 +176,39 @@ pub fn fit_to_aspect(rect: Option<CropRect>, aspect: AspectChoice, size: (u32, u
 }
 
 /// 回転・反転の結果。
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Oriented {
     pub orientation: Orientation,
     /// 同じ写真の部分を指すよう、一緒に回した範囲
     pub crop: Option<CropRect>,
+    /// 一緒に回した、投稿加工の範囲
+    pub regions: Vec<Region>,
     /// 回転・反転した後の原寸画像の大きさ
     pub size: (u32, u32),
 }
 
 /// 表示中の向きに対して回転・反転する（旧版 FR-UI-55）。size は今の向きの原寸画像の大きさ。
-pub fn orient(orientation: Orientation, op: OrientOp, crop: Option<CropRect>, size: (u32, u32)) -> Oriented {
+/// トリミング範囲と投稿加工の範囲も、同じ写真の部分を指すよう一緒に回す。
+pub fn orient(
+    orientation: Orientation,
+    op: OrientOp,
+    crop: Option<CropRect>,
+    regions: &[Region],
+    size: (u32, u32),
+) -> Oriented {
     let rect = crop.and_then(|r| clamp_crop(r, size));
+    let regions = regions
+        .iter()
+        .filter_map(|region| {
+            let rect = clamp_crop(region.rect, size)?;
+            Some(Region { rect: transform_rect(rect, size, op), ..region.clone() })
+        })
+        .collect();
     Oriented {
         orientation: orientation.apply(op),
         crop: rect.map(|r| transform_rect(r, size, op)),
+        regions,
         size: if op.swaps_sides() { (size.1, size.0) } else { size },
     }
 }
@@ -198,6 +216,7 @@ pub fn orient(orientation: Orientation, op: OrientOp, crop: Option<CropRect>, si
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::privacy::RegionKind;
 
     const fn choice(ratio: AspectRatio) -> AspectChoice {
         AspectChoice { ratio, portrait: false, frame: FrameType::None, shape: ShapeType::Rectangle }
@@ -295,12 +314,21 @@ mod tests {
             Orientation::default(),
             OrientOp::RotateRight,
             Some(CropRect::new(10, 20, 30, 40)),
+            &[
+                Region { kind: RegionKind::Mosaic, rect: CropRect::new(10, 20, 30, 40), strength: 70 },
+                // 画像の外の範囲は捨てる
+                Region { rect: CropRect::new(500, 500, 10, 10), ..Region::default() },
+            ],
             (200, 100),
         );
         assert_eq!(result.orientation, Orientation::new(90, false));
         assert_eq!(result.size, (100, 200));
         assert_eq!(result.crop, Some(CropRect::new(40, 10, 40, 30)));
-        let flipped = orient(Orientation::default(), OrientOp::FlipHorizontal, None, (200, 100));
+        assert_eq!(
+            result.regions,
+            vec![Region { kind: RegionKind::Mosaic, rect: CropRect::new(40, 10, 40, 30), strength: 70 }]
+        );
+        let flipped = orient(Orientation::default(), OrientOp::FlipHorizontal, None, &[], (200, 100));
         assert_eq!((flipped.size, flipped.crop), ((200, 100), None));
     }
 }

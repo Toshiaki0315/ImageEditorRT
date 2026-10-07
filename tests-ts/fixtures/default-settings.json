@@ -41,5 +41,6 @@
   },
   "frame": "none",
   "shape": "rectangle",
-  "cornerRadius": 10
+  "cornerRadius": 10,
+  "regions": []
 }

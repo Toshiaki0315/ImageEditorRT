@@ -66,7 +66,15 @@ export type EditSettings = {
   frame: FrameKind;
   shape: ShapeType;
   cornerRadius: number;
+  /** 投稿加工で隠す範囲（回転・反転した後の原寸の座標） */
+  regions: Region[];
 };
+
+/** 投稿加工の隠し方（Rust の privacy::RegionKind）。 */
+export type RegionKind = "blur" | "mosaic";
+
+/** 投稿加工で隠す範囲 1 つ（Rust の privacy::Region）。強さは 1〜100。 */
+export type Region = { kind: RegionKind; rect: CropRect; strength: number };
 
 /** フレーム（Rust の frames::FrameType）。 */
 export type FrameKind = "none" | "polaroid" | "instax_mini";
@@ -106,6 +114,7 @@ export function defaultSettings(): EditSettings {
     frame: "none",
     shape: "rectangle",
     cornerRadius: 10,
+    regions: [],
   };
 }
 

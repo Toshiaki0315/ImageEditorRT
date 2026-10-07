@@ -15,6 +15,8 @@
           <canvas id="canvas" class="preview" hidden></canvas>
           <!-- トリミング範囲の選択（範囲の外を暗くし、ドラッグで選ぶ） -->
           <svg id="overlay" class="overlay" hidden></svg>
+          <!-- 投稿加工の範囲（「投稿加工」タブを開いている間だけ。ドラッグで足す・動かす） -->
+          <svg id="privacy-overlay" class="overlay privacy-overlay" hidden></svg>
           <!-- ジオラマのピントの帯のガイド（「ジオラマ」タブを開いている間だけ） -->
           <svg id="guide" class="guide" hidden preserveAspectRatio="none" viewBox="0 0 1 1"></svg>
         </div>
@@ -36,6 +38,7 @@
           <button type="button" class="tab" role="tab" data-tab="crop">切り抜き</button>
           <button type="button" class="tab" role="tab" data-tab="output">出力</button>
           <button type="button" class="tab" role="tab" data-tab="diorama">ジオラマ</button>
+          <button type="button" class="tab" role="tab" data-tab="privacy">投稿加工</button>
           <button type="button" class="tab" role="tab" data-tab="exif">EXIF</button>
         </nav>
         <div id="page-adjust" class="page" role="tabpanel"></div>
@@ -88,6 +91,26 @@
           <label class="check"><input id="keep-gps" type="checkbox" /> 位置情報 (GPS) も残す</label>
         </div>
         <div id="page-diorama" class="page" role="tabpanel" hidden></div>
+        <div id="page-privacy" class="page" role="tabpanel" hidden>
+          <h2>位置情報</h2>
+          <label class="check"><input id="remove-gps" type="checkbox" /> 位置情報（GPS）を消して保存する</label>
+          <p class="note">「出力」タブの「位置情報を残す」と同じ設定です（EXIF を残さないときは、位置情報も残りません）。</p>
+          <h2>隠す範囲</h2>
+          <div class="buttons tools" role="group" aria-label="隠し方">
+            <button type="button" data-region-tool="blur" aria-pressed="true">ぼかし</button>
+            <button type="button" data-region-tool="mosaic" aria-pressed="false">モザイク</button>
+          </div>
+          <label class="row">
+            強さ
+            <input id="region-strength" type="range" min="1" max="100" step="1" title="ダブルクリックで 50 に戻す" />
+            <output id="region-strength-value"></output>
+          </label>
+          <div class="buttons">
+            <button type="button" id="region-delete">選んだ範囲を消す</button>
+            <button type="button" id="region-clear">すべて消す</button>
+          </div>
+          <p class="note" id="privacy-note">隠し方を選んでプレビューの上をドラッグすると、範囲を足します（いくつでも）。範囲を押すと選び、ドラッグで移動、四隅で大きさを変えます。強さ・隠し方は選んだ範囲に効きます。</p>
+        </div>
         <div id="page-exif" class="page exif" role="tabpanel" hidden></div>
         <div class="actions">
           <button type="button" id="before" disabled title="押している間だけ加工前の画像を表示します（\ キー）">加工前</button>

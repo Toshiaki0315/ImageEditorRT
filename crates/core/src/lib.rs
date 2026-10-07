@@ -28,6 +28,7 @@ pub mod output;
 pub mod pillow;
 pub mod pipeline;
 pub mod presets;
+pub mod privacy;
 mod pyfmt;
 pub mod pyrandom;
 pub mod resize;

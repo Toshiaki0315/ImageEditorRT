@@ -45,6 +45,7 @@ export function showLoaded(info: OpenInfo, openNotes: string[]) {
   preview.trimmed = false;
   preview.show(info.previewWidth, info.previewHeight, info.hasAlpha);
   parts.crop.reset([info.width, info.height]);
+  parts.privacy.reset();
   output.reset(true);
   parts.textDialog.show();
   parts.textButton.disabled = parts.tasteButton.disabled = false;
@@ -242,6 +243,7 @@ export async function resetImage() {
   parts.panel.show();
   preview.trimmed = false;
   parts.crop.reset(null);
+  parts.privacy.reset();
   output.reset(false);
   parts.textDialog.close();
   parts.textDialog.show();

@@ -1,8 +1,9 @@
 //! 文字の自動認識（投稿加工。旧版にはない）。macOS の Vision で文字の並んでいる範囲を見つける（端末の中だけで処理する）。
 //!
 //! 表札・ナンバープレート・名札・書類などを隠すため。Vision の文字の認識（日本語・英語）で、文字として読めた
-//! 範囲だけを使う（文字の並びを探すだけの認識は、階段の縞や服の模様も文字と間違えたため）。精度重視の認識は
-//! 小さな文字（ナンバープレートほど）も画像全体 1 回で見つけるので、顔と違って分けては探さない。
+//! 範囲だけを使う（文字の並びを探すだけの認識は、階段の縞や服の模様も文字と間違えたため）。顔と同じく、
+//! 全体と分けた部分ごとに探す（macOS 27 では全体 1 回で小さなナンバープレートも見つけたが、macOS 14 では
+//! 見つけなかったため）。ほぼ同じ範囲は 1 つにまとめる。
 
 use image::RgbaImage;
 use objc2::rc::Retained;
@@ -11,7 +12,7 @@ use objc2_core_graphics::CGImage;
 use objc2_foundation::{NSArray, NSDictionary, NSString};
 use objc2_vision::{VNImageRequestHandler, VNRecognizeTextRequest, VNRequest, VNRequestTextRecognitionLevel};
 
-use crate::faces::{cg_image, to_image_rect};
+use crate::faces::{cg_image, scan_tiles, to_image_rect};
 use crate::transform::{clamp_crop, CropRect};
 
 /// 文字の範囲を広げる幅（文字の高さに対する割合。上下左右に）。文字の端まで確実に隠すため。
@@ -27,7 +28,7 @@ const SAME_OVERLAP: f64 = 0.5;
 /// 上から順（同じ高さなら左から）に返す。見つからなければ空。
 pub fn detect_text(image: &RgbaImage) -> Result<Vec<CropRect>, String> {
     let size = image.dimensions();
-    let found = detect_image(image)?;
+    let found = scan_tiles(image, detect_image)?;
     let padded = merge(found).into_iter().filter_map(|r| pad(r, size)).collect();
     Ok(merge(padded))
 }

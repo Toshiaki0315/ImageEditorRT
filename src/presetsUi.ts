@@ -1,11 +1,12 @@
-// プリセット（名前付きの加工の組み合わせ。旧版 FR-UI-59）: 「プリセット ▾」のメニュー・保存・当てはめ・削除。
+// プリセット（名前付きの加工の組み合わせ。旧版 FR-UI-59）: 「プリセット ▾」のメニュー・保存・当てはめ・削除と、
+// 保存せずに使い回す「加工をコピー／ペースト」（旧版にはない）。
 
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { $, parts, state } from "./app";
 import { userChanged } from "./editing";
-import { MENU } from "./menus";
-import { showError, updateStatus } from "./status";
+import { MENU, updateMenus } from "./menus";
+import { notify, showError, updateStatus } from "./status";
 import type { EditSettings } from "./types";
 
 /** プリセットの名前の一覧（「プリセット ▾」のメニューに出す。並びは Rust の一覧と同じ） */
@@ -40,12 +41,36 @@ export function onPresetMenu(id: string) {
 }
 
 /** プリセットの加工を当てはめる（サイズ・範囲・向きはそのまま）。1 回の操作として元に戻せる。 */
-async function applyPreset(name: string) {
+function applyPreset(name: string) {
+  return applyLook("プリセットを当てはめられません", () =>
+    invoke<EditSettings>("apply_preset", { name, settings: state.settings }),
+  );
+}
+
+/** 「加工をコピー」: 今の写真の設定を覚える（ペーストでは加工の項目だけを使う）。 */
+export function copyLook() {
+  if (!state.loaded) return;
+  state.copiedLook = structuredClone(state.settings);
+  updateMenus();
+  notify("加工をコピーしました（「編集 > 加工をペースト」で別の写真に当てはめます）");
+}
+
+/** 「加工をペースト」: コピーした加工を、プリセットと同じく今の写真に当てはめる。 */
+export function pasteLook() {
+  const look = state.copiedLook;
+  if (!look) return;
+  return applyLook("加工をペーストできません", () =>
+    invoke<EditSettings>("apply_look", { look, settings: state.settings }),
+  );
+}
+
+/** 加工を当てはめる（fetch が当てはめた後の設定を返す）。1 回の操作として元に戻せる。 */
+async function applyLook(failure: string, fetch: () => Promise<EditSettings>) {
   if (!state.loaded || state.saving) return;
   try {
-    Object.assign(state.settings, await invoke<EditSettings>("apply_preset", { name, settings: state.settings }));
+    Object.assign(state.settings, await fetch());
   } catch (error) {
-    await showError("プリセットを当てはめられません", error);
+    await showError(failure, error);
     return;
   }
   parts.panel.show();

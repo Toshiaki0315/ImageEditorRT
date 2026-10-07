@@ -24,7 +24,7 @@ import {
 import { MENU, setMenuChecked } from "./menus";
 import { Panel } from "./panel";
 import { PrivacyPanel } from "./privacy";
-import { loadPresets, onPresetMenu, showPresetMenu } from "./presetsUi";
+import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
 import { catchUnexpectedErrors, notify, reportUnexpected, showError } from "./status";
 import { TasteGallery } from "./tasteGallery";
 import { TextDialog } from "./textDialog";
@@ -48,6 +48,8 @@ const menuActions: Record<string, () => void> = {
   [MENU.undo]: undo,
   [MENU.redo]: redo,
   [MENU.text]: () => state.loaded && parts.textDialog.open(),
+  [MENU.copyLook]: copyLook,
+  [MENU.pasteLook]: () => void pasteLook(),
   [MENU.actualSize]: () => showActualSize(),
   [MENU.fit]: fitToWindow,
   [MENU.histogram]: () => {

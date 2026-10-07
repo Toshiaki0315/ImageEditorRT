@@ -92,6 +92,13 @@ pub fn crop_fit(rect: Option<CropRect>, aspect: AspectChoice, size: (u32, u32)) 
     crop::fit_to_aspect(rect, aspect, size)
 }
 
+/// 「加工をペースト」: look（コピーした写真の設定）の加工（プリセットと同じ項目）を settings に当てはめる
+/// （サイズ・範囲・向き・投稿加工の範囲はそのまま）。
+#[tauri::command]
+pub fn apply_look(look: EditSettings, settings: EditSettings) -> EditSettings {
+    imageeditorrt_core::presets::Preset::from_settings("", &look).apply(&settings)
+}
+
 /// 投稿加工で選べるスタンプの絵文字（画面の並びの順）。
 #[tauri::command]
 pub fn stamp_list() -> Vec<&'static str> {

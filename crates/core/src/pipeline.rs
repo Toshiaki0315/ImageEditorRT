@@ -6,6 +6,7 @@
 //! フレーム・形（#13）は、トリミングの後の比への切り抜きと、経年劣化の後にここへ足す。
 
 use image::{imageops, RgbaImage};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::adjust::{self, Lut};
@@ -30,6 +31,8 @@ pub const FILTER_STRENGTH_MAX: u32 = 200;
 
 /// プレビューの長辺（px）。
 pub const PREVIEW_MAX_SIDE: u32 = 1600;
+/// テイストの一覧の見本の長辺（px。切り抜いた写真の長辺をこの大きさにする）。
+pub const THUMBNAIL_MAX_SIDE: u32 = 240;
 
 /// 編集設定。トリミング範囲は、回転・反転した後の原寸画像の座標で持つ。JSON では camelCase。
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -275,6 +278,36 @@ pub fn render_preview_with_histogram(
         text::draw_text(&mut rendered, &photo_text(settings), area, None);
     }
     (rendered, histogram)
+}
+
+/// テイストの一覧の見本: 今の設定のまま、テイストだけを FilterType::ALL の順に替えた小さな完成形を返す。
+///
+/// image・factor は render_preview と同じ（縮小したプレビューと、その縮小率）。切り抜いた写真の長辺が
+/// max_side になるまで縮めてから（大きくはしない）、切り抜き・形・フレームも付けた表示（trimmed）を作る。
+/// 強さは 100%（テイストを選び直すと 100% に戻るので、選んだときと同じ見た目）。テイストごとに並列に作る。
+pub fn filter_thumbnails(
+    image: &RgbaImage,
+    settings: &EditSettings,
+    factor: f64,
+    max_side: u32,
+) -> Vec<RgbaImage> {
+    let size = settings.orientation.size(image.dimensions());
+    let scaled = scale_settings(settings, factor);
+    let photo =
+        effective_crop(size, scaled.crop, settings.frame, settings.shape).unwrap_or(CropRect::whole(size));
+    let long = photo.width.max(photo.height).max(1) as f64;
+    // 縮める倍率（切り抜いた写真の長辺を max_side に）。画像全体の長辺に直して make_preview に渡す
+    let shrink = (f64::from(max_side) / long).min(1.0);
+    let whole_side = (f64::from(image.width().max(image.height())) * shrink).round().max(1.0) as u32;
+    let (small, small_factor) = make_preview(image, whole_side);
+    let factor = factor * small_factor;
+    FilterType::ALL
+        .par_iter()
+        .map(|&filter| {
+            let settings = EditSettings { filter, filter_strength: FILTER_STRENGTH_FULL, ..settings.clone() };
+            render_preview(&small, &settings, factor, true)
+        })
+        .collect()
 }
 
 /// プレビューに重ねる、ジオラマのピントの帯のガイドの線。
@@ -720,5 +753,30 @@ mod tests {
         let rotated = EditSettings { orientation: Orientation::new(90, false), ..settings.clone() };
         let expected = transform::straighten(&Orientation::new(90, false).transpose(&image), 5.0);
         assert_eq!(apply_edits(&image, &rotated).unwrap(), expected);
+    }
+
+    #[test]
+    fn filter_thumbnails_cover_every_taste() {
+        let image = sample();
+        let settings = EditSettings {
+            filter: FilterType::Sepia,
+            filter_strength: 30,
+            crop: Some(CropRect::new(0, 0, 60, 40)),
+            exposure: 0.5,
+            ..EditSettings::default()
+        };
+        // 原寸 240×160 を 0.5 倍にしたプレビュー。切り抜いた写真（原寸 60×40 → プレビュー 30×20）の長辺は大きくしない
+        let thumbnails = filter_thumbnails(&image, &settings, 0.5, 240);
+        assert_eq!(thumbnails.len(), FilterType::ALL.len());
+        assert!(thumbnails.iter().all(|t| t.dimensions() == (30, 20)));
+        // 「なし」の見本はテイストなし（強さに関係なく）、セピアは強さ 100% の完成形
+        let none = EditSettings { filter: FilterType::None, ..settings.clone() };
+        assert_eq!(thumbnails[0], render_preview(&image, &none, 0.5, true));
+        let sepia = FilterType::ALL.iter().position(|&f| f == FilterType::Sepia).unwrap();
+        let full = EditSettings { filter_strength: 100, ..settings.clone() };
+        assert_eq!(thumbnails[sepia], render_preview(&image, &full, 0.5, true));
+        // 大きい写真は、切り抜いた写真の長辺が max_side になるまで縮める
+        let big = filter_thumbnails(&image, &EditSettings::default(), 1.0, 60);
+        assert!(big.iter().all(|t| t.dimensions() == (60, 40)));
     }
 }

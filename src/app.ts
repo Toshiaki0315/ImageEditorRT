@@ -11,6 +11,7 @@ import type { Panel } from "./panel";
 import { Preview } from "./preview";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
+import type { TasteGallery } from "./tasteGallery";
 import type { TextDialog } from "./textDialog";
 import { defaultSettings, type EditSettings, type OpenInfo } from "./types";
 import type { AspectState } from "./crop";
@@ -63,6 +64,9 @@ export const parts = {} as {
   textDialog: TextDialog;
   /** 「加工」タブの「文字…」のボタン（設定パネルを作った後に取る） */
   textButton: HTMLButtonElement;
+  /** テイストの一覧と、それを開く「一覧…」のボタン */
+  tasteGallery: TasteGallery;
+  tasteButton: HTMLButtonElement;
   recorder: HistoryRecorder<Snapshot>;
   batchDialog: BatchDialog;
 };

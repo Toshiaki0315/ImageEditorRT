@@ -39,3 +39,19 @@ export function readRawImage(buffer: ArrayBuffer): RawImage {
   const height = header.getUint32(4, true);
   return { width, height, pixels: new Uint8ClampedArray(buffer, 8, width * height * 4) };
 }
+
+/** テイストの一覧の見本（filter_thumbnails）: 数の u32、見本ごとに幅・高さの u32 が 2 つと RGBA の画素。 */
+export function readImages(buffer: ArrayBuffer): RawImage[] {
+  const view = new DataView(buffer);
+  const count = view.getUint32(0, true);
+  const images: RawImage[] = [];
+  let offset = 4;
+  for (let i = 0; i < count; i++) {
+    const width = view.getUint32(offset, true);
+    const height = view.getUint32(offset + 4, true);
+    const size = width * height * 4;
+    images.push({ width, height, pixels: new Uint8ClampedArray(buffer, offset + 8, size) });
+    offset += 8 + size;
+  }
+  return images;
+}

@@ -84,8 +84,9 @@ async function createParts() {
       void showError("顔を認識できません", error);
       return null;
     });
-  parts.privacy.onFaces = (count) =>
-    notify(count > 0 ? `顔を ${count} 個見つけて、スタンプを置きました` : "顔が見つかりませんでした");
+  const coverNames = { blur: "ぼかし", mosaic: "モザイク", stamp: "スタンプ" } as const;
+  parts.privacy.onFaces = (count, kind) =>
+    notify(count > 0 ? `顔を ${count} 個見つけて、${coverNames[kind]}で隠しました` : "顔が見つかりませんでした");
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
   parts.textButton = $<HTMLButtonElement>("text-button");

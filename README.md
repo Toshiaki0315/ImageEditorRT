@@ -90,11 +90,12 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 | コマンド | すること | できるもの |
 |---|---|---|
 | `make app` | `.app` を作り、ad-hoc で署名し、起動確認をする（画面を出さずに PNG と HEIC を読めるか） | `target/release/bundle/macos/ImageEditorRT.app` |
-| `make dmg` | `.app` を作ってからディスクイメージにする（`.app` と Applications へのリンク） | `target/release/bundle/dmg/ImageEditorRT_<版>_arm64.dmg` |
+| `make dmg` | `.app` を作ってからディスクイメージにする（開くと、ほかのアプリと同じく大きなアイコンで `.app` と Applications へのリンクが並ぶ） | `target/release/bundle/dmg/ImageEditorRT_<版>_arm64.dmg` |
 | `scripts/build_app.sh --install` | `make app` と同じことをしてから `/Applications` に入れ、「このアプリケーションで開く」に出るよう登録する | `/Applications/ImageEditorRT.app` |
 
 - インストールのとき ImageEditorRT が起動していると、入れ替えずに止まる。終了してから、もう一度実行する。
 - dmg を開いて `.app` を Applications にドラッグしてもインストールできる。
+- `make dmg` は dmg の見た目を Finder に設定させるので、作っている間に Finder のウィンドウが一瞬開く（初回は「Finder を操作する」許可を求められる）。同じ名前の dmg（ImageEditorRT）を開いたままだと作れないので、取り出してから実行する。
 - どれも、画面の依存パッケージ（`node_modules`）がなければ先に入れる。
 
 ## 利用方法

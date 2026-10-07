@@ -315,7 +315,12 @@ mod tests {
             OrientOp::RotateRight,
             Some(CropRect::new(10, 20, 30, 40)),
             &[
-                Region { kind: RegionKind::Mosaic, rect: CropRect::new(10, 20, 30, 40), strength: 70 },
+                Region {
+                    kind: RegionKind::Mosaic,
+                    rect: CropRect::new(10, 20, 30, 40),
+                    strength: 70,
+                    ..Region::default()
+                },
                 // 画像の外の範囲は捨てる
                 Region { rect: CropRect::new(500, 500, 10, 10), ..Region::default() },
             ],
@@ -326,7 +331,12 @@ mod tests {
         assert_eq!(result.crop, Some(CropRect::new(40, 10, 40, 30)));
         assert_eq!(
             result.regions,
-            vec![Region { kind: RegionKind::Mosaic, rect: CropRect::new(40, 10, 40, 30), strength: 70 }]
+            vec![Region {
+                kind: RegionKind::Mosaic,
+                rect: CropRect::new(40, 10, 40, 30),
+                strength: 70,
+                ..Region::default()
+            }]
         );
         let flipped = orient(Orientation::default(), OrientOp::FlipHorizontal, None, &[], (200, 100));
         assert_eq!((flipped.size, flipped.crop), ((200, 100), None));

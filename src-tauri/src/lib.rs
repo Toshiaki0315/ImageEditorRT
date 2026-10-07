@@ -77,6 +77,7 @@ pub fn run() {
             settings::crop_spin,
             settings::crop_fit,
             settings::crop_orient,
+            settings::stamp_list,
             settings::resolve_size,
             settings::rotate_size,
             settings::output_size,

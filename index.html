@@ -99,7 +99,9 @@
           <div class="buttons tools" role="group" aria-label="隠し方">
             <button type="button" data-region-tool="blur" aria-pressed="true">ぼかし</button>
             <button type="button" data-region-tool="mosaic" aria-pressed="false">モザイク</button>
+            <button type="button" data-region-tool="stamp" aria-pressed="false">スタンプ</button>
           </div>
+          <div id="stamp-grid" class="stamp-grid" role="group" aria-label="スタンプ"></div>
           <label class="row">
             強さ
             <input id="region-strength" type="range" min="1" max="100" step="1" title="ダブルクリックで 50 に戻す" />
@@ -109,7 +111,7 @@
             <button type="button" id="region-delete">選んだ範囲を消す</button>
             <button type="button" id="region-clear">すべて消す</button>
           </div>
-          <p class="note" id="privacy-note">隠し方を選んでプレビューの上をドラッグすると、範囲を足します（いくつでも）。範囲を押すと選び、ドラッグで移動、四隅で大きさを変えます。強さ・隠し方は選んだ範囲に効きます。</p>
+          <p class="note" id="privacy-note">隠し方を選んでプレビューの上をドラッグすると、範囲を足します（いくつでも）。スタンプは範囲に収まる正方形で中央に置きます。範囲を押すと選び、ドラッグで移動、四隅で大きさを変えます。隠し方・強さ・スタンプの絵は選んだ範囲に効きます。</p>
         </div>
         <div id="page-exif" class="page exif" role="tabpanel" hidden></div>
         <div class="actions">

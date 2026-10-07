@@ -1,8 +1,14 @@
-//! 投稿加工（旧版にはない）: 写真の一部をぼかし・モザイクで隠す。
+//! 投稿加工（旧版にはない）: 写真の一部をぼかし・モザイク・絵文字のスタンプで隠す。
 //!
 //! 範囲はトリミング範囲と同じく、回転・反転（と水平の補正）をした後の原寸の画像の座標で持つ。
 //! ぼかしの半径・モザイクの目の大きさは範囲の短辺に比例させるので、縮小したプレビューでも原寸でも
 //! 同じ見え方になる。範囲の外の画素は変えない。
+//!
+//! ぼかし・モザイクは回転・反転の直後に（`cover`）、スタンプはテイスト・周辺減光・経年劣化の後に
+//! （`stamp`。色を変えない）かける。スタンプは macOS の Apple Color Emoji の絵で描く。
+
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 use image::{imageops, RgbaImage};
 use serde::{Deserialize, Serialize};
@@ -22,7 +28,21 @@ pub enum RegionKind {
     #[default]
     Blur,
     Mosaic,
+    /// 絵文字のスタンプ（範囲に収まる正方形で中央に置く）
+    Stamp,
 }
+
+/// スタンプの既定の絵文字。
+pub const STAMP_DEFAULT: &str = "😊";
+
+/// 選べるスタンプ（画面の並びの順）。どれも Apple Color Emoji の 1 文字（ハートは異体字セレクタ付き）。
+pub const STAMPS: [&str; 20] = [
+    "😊", "😀", "😆", "😎", "🥰", "😇", "🙂", "😺", "🐱", "🐶", "🐰", "🐻", "🐼", "🐵", "❤️", "⭐", "🌸",
+    "✨", "🍀", "🙈",
+];
+
+/// Apple Color Emoji のファイル。
+const EMOJI_FONT: &str = "/System/Library/Fonts/Apple Color Emoji.ttc";
 
 /// 隠す範囲 1 つ。
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,13 +51,20 @@ pub struct Region {
     pub kind: RegionKind,
     /// 回転・反転した後の原寸の画像の座標（px）
     pub rect: CropRect,
-    /// 強さ 1〜100（ぼかしの半径・モザイクの目の大きさ）
+    /// 強さ 1〜100（ぼかしの半径・モザイクの目の大きさ。スタンプでは使わない）
     pub strength: u32,
+    /// スタンプの絵文字（スタンプのときだけ使う）
+    pub stamp: String,
 }
 
 impl Default for Region {
     fn default() -> Self {
-        Self { kind: RegionKind::Blur, rect: CropRect::new(0, 0, 0, 0), strength: STRENGTH_DEFAULT }
+        Self {
+            kind: RegionKind::Blur,
+            rect: CropRect::new(0, 0, 0, 0),
+            strength: STRENGTH_DEFAULT,
+            stamp: STAMP_DEFAULT.into(),
+        }
     }
 }
 
@@ -62,6 +89,9 @@ pub fn scale_rect(rect: CropRect, factor: f64) -> CropRect {
 /// 範囲が重なっていれば、並んでいる順にかける。
 pub fn cover(image: &mut RgbaImage, regions: &[Region], factor: f64) {
     for region in regions {
+        if region.kind == RegionKind::Stamp {
+            continue;
+        }
         let Some(rect) = clamp_crop(scale_rect(region.rect, factor), image.dimensions()) else { continue };
         let area =
             imageops::crop_imm(image, rect.x as u32, rect.y as u32, rect.width as u32, rect.height as u32)
@@ -70,9 +100,60 @@ pub fn cover(image: &mut RgbaImage, regions: &[Region], factor: f64) {
         let covered = match region.kind {
             RegionKind::Blur => gaussian_blur(&area, size as f32),
             RegionKind::Mosaic => mosaic(&area, size.round().max(1.0) as u32),
+            RegionKind::Stamp => continue,
         };
         imageops::replace(image, &covered, rect.x, rect.y);
     }
+}
+
+/// 画像にスタンプを描く。原寸の座標 (x, y) は画像の (x × scale.0 − offset.0, y × scale.1 − offset.1) に当たる
+/// （切り抜き・リサイズの後の画像に描くため）。スタンプは範囲に収まる正方形で、範囲の中央に置く。
+/// 画像の外にはみ出す部分は描かない。絵文字を描けなければ（macOS 以外など）何もしない。
+pub fn stamp(image: &mut RgbaImage, regions: &[Region], scale: (f64, f64), offset: (f64, f64)) {
+    for region in regions.iter().filter(|r| r.kind == RegionKind::Stamp) {
+        let r = region.rect;
+        let (left, top) = (r.x as f64 * scale.0 - offset.0, r.y as f64 * scale.1 - offset.1);
+        let (width, height) = (r.width as f64 * scale.0, r.height as f64 * scale.1);
+        let side = width.min(height).round();
+        if side < 1.0 {
+            continue;
+        }
+        let Some(picture) = emoji(&region.stamp, side as u32) else { continue };
+        let x = (left + (width - side) / 2.0).round() as i64;
+        let y = (top + (height - side) / 2.0).round() as i64;
+        imageops::overlay(image, &picture, x, y);
+    }
+}
+
+/// 絵文字の絵を side × side px で返す（Apple Color Emoji の 160px の絵を Lanczos で拡大・縮小する）。
+fn emoji(text: &str, side: u32) -> Option<RgbaImage> {
+    let picture = emoji_picture(text)?;
+    Some(crate::transform::resize_to(&picture, (side, side)))
+}
+
+/// 絵文字の元の絵（1 文字目。異体字セレクタは見ない）。一度読んだ絵文字は覚えておく。
+fn emoji_picture(text: &str) -> Option<RgbaImage> {
+    use ab_glyph::Font;
+    static CACHE: OnceLock<Mutex<HashMap<char, Option<RgbaImage>>>> = OnceLock::new();
+    let c = text.chars().next()?;
+    let mut cache = CACHE.get_or_init(Default::default).lock().ok()?;
+    cache
+        .entry(c)
+        .or_insert_with(|| {
+            let font = crate::text::load_font_file(std::path::Path::new(EMOJI_FONT), 0)?;
+            let id = font.glyph_id(c);
+            if id.0 == 0 {
+                return None;
+            }
+            let raster = font.glyph_raster_image2(id, u16::MAX)?;
+            if !matches!(raster.format, ab_glyph::GlyphImageFormat::Png) {
+                return None;
+            }
+            image::load_from_memory_with_format(raster.data, image::ImageFormat::Png)
+                .ok()
+                .map(|i| i.to_rgba8())
+        })
+        .clone()
 }
 
 /// モザイク: block × block の目ごとに、その中の色の平均で塗る（透明度を考えて平均する）。
@@ -126,7 +207,7 @@ mod tests {
     }
 
     fn region(kind: RegionKind, rect: CropRect, strength: u32) -> Region {
-        Region { kind, rect, strength }
+        Region { kind, rect, strength, ..Region::default() }
     }
 
     #[test]
@@ -225,5 +306,57 @@ mod tests {
         assert_eq!(out.get_pixel(0, 0).0, [0, 0, 255, 128]);
         image = out;
         assert_eq!(image.get_pixel(1, 0).0, [0, 0, 255, 128]);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn every_stamp_can_be_drawn() {
+        for text in STAMPS {
+            let picture = emoji(text, 64).unwrap_or_else(|| panic!("{text}"));
+            assert_eq!(picture.dimensions(), (64, 64));
+            // 色のついた、不透明な部分がある
+            assert!(picture.pixels().filter(|p| p[3] > 200).count() > 200, "{text}");
+        }
+        // 絵文字のない文字は描かない
+        assert!(emoji("\u{E000}", 64).is_none());
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn stamp_is_a_centered_square_inside_the_region() {
+        let original = RgbaImage::from_pixel(100, 60, Rgba([0, 0, 255, 255]));
+        let mut image = original.clone();
+        let regions =
+            [Region { kind: RegionKind::Stamp, rect: CropRect::new(10, 10, 60, 40), ..Region::default() }];
+        stamp(&mut image, &regions, (1.0, 1.0), (0.0, 0.0));
+        // 40 × 40 の正方形を、範囲の中央（x = 20〜60, y = 10〜50）に置く
+        for (x, y, p) in image.enumerate_pixels() {
+            if !((20..60).contains(&x) && (10..50).contains(&y)) {
+                assert_eq!(p, original.get_pixel(x, y), "{x} {y}");
+            }
+        }
+        assert_ne!(image.get_pixel(40, 30), original.get_pixel(40, 30));
+        // ぼかし・モザイクの cover はスタンプを描かない
+        let mut covered = original.clone();
+        cover(&mut covered, &regions, 1.0);
+        assert_eq!(covered, original);
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn stamp_follows_scale_and_offset() {
+        let blank = RgbaImage::from_pixel(50, 50, Rgba([0, 0, 0, 255]));
+        let regions =
+            [Region { kind: RegionKind::Stamp, rect: CropRect::new(40, 40, 40, 40), ..Region::default() }];
+        // 原寸を 0.5 倍にして、(10, 10) から切り抜いた画像 → (10, 10)〜(30, 30) に描く
+        let mut image = blank.clone();
+        stamp(&mut image, &regions, (0.5, 0.5), (10.0, 10.0));
+        let changed: Vec<(u32, u32)> = image
+            .enumerate_pixels()
+            .filter(|(x, y, p)| *p != blank.get_pixel(*x, *y))
+            .map(|(x, y, _)| (x, y))
+            .collect();
+        assert!(!changed.is_empty());
+        assert!(changed.iter().all(|&(x, y)| (10..30).contains(&x) && (10..30).contains(&y)));
     }
 }

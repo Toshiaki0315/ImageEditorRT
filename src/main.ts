@@ -77,7 +77,8 @@ async function createParts() {
     },
     () => output.rotate(),
   );
-  parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, userChanged);
+  const stamps = await invoke<string[]>("stamp_list");
+  parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
   parts.textButton = $<HTMLButtonElement>("text-button");

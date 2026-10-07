@@ -58,6 +58,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             image::open_path,
             image::render_preview,
+            image::filter_thumbnails,
             image::render_actual_size,
             image::close_image,
             image::diorama_guide,

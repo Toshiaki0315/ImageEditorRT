@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { histogramPeak } from "../src/histogram.ts";
 import { isCompareKey } from "../src/keys.ts";
 import { sizeSnapshot } from "../src/output.ts";
-import { readPreview, readRawImage } from "../src/protocol.ts";
+import { readImages, readPreview, readRawImage } from "../src/protocol.ts";
 import { centeredOffset, clampOffset } from "../src/zoom.ts";
 
 test("100% 表示: 表示より小さい向きは中央にそろえる", () => {
@@ -49,6 +49,18 @@ test("原寸の画像のバイト列: 幅・高さ・画素", () => {
   const buffer = new Uint8Array([...u32s([1, 2]), 9, 8, 7, 6, 5, 4, 3, 2]).buffer;
   const image = readRawImage(buffer);
   assert.deepEqual([image.width, image.height, [...image.pixels]], [1, 2, [9, 8, 7, 6, 5, 4, 3, 2]]);
+});
+
+test("テイストの一覧の見本のバイト列: 数・見本ごとの幅・高さ・画素", () => {
+  const buffer = new Uint8Array([...u32s([2, 1, 1]), 1, 2, 3, 4, ...u32s([2, 1]), 5, 6, 7, 8, 9, 10, 11, 12]).buffer;
+  const images = readImages(buffer);
+  assert.deepEqual(
+    images.map((i) => [i.width, i.height, [...i.pixels]]),
+    [
+      [1, 1, [1, 2, 3, 4]],
+      [2, 1, [5, 6, 7, 8, 9, 10, 11, 12]],
+    ],
+  );
 });
 
 test("ヒストグラムの高さの基準は、両端（0・255）を除いた最大（最小 1）", () => {

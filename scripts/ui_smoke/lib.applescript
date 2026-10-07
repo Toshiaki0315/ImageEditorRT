@@ -56,10 +56,10 @@ on run argv
 			end repeat
 			return out as text
 		else if requested is "click" then
-			-- ボタン・タブ（ラジオボタン）を名前で押す（シートのダイアログの中も探す）
+			-- ボタン・タブ（ラジオボタン）・押したままの状態を持つボタン（チェックボックス）を名前で押す（シートのダイアログの中も探す）
 			set wanted to item 3 of argv
 			repeat with w in windows of p
-				repeat with r in {"AXButton", "AXRadioButton"}
+				repeat with r in {"AXButton", "AXRadioButton", "AXCheckBox"}
 					set b to my findElement(w, contents of r, wanted, 0)
 					if b is not missing value then
 						click b

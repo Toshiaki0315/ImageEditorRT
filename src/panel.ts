@@ -83,14 +83,7 @@ export class Panel {
     heading.textContent = "テイスト";
     this.filter.className = "filter";
     for (const [value, label] of filters) this.filter.add(new Option(label, value));
-    this.filter.addEventListener("change", () => {
-      this.settings.filter = this.filter.value as FilterType;
-      // テイストを選び直したら、強さは既定（100%）に戻す（前のテイストに合わせた強さを持ち越さない）
-      this.settings.filterStrength = STRENGTH[0].initial;
-      this.showRow("filterStrength");
-      this.updateStrength();
-      this.onChange();
-    });
+    this.filter.addEventListener("change", () => this.selectFilter(this.filter.value as FilterType));
     // 旧版と同じく、テイストの行に「文字…」のボタンを置く（⌘T と同じ）
     const row = document.createElement("div");
     row.className = "filter-row";
@@ -106,7 +99,14 @@ export class Panel {
     presetButton.id = "preset-button";
     presetButton.textContent = "プリセット ▾";
     presetButton.title = "加工の組み合わせを保存・呼び出し・削除します";
-    row.append(this.filter, presetButton, textButton);
+    // 今の写真にテイストをかけた見本を並べて選ぶ（旧版にはない）
+    const galleryButton = document.createElement("button");
+    galleryButton.type = "button";
+    galleryButton.id = "taste-button";
+    galleryButton.textContent = "一覧…";
+    galleryButton.title = "今の写真にテイストをかけた見本を並べて選びます";
+    galleryButton.disabled = true;
+    row.append(this.filter, galleryButton, presetButton, textButton);
     adjustPage.append(heading, row);
     this.build(adjustPage, STRENGTH);
     this.heading(adjustPage, "加工");
@@ -177,6 +177,16 @@ export class Panel {
     }
     this.settings[slider.key] = fixed;
     this.showRow(slider.key);
+    this.onChange();
+  }
+
+  /** テイストを選ぶ（プルダウン・一覧から）。強さは既定（100%）に戻す（前のテイストに合わせた強さを持ち越さない）。 */
+  selectFilter(filter: FilterType) {
+    this.settings.filter = filter;
+    this.filter.value = filter;
+    this.settings.filterStrength = STRENGTH[0].initial;
+    this.showRow("filterStrength");
+    this.updateStrength();
     this.onChange();
   }
 

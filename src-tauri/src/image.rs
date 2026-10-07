@@ -75,6 +75,35 @@ pub async fn render_preview(
     Ok(Response::new(body))
 }
 
+/// テイストの一覧の見本（今の設定のまま、テイストだけを替えた小さな完成形。順は filter_types と同じ）。
+///
+/// 返すバイト列: 先頭 4 バイトが見本の数、その後ろに見本ごとの幅・高さ（u32 リトルエンディアン）と
+/// RGBA の画素を続ける。
+#[tauri::command]
+pub async fn filter_thumbnails(
+    settings: EditSettings,
+    state: State<'_, AppState>,
+) -> Result<Response, String> {
+    let (preview, factor) = {
+        let loaded = state.0.lock().map_err(|e| e.to_string())?;
+        (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor)
+    };
+    let thumbnails = blocking(move || {
+        Ok(pipeline::filter_thumbnails(&preview, &settings, factor, pipeline::THUMBNAIL_MAX_SIDE))
+    })
+    .await?;
+    let total: usize = thumbnails.iter().map(|t| 8 + t.as_raw().len()).sum();
+    let mut body = Vec::with_capacity(4 + total);
+    body.extend_from_slice(&(thumbnails.len() as u32).to_le_bytes());
+    for thumbnail in thumbnails {
+        let (width, height) = thumbnail.dimensions();
+        body.extend_from_slice(&width.to_le_bytes());
+        body.extend_from_slice(&height.to_le_bytes());
+        body.extend_from_slice(thumbnail.as_raw());
+    }
+    Ok(Response::new(body))
+}
+
 /// リセット（旧版 FR-UI-42）: 読み込んだ画像を捨てて、未読込の状態に戻す。
 #[tauri::command]
 pub fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {

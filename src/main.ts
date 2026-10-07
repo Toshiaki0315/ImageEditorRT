@@ -25,6 +25,7 @@ import { MENU, setMenuChecked } from "./menus";
 import { Panel } from "./panel";
 import { loadPresets, onPresetMenu, showPresetMenu } from "./presetsUi";
 import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
+import { TasteGallery } from "./tasteGallery";
 import { TextDialog } from "./textDialog";
 import type { AspectRatio, FilterType, FrameKind, OpenInfo, ShapeType, TextFont, TextPosition } from "./types";
 import { fitToWindow, onPreviewDoubleClick, placeBadge, setupCompare, showActualSize, updateGuide } from "./view";
@@ -77,6 +78,8 @@ async function createParts() {
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
   parts.textButton = $<HTMLButtonElement>("text-button");
+  parts.tasteGallery = new TasteGallery(filters, settings, (filter) => parts.panel.selectFilter(filter));
+  parts.tasteButton = $<HTMLButtonElement>("taste-button");
   parts.batchDialog = new BatchDialog(state.extensions);
   setupHistory();
 }
@@ -91,6 +94,13 @@ function connectControls() {
   );
   parts.textButton.addEventListener("click", () => {
     if (state.loaded) parts.textDialog.open();
+  });
+  parts.tasteButton.addEventListener("click", () => {
+    if (!state.loaded) return;
+    parts.tasteGallery.open(parts.tasteButton).catch((error) => {
+      parts.tasteGallery.close();
+      void showError("テイストの一覧を作れません", error);
+    });
   });
   preview.onResize = () => {
     parts.crop.draw();

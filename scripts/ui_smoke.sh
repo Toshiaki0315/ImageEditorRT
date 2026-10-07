@@ -4,7 +4,7 @@
 # 使い方:
 #   scripts/ui_smoke.sh
 #
-# - 確かめること: 画像を開く・スライダー・元に戻す／やり直す・100% 表示と戻す・リセット（キャンセル・破棄）・終了
+# - 確かめること: 画像を開く・スライダー・元に戻す／やり直す・水平の補正・100% 表示と戻す・リセット（キャンセル・破棄）・終了
 # - 開発版（npm run tauri dev）を使う（インストールしたアプリと環境設定を共有しないため）
 # - 操作は開発版のプロセスだけに向けたアクセシビリティの操作で行い、キー入力は送らない。クリップボードは触らない
 # - ターミナル（またはこのスクリプトを動かすアプリ）に、システム設定の「プライバシーとセキュリティ >
@@ -78,6 +78,10 @@ ax menu "$PID" "編集" "元に戻す" >/dev/null; sleep 0.5
 check "元に戻す" "0" "$(ax slider "$PID" "明るさ" 0)"
 ax menu "$PID" "編集" "やり直す" >/dev/null; sleep 0.5
 check "やり直す" "3" "$(ax slider "$PID" "明るさ" 0)"
+
+ax click "$PID" "切り抜き" >/dev/null; sleep 0.5
+check "水平の補正のスライダー" "0.3" "$(ax slider "$PID" "水平の補正" 3)"
+ax click "$PID" "加工" >/dev/null
 
 ax menu "$PID" "表示" "100% で表示" >/dev/null
 wait_for 15 sh -c "[ \"\$(osascript '$LIB' menu-enabled $PID 表示 画面に合わせる)\" = true ]" || true

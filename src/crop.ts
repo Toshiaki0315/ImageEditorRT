@@ -24,6 +24,9 @@ const EDIT_RANGE_TEXT = "範囲を編集";
 /** 縦向きを選べる比（自由と 1:1 には向きがない） */
 const HAS_ORIENTATION: AspectRatio[] = ["ratio4x3", "ratio3x2", "ratio16x9"];
 
+/** 角度を「+1.5°」「-0.3°」「0.0°」のように表示する。 */
+export const degreesText = (degrees: number) => `${degrees > 0 ? "+" : ""}${degrees.toFixed(1)}°`;
+
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 export class CropController {
@@ -41,6 +44,8 @@ export class CropController {
   private readonly shape = $<HTMLSelectElement>("shape");
   private readonly corner = $<HTMLInputElement>("corner-radius");
   private readonly cornerValue = $<HTMLOutputElement>("corner-radius-value");
+  private readonly straighten = $<HTMLInputElement>("straighten");
+  private readonly straightenValue = $<HTMLOutputElement>("straighten-value");
   /** フレーム・円で比を固定したときに覚えておく、比のプルダウンの選択 */
   private chosenRatio: AspectRatio = "free";
   /** 形をかける範囲（実際に切り抜く範囲。なければ画像全体） */
@@ -87,6 +92,8 @@ export class CropController {
     this.corner.addEventListener("input", () => this.setCorner(Number(this.corner.value)));
     // ダブルクリックで既定値に戻す（旧版 FR-UI-53。角丸以外の形では操作できない）
     this.corner.addEventListener("dblclick", () => this.setCorner(CORNER_RADIUS_DEFAULT));
+    this.straighten.addEventListener("input", () => this.setStraighten(Number(this.straighten.value)));
+    this.straighten.addEventListener("dblclick", () => this.setStraighten(0));
     this.portrait.addEventListener("change", () => void this.aspectChanged());
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) {
       button.addEventListener("click", () => void this.orient(button.dataset.orient as OrientOp));
@@ -230,6 +237,15 @@ export class CropController {
     this.onChange();
   }
 
+  /** 水平の補正（0.1° 刻み。大きさは変わらないので、範囲はそのまま）。 */
+  private setStraighten(value: number) {
+    const degrees = Number((Math.round(value * 10) / 10).toFixed(1));
+    if (this.settings.straighten === degrees) return;
+    this.settings.straighten = degrees;
+    this.updateControls();
+    this.onChange();
+  }
+
   // --- 範囲・比・向き ----------------------------------------------------------
 
   private aspectChoice() {
@@ -299,6 +315,10 @@ export class CropController {
       size: this.size,
     });
     this.settings.orientation = result.orientation;
+    // 反転すると傾きの向きも逆になる（90° 回転では同じ角度のまま）
+    if ((op === "flip_horizontal" || op === "flip_vertical") && this.settings.straighten !== 0) {
+      this.settings.straighten = -this.settings.straighten;
+    }
     this.size = result.size;
     const swaps = op === "rotate_left" || op === "rotate_right";
     if (swaps && !this.portrait.disabled) this.portrait.checked = !this.portrait.checked;
@@ -344,6 +364,9 @@ export class CropController {
     this.corner.disabled = !loaded || this.settings.shape !== "rounded";
     this.clear.disabled = !loaded || !crop;
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) button.disabled = !loaded;
+    this.straighten.value = String(this.settings.straighten);
+    this.straightenValue.textContent = degreesText(this.settings.straighten);
+    this.straighten.disabled = !loaded;
     // 範囲・フレーム・形（矩形以外）のどれもなければ「トリミング実行」は押せず、全体の表示に戻す
     const canTrim = loaded && (crop !== null || this.settings.frame !== "none" || this.settings.shape !== "rectangle");
     if (!canTrim && this.isTrimmed()) this.setTrimmed(false);

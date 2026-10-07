@@ -55,6 +55,11 @@
             <button type="button" data-orient="flip_horizontal">左右反転</button>
             <button type="button" data-orient="flip_vertical">上下反転</button>
           </div>
+          <label class="row">
+            水平の補正
+            <input id="straighten" type="range" min="-45" max="45" step="0.1" title="ダブルクリックで 0° に戻す" />
+            <output id="straighten-value"></output>
+          </label>
           <h2>トリミング</h2>
           <label class="row">比 <select id="aspect"></select></label>
           <label class="check"><input id="portrait" type="checkbox" /> 縦向き</label>

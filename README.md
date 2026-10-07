@@ -7,7 +7,7 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 主な機能:
 
 - テイスト 23 種（強さ 0〜200%）・露出〜経年劣化の色の調整・シャープ／ぼかし／ノイズ除去・ジオラマ風
-- 回転・反転・トリミング（比の固定）・リサイズ・フレーム（ポラロイド・チェキ）・形（角丸・円）・文字／透かし
+- 回転・反転・水平の補正・トリミング（比の固定）・リサイズ・フレーム（ポラロイド・チェキ）・形（角丸・円）・文字／透かし
 - 加工前との比較・100% 表示・ヒストグラム・元に戻す／やり直す・プリセット・まとめて処理
 - EXIF の表示（GPS・主なメーカーの MakerNote）と保存（EXIF・位置情報を残すかを選べる）
 - PNG / JPEG / GIF / TIFF / BMP を読み書き、HEIC / HEIF は読み込みのみ
@@ -50,7 +50,7 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 | 画面 | TypeScript 6・Vite 8（フレームワークなし） |
 | テスト | `cargo test`（Rust）・Node の組み込みのテスト（画面のロジック）・アクセシビリティで操作する通しの確認 |
 
-- 処理の順番は旧版と同じ: 向きの補正 → 回転・反転 → トリミング → リサイズ → ジオラマ → テイスト → 形 → 文字 → フレーム。
+- 処理の順番は旧版と同じ: 向きの補正 → 回転・反転 →（水平の補正）→ トリミング → リサイズ → ジオラマ → テイスト → 形 → 文字 → フレーム。
 - プレビューは長辺 1600px に縮めた画像に設定をかけ、保存のときだけ原寸で処理する。元の画像は変えない。
 - ファイルの構成と作業のルールは [CLAUDE.md](CLAUDE.md)、決めたことは [docs/decisions.md](docs/decisions.md) にある。
 
@@ -103,7 +103,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 |---|---|
 | 画像を開く | ウィンドウにドロップ・⌘O・⌘V（クリップボードの画像・Finder でコピーしたファイル）・Finder の「このアプリケーションで開く」 |
 | 加工する | 右の「加工」タブ（テイストと強さ・露出〜経年劣化・ディテール）。スライダーはダブルクリックで既定値 |
-| 切り抜く | 「切り抜き」タブで比を選び、プレビューをドラッグ。回転・反転・フレーム・形（角丸・円）もここ |
+| 切り抜く | 「切り抜き」タブで比を選び、プレビューをドラッグ。回転・反転・水平の補正（±45°）・フレーム・形（角丸・円）もここ |
 | 大きさを変える | 「出力」タブで幅・高さ。保存の設定（JPEG 品質・EXIF・位置情報）も |
 | ジオラマ風 | 「ジオラマ」タブ。ピントの帯のガイドがプレビューに出る |
 | 文字・透かし | ⌘T か「文字…」 |
@@ -115,7 +115,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 ## その他・備考
 
-- **旧版との違い**: 文字の形は Pillow（FreeType）ではなく ab_glyph で描くので、縁や位置が 1px 程度違うことがある。テイストの強さ・未保存のまま終了するときの確認は、この版で足した機能。
+- **旧版との違い**: 文字の形は Pillow（FreeType）ではなく ab_glyph で描くので、縁や位置が 1px 程度違うことがある。テイストの強さ・水平の補正・未保存のまま終了するときの確認は、この版で足した機能。
 - **保存される場所**:
   - プリセット: `~/Library/Application Support/ImageEditorRT/presets.json`（まだなければ旧版の `~/Library/Application Support/ImageEditor/presets.json` を読む。旧版のファイルは書き換えない）
   - 想定外のエラーのログ: `~/Library/Logs/ImageEditorRT/imageeditorrt.log`

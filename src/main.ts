@@ -22,7 +22,7 @@ import {
   startBatch,
 } from "./files";
 import { MENU, setMenuChecked } from "./menus";
-import { Panel } from "./panel";
+import { evText, kelvinText, Panel, signedText } from "./panel";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
 import { catchUnexpectedErrors, notify, reportUnexpected, showError } from "./status";
@@ -104,6 +104,7 @@ async function createParts() {
   parts.textButton = $<HTMLButtonElement>("text-button");
   parts.tasteGallery = new TasteGallery(filters, settings, (filter) => parts.panel.selectFilter(filter));
   parts.tasteButton = $<HTMLButtonElement>("taste-button");
+  parts.autoButton = $<HTMLButtonElement>("auto-adjust");
   parts.batchDialog = new BatchDialog(state.extensions);
   setupHistory();
 }
@@ -120,6 +121,23 @@ function updatePrivacyActive() {
   parts.privacy.setActive(tabs.selected() === "privacy" && !preview.trimmed);
 }
 
+/** 自動補正: 今の写真から露出・コントラスト・色温度を求めてスライダーに入れる（1 回の操作として元に戻せる）。 */
+async function autoAdjust() {
+  if (!state.loaded) return;
+  parts.autoButton.disabled = true;
+  try {
+    const values = await invoke<{ exposure: number; contrast: number; temperature: number }>("auto_adjust", {
+      settings: state.settings,
+    });
+    parts.panel.setAuto(values);
+    notify(`自動補正: 露出 ${evText(values.exposure)}・コントラスト ${signedText(values.contrast)}・色温度 ${kelvinText(values.temperature)}`);
+  } catch (error) {
+    await showError("自動補正できません", error);
+  } finally {
+    parts.autoButton.disabled = state.loaded === null;
+  }
+}
+
 /** ボタン・プレビューの操作をつなぐ。 */
 function connectControls() {
   dom.resetButton.addEventListener("click", () => void resetImage());
@@ -131,6 +149,7 @@ function connectControls() {
   parts.textButton.addEventListener("click", () => {
     if (state.loaded) parts.textDialog.open();
   });
+  parts.autoButton.addEventListener("click", () => void autoAdjust());
   parts.tasteButton.addEventListener("click", () => {
     if (!state.loaded) return;
     parts.tasteGallery.open(parts.tasteButton).catch((error) => {

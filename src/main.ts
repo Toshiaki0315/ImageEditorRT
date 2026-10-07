@@ -86,14 +86,17 @@ async function createParts() {
     notify(degrees === null ? "傾きが分かりませんでした（水平線や長い直線が見つかりません）" : `傾きを ${degreesText(degrees)} 直しました`);
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
-  parts.privacy.detectFaces = () =>
-    invoke<CropRect[]>("detect_faces", { settings: state.settings }).catch((error) => {
-      void showError("顔を認識できません", error);
+  const targets = { faces: { command: "detect_faces", name: "顔" }, text: { command: "detect_text", name: "文字" } };
+  parts.privacy.find = (target) =>
+    invoke<CropRect[]>(targets[target].command, { settings: state.settings }).catch((error) => {
+      void showError(`${targets[target].name}を認識できません`, error);
       return null;
     });
   const coverNames = { blur: "ぼかし", mosaic: "モザイク", stamp: "スタンプ" } as const;
-  parts.privacy.onFaces = (count, kind) =>
-    notify(count > 0 ? `顔を ${count} 個見つけて、${coverNames[kind]}で隠しました` : "顔が見つかりませんでした");
+  parts.privacy.onFound = (target, count, kind) => {
+    const name = targets[target].name;
+    notify(count > 0 ? `${name}を ${count} か所見つけて、${coverNames[kind]}で隠しました` : `${name}が見つかりませんでした`);
+  };
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
   parts.textButton = $<HTMLButtonElement>("text-button");

@@ -6,6 +6,7 @@ use std::time::Instant;
 use imageeditorrt_core::exif_info::ExifInfo;
 use imageeditorrt_core::formats::Format;
 use imageeditorrt_core::pipeline::{self, EditSettings};
+use imageeditorrt_core::transform::CropRect;
 use imageeditorrt_core::{decode, load, save};
 use tauri::ipc::Response;
 use tauri::{State, WebviewWindow};
@@ -104,16 +105,34 @@ pub async fn filter_thumbnails(
     Ok(Response::new(body))
 }
 
-/// 顔の自動認識（投稿加工のスタンプ）: プレビュー用の画像を今の向き（回転・反転・水平の補正）にして顔を見つけ、
-/// スタンプで覆う範囲（顔より少し大きい正方形）を、回転・反転した後の原寸の座標で返す。
-#[cfg(target_os = "macos")]
+/// 顔の自動認識（投稿加工）: 隠す範囲（顔より少し大きい正方形）を、回転・反転した後の原寸の座標で返す。
 #[tauri::command]
 pub async fn detect_faces(
     settings: EditSettings,
     state: State<'_, AppState>,
-) -> Result<Vec<imageeditorrt_core::transform::CropRect>, String> {
+) -> Result<Vec<CropRect>, String> {
     use imageeditorrt_core::faces;
-    use imageeditorrt_core::transform::CropRect;
+    find_regions(settings, state, faces::detect_faces, faces::cover_rect).await
+}
+
+/// 文字の自動認識（投稿加工）: 隠す範囲（文字の範囲を少し広げたもの）を、回転・反転した後の原寸の座標で返す。
+#[tauri::command]
+pub async fn detect_text(
+    settings: EditSettings,
+    state: State<'_, AppState>,
+) -> Result<Vec<CropRect>, String> {
+    use imageeditorrt_core::{text_regions, transform};
+    find_regions(settings, state, text_regions::detect_text, transform::clamp_crop).await
+}
+
+/// プレビュー用の画像を今の向き（回転・反転・水平の補正）にして detect で範囲を探し、原寸の座標に直してから
+/// finish（原寸の画像の大きさで、隠す範囲に仕上げる）にかけて返す（処理は別のスレッド）。
+async fn find_regions(
+    settings: EditSettings,
+    state: State<'_, AppState>,
+    detect: fn(&image::RgbaImage) -> Result<Vec<CropRect>, String>,
+    finish: fn(CropRect, (u32, u32)) -> Option<CropRect>,
+) -> Result<Vec<CropRect>, String> {
     let (preview, factor, original) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let original =
@@ -124,16 +143,16 @@ pub async fn detect_faces(
         let image = pipeline::straightened(&preview, &settings);
         let size = settings.orientation.size(original);
         let to_original = |v: i64| (v as f64 / factor).round() as i64;
-        Ok(faces::detect_faces(&image)?
+        Ok(detect(&image)?
             .into_iter()
-            .filter_map(|face| {
-                let face = CropRect::new(
-                    to_original(face.x),
-                    to_original(face.y),
-                    to_original(face.width),
-                    to_original(face.height),
+            .filter_map(|r| {
+                let r = CropRect::new(
+                    to_original(r.x),
+                    to_original(r.y),
+                    to_original(r.width),
+                    to_original(r.height),
                 );
-                faces::cover_rect(face, size)
+                finish(r, size)
             })
             .collect())
     })

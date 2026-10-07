@@ -30,8 +30,17 @@ const TILE_OVERLAP: f64 = 1.5;
 /// GPU・Neural Engine を使えない環境（CI の仮想マシンなど）では Vision が「Could not create inference
 /// context」で失敗するので、そのときは CPU だけで認識し直す。
 pub fn detect_faces(image: &RgbaImage) -> Result<Vec<CropRect>, String> {
+    Ok(merge(scan_tiles(image, detect_image)?))
+}
+
+/// 画像全体と、重なりを持たせて 2 × 2・3 × 3 に分けた部分ごとに detect をかけ、見つけた枠（画像の座標）を
+/// すべて返す（同じものを何度も見つけるので、まとめるのは呼んだ側）。顔・文字の認識で使う。
+pub(crate) fn scan_tiles(
+    image: &RgbaImage,
+    detect: impl Fn(&RgbaImage) -> Result<Vec<CropRect>, String>,
+) -> Result<Vec<CropRect>, String> {
     let (width, height) = image.dimensions();
-    let mut found = detect_image(image)?;
+    let mut found = detect(image)?;
     for split in TILE_SPLITS {
         // split × split に分け、隣どうしを重ねる（一辺は 1.5 ÷ split）
         let (tile_w, tile_h) = (tile_side(width, split), tile_side(height, split));
@@ -45,11 +54,11 @@ pub fn detect_faces(image: &RgbaImage) -> Result<Vec<CropRect>, String> {
                 let tile = image::imageops::crop_imm(image, x, y, tile_w, tile_h).to_image();
                 let shift =
                     |r: CropRect| CropRect::new(r.x + i64::from(x), r.y + i64::from(y), r.width, r.height);
-                found.extend(detect_image(&tile)?.into_iter().map(shift));
+                found.extend(detect(&tile)?.into_iter().map(shift));
             }
         }
     }
-    Ok(merge(found))
+    Ok(found)
 }
 
 /// split × split に分けるときの一辺（隣と重なるよう、ちょうど分けた長さの 1.5 倍）。
@@ -113,7 +122,7 @@ fn detect(cg: &CGImage, size: (u32, u32), cpu_only: bool) -> Result<Vec<CropRect
 }
 
 /// Vision の枠（0〜1 に正規化、原点は左下）を、画像の座標（px、原点は左上）にする。
-fn to_image_rect(rect: CGRect, (width, height): (u32, u32)) -> CropRect {
+pub(crate) fn to_image_rect(rect: CGRect, (width, height): (u32, u32)) -> CropRect {
     let (w, h) = (f64::from(width), f64::from(height));
     let x = rect.origin.x * w;
     let y = (1.0 - rect.origin.y - rect.size.height) * h;

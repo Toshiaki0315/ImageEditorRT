@@ -1,4 +1,4 @@
-//! 色の調整（露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化）。
+//! 色の調整（露出・明るさ・コントラスト・ハイライト／シャドウ・色温度・彩度・周辺減光・経年劣化）。
 //!
 //! 計算式・丸め方は旧版（core/effects.py・core/tone.py と、その中で使う Pillow）と同じ。
 //! チャンネルごとの調整はルックアップテーブル (LUT) にして、続けてかける分は 1 つの表に
@@ -20,6 +20,10 @@ const LUMA: [f64; 3] = [0.299, 0.587, 0.114];
 pub const TEMPERATURE_NEUTRAL: u32 = 6500;
 const TEMPERATURE_STRENGTH: f64 = 0.5;
 const CONTRAST_MIN_SLOPE: f64 = 0.5;
+/// ハイライト／シャドウの効きの強さ（1 未満なら、両方を最大にしても明るさの順が入れ替わらない）。
+const TONE_STRENGTH: f64 = 0.9;
+/// ハイライト／シャドウの表の細かさ（輝度 0〜255 をこの数で割った刻み）。
+const TONE_STEPS: usize = 1024;
 const VIGNETTE_MAX_DARKEN: f64 = 0.8;
 const VIGNETTE_START: f64 = 0.35;
 const AGING_MAX_DESATURATE: f64 = 0.6;
@@ -108,6 +112,40 @@ pub fn apply_lut(image: &mut RgbaImage, lut: &Lut) {
         p[0] = lut[0][p[0] as usize];
         p[1] = lut[1][p[1] as usize];
         p[2] = lut[2][p[2] as usize];
+    });
+}
+
+/// ハイライト／シャドウ -100〜+100（0 で変化なし。旧版にはない）。
+///
+/// 輝度 L（0〜1）を f(L) = L + k·(shadows·L(1−L)² + highlights·L²(1−L)) に変え、R・G・B を同じ倍率
+/// f(L)/L で掛ける（色合い = R・G・B の比を保つ）。シャドウは L = 1/3 あたり、ハイライトは L = 2/3
+/// あたりを最もよく動かし、黒（0）と白（1）は動かさない。k < 1 なので f は単調に増え、明るさの順は
+/// 入れ替わらない。輝度ごとの倍率は表にしてから引く。
+pub fn highlights_shadows(image: &mut RgbaImage, highlights: i32, shadows: i32) {
+    if highlights == 0 && shadows == 0 {
+        return;
+    }
+    let (h, s) =
+        (f64::from(highlights.clamp(-100, 100)) / 100.0, f64::from(shadows.clamp(-100, 100)) / 100.0);
+    let gains: Vec<f64> = (0..=TONE_STEPS)
+        .map(|i| {
+            let l = i as f64 / TONE_STEPS as f64;
+            if l == 0.0 {
+                return 1.0;
+            }
+            let curved = l + TONE_STRENGTH * (s * l * (1.0 - l).powi(2) + h * l * l * (1.0 - l));
+            curved / l
+        })
+        .collect();
+    image.as_mut().par_chunks_exact_mut(4).with_min_len(PIXELS_PER_TASK).for_each(|p| {
+        let luma = LUMA[0] * f64::from(p[0]) + LUMA[1] * f64::from(p[1]) + LUMA[2] * f64::from(p[2]);
+        let position = luma / 255.0 * TONE_STEPS as f64;
+        let index = (position as usize).min(TONE_STEPS - 1);
+        let fraction = position - index as f64;
+        let gain = gains[index] + (gains[index + 1] - gains[index]) * fraction;
+        for channel in &mut p[..3] {
+            *channel = clip(f64::from(*channel) * gain);
+        }
     });
 }
 
@@ -310,5 +348,69 @@ mod tests {
         add_grain(&mut b, 10, 1);
         assert_eq!(a, b);
         assert_ne!(a, base);
+    }
+
+    #[test]
+    fn highlights_shadows_zero_changes_nothing() {
+        let mut image =
+            RgbaImage::from_fn(16, 16, |x, y| image::Rgba([(x * 16) as u8, (y * 16) as u8, 90, 200]));
+        let original = image.clone();
+        highlights_shadows(&mut image, 0, 0);
+        assert_eq!(image, original);
+    }
+
+    #[test]
+    fn shadows_move_dark_tones_and_highlights_move_bright_tones() {
+        let grays = |levels: &[u8]| {
+            RgbaImage::from_fn(levels.len() as u32, 1, |x, _| {
+                let v = levels[x as usize];
+                image::Rgba([v, v, v, 255])
+            })
+        };
+        let levels: Vec<u8> = (0..=255).collect();
+        let shifted = |h: i32, s: i32| {
+            let mut image = grays(&levels);
+            highlights_shadows(&mut image, h, s);
+            image.pixels().map(|p| i32::from(p[0])).collect::<Vec<_>>()
+        };
+        let base: Vec<i32> = levels.iter().map(|&v| i32::from(v)).collect();
+        let delta = |out: &[i32], v: usize| out[v] - base[v];
+        // シャドウを持ち上げると暗部が明るくなり、明部はほとんど変わらない。黒と白は動かない
+        let lifted = shifted(0, 100);
+        assert!(
+            delta(&lifted, 64) > 15 && delta(&lifted, 230) < 4,
+            "{} {}",
+            delta(&lifted, 64),
+            delta(&lifted, 230)
+        );
+        assert_eq!((lifted[0], lifted[255]), (0, 255));
+        // ハイライトを押さえると明部が暗くなり、暗部はほとんど変わらない
+        let lowered = shifted(-100, 0);
+        assert!(
+            delta(&lowered, 190) < -15 && delta(&lowered, 25) > -4,
+            "{} {}",
+            delta(&lowered, 190),
+            delta(&lowered, 25)
+        );
+        assert_eq!((lowered[0], lowered[255]), (0, 255));
+        // どの組み合わせでも明るさの順は入れ替わらない
+        for (h, s) in [(100, 100), (-100, -100), (100, -100), (-100, 100)] {
+            let out = shifted(h, s);
+            assert!(out.windows(2).all(|w| w[0] <= w[1]), "{h} {s}");
+        }
+    }
+
+    #[test]
+    fn highlights_shadows_keep_hue_and_alpha() {
+        let mut image = RgbaImage::from_pixel(1, 1, image::Rgba([60, 30, 15, 77]));
+        highlights_shadows(&mut image, 0, 80);
+        let p = image.get_pixel(0, 0);
+        assert!(p[0] > 60 && p[3] == 77);
+        // R:G:B = 4:2:1 のまま（丸めの誤差は 1）
+        assert!(
+            (i32::from(p[0]) - 2 * i32::from(p[1])).abs() <= 1
+                && (i32::from(p[1]) - 2 * i32::from(p[2])).abs() <= 1,
+            "{p:?}"
+        );
     }
 }

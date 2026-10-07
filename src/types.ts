@@ -50,6 +50,9 @@ export type EditSettings = {
   saturation: number;
   brightness: number;
   contrast: number;
+  /** ハイライト・シャドウ -100〜100（明部・暗部だけを明るく・暗くする） */
+  highlights: number;
+  shadows: number;
   exposure: number;
   sharpen: number;
   blur: number;
@@ -88,6 +91,8 @@ export function defaultSettings(): EditSettings {
     saturation: 0,
     brightness: 0,
     contrast: 0,
+    highlights: 0,
+    shadows: 0,
     exposure: 0,
     sharpen: 0,
     blur: 0,

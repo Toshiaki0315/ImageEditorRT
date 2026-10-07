@@ -29,6 +29,8 @@ const COLOR: Slider[] = [
   { key: "exposure", label: "露出", min: -5, max: 5, step: 0.1, initial: 0, text: evText },
   { key: "brightness", label: "明るさ", min: -100, max: 100, initial: 0, text: signedText },
   { key: "contrast", label: "コントラスト", min: -100, max: 100, initial: 0, text: signedText },
+  { key: "highlights", label: "ハイライト", min: -100, max: 100, initial: 0, text: signedText },
+  { key: "shadows", label: "シャドウ", min: -100, max: 100, initial: 0, text: signedText },
   { key: "temperature", label: "色温度", min: 2000, max: 10000, step: 100, initial: 6500, text: kelvinText },
   { key: "saturation", label: "彩度", min: -100, max: 100, initial: 0, text: signedText },
   { key: "vignette", label: "周辺減光", min: 0, max: 100, initial: 0 },

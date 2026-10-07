@@ -6,7 +6,7 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 
 主な機能:
 
-- テイスト 23 種（強さ 0〜200%）・露出〜経年劣化の色の調整・シャープ／ぼかし／ノイズ除去・ジオラマ風
+- テイスト 23 種（強さ 0〜200%）・露出〜経年劣化の色の調整（ハイライト／シャドウを含む）・シャープ／ぼかし／ノイズ除去・ジオラマ風
 - 回転・反転・水平の補正・トリミング（比の固定）・リサイズ・フレーム（ポラロイド・チェキ）・形（角丸・円）・文字／透かし
 - 加工前との比較・100% 表示・ヒストグラム・元に戻す／やり直す・プリセット・まとめて処理
 - EXIF の表示（GPS・主なメーカーの MakerNote）と保存（EXIF・位置情報を残すかを選べる）
@@ -115,7 +115,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 ## その他・備考
 
-- **旧版との違い**: 文字の形は Pillow（FreeType）ではなく ab_glyph で描くので、縁や位置が 1px 程度違うことがある。テイストの強さ・水平の補正・未保存のまま終了するときの確認は、この版で足した機能。
+- **旧版との違い**: 文字の形は Pillow（FreeType）ではなく ab_glyph で描くので、縁や位置が 1px 程度違うことがある。テイストの強さ・水平の補正・ハイライト／シャドウ・未保存のまま終了するときの確認は、この版で足した機能。
 - **保存される場所**:
   - プリセット: `~/Library/Application Support/ImageEditorRT/presets.json`（まだなければ旧版の `~/Library/Application Support/ImageEditor/presets.json` を読む。旧版のファイルは書き換えない）
   - 想定外のエラーのログ: `~/Library/Logs/ImageEditorRT/imageeditorrt.log`

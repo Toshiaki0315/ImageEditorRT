@@ -50,6 +50,11 @@ pub struct Preset {
     pub exposure: f64,
     pub brightness: i32,
     pub contrast: i32,
+    /// ハイライト・シャドウ（旧版にはない）。ファイルには 0 以外のときだけ書く
+    #[serde(skip_serializing_if = "is_zero")]
+    pub highlights: i32,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub shadows: i32,
     pub temperature: u32,
     pub saturation: i32,
     pub vignette: u32,
@@ -78,6 +83,8 @@ impl Preset {
             exposure: s.exposure,
             brightness: s.brightness,
             contrast: s.contrast,
+            highlights: s.highlights,
+            shadows: s.shadows,
             temperature: s.temperature,
             saturation: s.saturation,
             vignette: s.vignette,
@@ -105,6 +112,8 @@ impl Preset {
             exposure: self.exposure,
             brightness: self.brightness,
             contrast: self.contrast,
+            highlights: self.highlights,
+            shadows: self.shadows,
             temperature: self.temperature,
             saturation: self.saturation,
             vignette: self.vignette,
@@ -128,6 +137,10 @@ impl Preset {
 
 fn is_full_strength(strength: &u32) -> bool {
     *strength == FILTER_STRENGTH_FULL
+}
+
+fn is_zero(value: &i32) -> bool {
+    *value == 0
 }
 
 /// Python の str.strip() が取り除く空白か（Rust の is_whitespace に加えて、区切りの制御文字 0x1C〜0x1F）。
@@ -338,6 +351,8 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
             "exposure" => p.exposure = python_float(raw)?,
             "brightness" => p.brightness = int_value(number()?)?,
             "contrast" => p.contrast = int_value(number()?)?,
+            "highlights" => p.highlights = int_value::<i32>(number()?)?.clamp(-100, 100),
+            "shadows" => p.shadows = int_value::<i32>(number()?)?.clamp(-100, 100),
             "temperature" => p.temperature = int_value(number()?)?,
             "saturation" => p.saturation = int_value(number()?)?,
             "vignette" => p.vignette = int_value(number()?)?,
@@ -446,5 +461,23 @@ mod tests {
         assert_eq!(load_presets_with_legacy(&path, Some(&legacy)).unwrap(), vec![]);
         assert!(!path.with_file_name("presets.json.tmp").exists());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn highlights_and_shadows_are_written_only_when_set() {
+        let plain = Preset::from_settings("A", &EditSettings::default());
+        let text = presets_json(std::slice::from_ref(&plain));
+        assert!(!text.contains("highlights") && !text.contains("shadows"), "{text}");
+        let set = Preset { highlights: -30, shadows: 45, ..plain.clone() };
+        let text = presets_json(std::slice::from_ref(&set));
+        assert!(text.contains("\"highlights\": -30") && text.contains("\"shadows\": 45"), "{text}");
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
+        // 範囲の外は -100〜100 に収める
+        let wide =
+            preset_from_value(&serde_json::json!({"name": "B", "highlights": 300, "shadows": -150})).unwrap();
+        assert_eq!((wide.highlights, wide.shadows), (100, -100));
+        let applied = set.apply(&EditSettings::default());
+        assert_eq!((applied.highlights, applied.shadows), (-30, 45));
     }
 }

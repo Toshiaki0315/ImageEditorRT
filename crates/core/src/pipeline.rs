@@ -1,7 +1,7 @@
 //! 編集設定 (EditSettings) と、それを画像にかける処理の流れ（旧版の core/pipeline.py を移したもの）。
 //!
 //! 処理順（旧版 §5.1）: 回転・反転 →（水平の補正）→ トリミング → リサイズ → 露出 → 明るさ → コントラスト →
-//! 色温度 → 彩度 → ディテール（ノイズ除去 → ぼかし → シャープ） → ジオラマ → フィルター →
+//! 色温度 →（ハイライト／シャドウ）→ 彩度 → ディテール（ノイズ除去 → ぼかし → シャープ） → ジオラマ → フィルター →
 //! 周辺減光 → 経年劣化 → 文字。
 //! フレーム・形（#13）は、トリミングの後の比への切り抜きと、経年劣化の後にここへ足す。
 
@@ -59,6 +59,9 @@ pub struct EditSettings {
     pub brightness: i32,
     /// コントラスト -100〜+100（0 = 変化なし）
     pub contrast: i32,
+    /// ハイライト・シャドウ -100〜+100（0 = 変化なし。明部・暗部だけを明るく・暗くする。旧版にはない）
+    pub highlights: i32,
+    pub shadows: i32,
     /// 露出 -5.0〜+5.0 EV（0 = 変化なし）
     pub exposure: f64,
     /// シャープ・ぼかし・ノイズ除去 0〜100（0 = なし）
@@ -95,6 +98,8 @@ impl Default for EditSettings {
             saturation: 0,
             brightness: 0,
             contrast: 0,
+            highlights: 0,
+            shadows: 0,
             exposure: 0.0,
             sharpen: 0,
             blur: 0,
@@ -429,7 +434,7 @@ fn scale(value: i64, factor: f64) -> i64 {
     }
 }
 
-/// フィルターの前にかける基本補正（露出 → 明るさ → コントラスト → 色温度 → 彩度）。
+/// フィルターの前にかける基本補正（露出 → 明るさ → コントラスト → 色温度 → ハイライト／シャドウ → 彩度）。
 /// 露出〜色温度は 1 つの変換表にまとめて 1 回でかける。
 fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> RgbaImage {
     let mut lut: Lut = adjust::identity_lut();
@@ -448,6 +453,7 @@ fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> Rgb
     if lut != adjust::identity_lut() {
         adjust::apply_lut(&mut image, &lut);
     }
+    adjust::highlights_shadows(&mut image, settings.highlights, settings.shadows);
     if settings.saturation != 0 {
         adjust::saturation(&mut image, settings.saturation);
     }

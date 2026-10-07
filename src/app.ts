@@ -70,6 +70,8 @@ export const parts = {} as {
   /** テイストの一覧と、それを開く「一覧…」のボタン */
   tasteGallery: TasteGallery;
   tasteButton: HTMLButtonElement;
+  /** 「加工」タブの「自動補正」のボタン */
+  autoButton: HTMLButtonElement;
   recorder: HistoryRecorder<Snapshot>;
   privacy: PrivacyPanel;
   batchDialog: BatchDialog;

@@ -174,6 +174,22 @@ pub async fn auto_straighten(
         .await
 }
 
+/// 自動補正: 今の写真（切り抜く範囲。色の調整をかける前）から、露出・コントラスト・色温度のちょうどよい値を求める。
+#[tauri::command]
+pub async fn auto_adjust(
+    settings: EditSettings,
+    state: State<'_, AppState>,
+) -> Result<imageeditorrt_core::auto::AutoAdjust, String> {
+    let (preview, factor) = {
+        let loaded = state.0.lock().map_err(|e| e.to_string())?;
+        (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor)
+    };
+    blocking(move || {
+        Ok(imageeditorrt_core::auto::auto_adjust(&pipeline::photo_for_analysis(&preview, &settings, factor)))
+    })
+    .await
+}
+
 /// リセット（旧版 FR-UI-42）: 読み込んだ画像を捨てて、未読込の状態に戻す。
 #[tauri::command]
 pub fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {

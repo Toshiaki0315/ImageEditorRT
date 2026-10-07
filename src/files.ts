@@ -48,7 +48,7 @@ export function showLoaded(info: OpenInfo, openNotes: string[]) {
   parts.privacy.reset();
   output.reset(true);
   parts.textDialog.show();
-  parts.textButton.disabled = parts.tasteButton.disabled = false;
+  parts.textButton.disabled = parts.tasteButton.disabled = parts.autoButton.disabled = false;
   exifView.show(info.exif);
   tabs.setEnabled("exif", !info.exif.empty);
   state.notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
@@ -247,7 +247,7 @@ export async function resetImage() {
   output.reset(false);
   parts.textDialog.close();
   parts.textDialog.show();
-  parts.textButton.disabled = parts.tasteButton.disabled = true;
+  parts.textButton.disabled = parts.tasteButton.disabled = parts.autoButton.disabled = true;
   parts.tasteGallery.close();
   exifView.show(null);
   tabs.setEnabled("exif", false);

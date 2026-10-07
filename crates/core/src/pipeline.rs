@@ -165,6 +165,17 @@ fn orient(image: &RgbaImage, settings: &EditSettings, factor: f64) -> RgbaImage 
     image
 }
 
+/// 自動補正で調べる写真: プレビュー用の画像 image（原寸を factor 倍にしたもの）を今の向き（回転・反転・水平の
+/// 補正）にし、実際に切り抜く範囲（なければ全体）だけにしたもの。色の調整はかけない。
+pub fn photo_for_analysis(image: &RgbaImage, settings: &EditSettings, factor: f64) -> RgbaImage {
+    let image = straightened(image, settings);
+    let scaled = scale_settings(settings, factor);
+    match effective_crop(image.dimensions(), scaled.crop, settings.frame, settings.shape) {
+        Some(rect) => transform::crop(&image, rect),
+        None => image,
+    }
+}
+
 /// 回転・反転し、水平の補正をかけた画像（投稿加工の範囲の座標と同じ向き。顔の認識に使う）。
 pub fn straightened(image: &RgbaImage, settings: &EditSettings) -> RgbaImage {
     let image = settings.orientation.transpose(image);
@@ -864,5 +875,19 @@ mod tests {
             .enumerate_pixels()
             .filter(|(x, y, p)| *p != blank.get_pixel(*x, *y))
             .all(|(x, y, _)| (10..30).contains(&x) && (10..30).contains(&y)));
+    }
+
+    #[test]
+    fn photo_for_analysis_is_the_cropped_photo() {
+        let image = sample();
+        let settings = EditSettings {
+            crop: Some(CropRect::new(20, 10, 60, 40)),
+            exposure: 2.0,
+            ..EditSettings::default()
+        };
+        // プレビューは原寸の半分。範囲も半分にして切り抜き、色の調整はかけない
+        let photo = photo_for_analysis(&image, &settings, 0.5);
+        assert_eq!(photo.dimensions(), (30, 20));
+        assert_eq!(photo.get_pixel(0, 0), image.get_pixel(10, 5));
     }
 }

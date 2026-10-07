@@ -110,6 +110,17 @@ export class Panel {
     adjustPage.append(heading, row);
     this.build(adjustPage, STRENGTH);
     this.heading(adjustPage, "加工");
+    // 今の写真から露出・コントラスト・色温度を求めてスライダーに入れる（旧版にはない。main.ts でつなぐ）
+    const autoRow = document.createElement("div");
+    autoRow.className = "buttons";
+    const autoButton = document.createElement("button");
+    autoButton.type = "button";
+    autoButton.id = "auto-adjust";
+    autoButton.textContent = "自動補正";
+    autoButton.title = "今の写真の明るさ・メリハリ・色かぶりから、露出・コントラスト・色温度を入れます（そのあと手で調整できます）";
+    autoButton.disabled = true;
+    autoRow.append(autoButton);
+    adjustPage.append(autoRow);
     this.build(adjustPage, COLOR);
     this.heading(adjustPage, "ディテール");
     this.build(adjustPage, DETAIL);
@@ -187,6 +198,13 @@ export class Panel {
     this.settings.filterStrength = STRENGTH[0].initial;
     this.showRow("filterStrength");
     this.updateStrength();
+    this.onChange();
+  }
+
+  /** 自動補正の値をスライダーに入れる（ほかの項目はそのまま）。 */
+  setAuto(values: Pick<EditSettings, "exposure" | "contrast" | "temperature">) {
+    Object.assign(this.settings, values);
+    this.show();
     this.onChange();
   }
 

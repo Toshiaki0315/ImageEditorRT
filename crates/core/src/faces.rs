@@ -19,25 +19,40 @@ use crate::transform::CropRect;
 const COVER_SCALE: f64 = 1.4;
 
 /// 画像の中の顔を見つけ、顔ごとの枠（画像の座標、px）を返す。見つからなければ空。
+///
+/// GPU・Neural Engine を使えない環境（CI の仮想マシンなど）では Vision が「Could not create inference
+/// context」で失敗するので、そのときは CPU だけで認識し直す。
 pub fn detect_faces(image: &RgbaImage) -> Result<Vec<CropRect>, String> {
     let cg = cg_image(image).ok_or("画像を顔の認識に渡せません")?;
+    let size = image.dimensions();
+    detect(&cg, size, false).or_else(|_| detect(&cg, size, true))
+}
+
+/// 顔を認識する。cpu_only なら CPU だけで認識する。
+fn detect(cg: &CGImage, size: (u32, u32), cpu_only: bool) -> Result<Vec<CropRect>, String> {
     // SAFETY: CGImage は認識が終わるまで生きている。オプションは空
     let handler = unsafe {
         VNImageRequestHandler::initWithCGImage_options(
             VNImageRequestHandler::alloc(),
-            &cg,
+            cg,
             &NSDictionary::new(),
         )
     };
     // SAFETY: 引数のない初期化
     let request = unsafe { VNDetectFaceRectanglesRequest::new() };
+    if cpu_only {
+        // SAFETY: 認識の前に設定を変えるだけ（新しい計算資源の指定は macOS 14 以降なので、古い設定を使う）
+        #[allow(deprecated)]
+        unsafe {
+            request.setUsesCPUOnly(true)
+        };
+    }
     // 顔の認識 → 画像の認識 → 認識の順に親のクラスにして、認識の一覧に入れる
     let requests: Retained<NSArray<VNRequest>> =
         NSArray::from_retained_slice(&[Retained::into_super(Retained::into_super(request.clone()))]);
     handler.performRequests_error(&requests).map_err(|e| format!("顔を認識できません（{e}）"))?;
     // SAFETY: 認識が終わった後に結果を読む
     let results = unsafe { request.results() };
-    let size = image.dimensions();
     Ok(results.map_or_else(Vec::new, |faces| {
         // SAFETY: 結果の枠を読むだけ
         (0..faces.count())
@@ -138,6 +153,9 @@ mod tests {
         let image = image::open(path).unwrap().to_rgba8();
         let faces = detect_faces(&image).unwrap();
         assert_eq!(faces.len(), 1, "{faces:?}");
+        // CPU だけで認識しても同じ顔を見つける（GPU を使えない環境で使う道）
+        let cpu = detect(&cg_image(&image).unwrap(), image.dimensions(), true).unwrap();
+        assert_eq!(cpu.len(), 1, "{cpu:?}");
         let face = faces[0];
         let (cx, cy) = (face.x + face.width / 2, face.y + face.height / 2);
         assert!((135..185).contains(&cx) && (60..115).contains(&cy), "{face:?}");

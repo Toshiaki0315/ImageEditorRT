@@ -22,7 +22,10 @@ const FOLLOW_TEXT = "フレーム・円に合わせる";
 const CORNER_RADIUS_DEFAULT = 10;
 const EDIT_RANGE_TEXT = "範囲を編集";
 /** 縦向きを選べる比（自由と 1:1 には向きがない） */
-const HAS_ORIENTATION: AspectRatio[] = ["ratio4x3", "ratio3x2", "ratio16x9"];
+const HAS_ORIENTATION: AspectRatio[] = ["ratio5x4", "ratio4x3", "ratio3x2", "ratio16x9"];
+
+/** 比の名前を縦の形にする（「16:9」→「9:16」）。 */
+export const portraitName = (name: string) => name.split(":").reverse().join(":");
 
 /** 角度を「+1.5°」「-0.3°」「0.0°」のように表示する。 */
 export const degreesText = (degrees: number) => `${degrees > 0 ? "+" : ""}${degrees.toFixed(1)}°`;
@@ -46,6 +49,8 @@ export class CropController {
   private readonly cornerValue = $<HTMLOutputElement>("corner-radius-value");
   private readonly straighten = $<HTMLInputElement>("straighten");
   private readonly straightenValue = $<HTMLOutputElement>("straighten-value");
+  /** 向きのある比の、横向きの名前（「縦向き」で名前を縦の形にするため） */
+  private readonly ratioNames = new Map<string, string>();
   /** フレーム・円で比を固定したときに覚えておく、比のプルダウンの選択 */
   private chosenRatio: AspectRatio = "free";
   /** 形をかける範囲（実際に切り抜く範囲。なければ画像全体） */
@@ -71,7 +76,10 @@ export class CropController {
     private readonly onTrimChange: (trimmed: boolean) => void,
     private readonly onRotate: () => Promise<void> = async () => {},
   ) {
-    for (const [value, label] of ratios) this.aspect.add(new Option(label, value));
+    for (const [value, label] of ratios) {
+      this.aspect.add(new Option(label, value));
+      if (HAS_ORIENTATION.includes(value)) this.ratioNames.set(value, label);
+    }
     const follow = new Option(FOLLOW_TEXT, FOLLOW);
     follow.disabled = true;
     this.aspect.add(follow);
@@ -358,6 +366,7 @@ export class CropController {
     this.aspect.value = locked ? FOLLOW : this.chosenRatio;
     this.aspect.disabled = !loaded || locked;
     this.portrait.disabled = !loaded || locked || !HAS_ORIENTATION.includes(this.chosenRatio);
+    this.showRatioNames();
     this.frame.value = this.settings.frame;
     this.shape.value = this.settings.shape;
     this.frame.disabled = this.shape.disabled = !loaded;
@@ -373,6 +382,14 @@ export class CropController {
     const canTrim = loaded && (crop !== null || this.settings.frame !== "none" || this.settings.shape !== "rectangle");
     if (!canTrim && this.isTrimmed()) this.setTrimmed(false);
     this.trim.disabled = !canTrim;
+  }
+
+  /** 「縦向き」にチェックがあれば、向きのある比の名前を縦の形（4:5・9:16 など）で出す。 */
+  private showRatioNames() {
+    for (const option of this.aspect.options) {
+      const name = this.ratioNames.get(option.value);
+      if (name) option.text = this.portrait.checked ? portraitName(name) : name;
+    }
   }
 
   // --- プレビュー上のドラッグ ----------------------------------------------------

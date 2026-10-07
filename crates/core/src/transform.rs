@@ -55,6 +55,8 @@ impl CropRect {
 pub enum AspectRatio {
     Free,
     Square,
+    /// 5:4（縦向きで 4:5。Instagram の縦長）
+    Ratio5x4,
     Ratio4x3,
     Ratio3x2,
     Ratio16x9,
@@ -62,14 +64,15 @@ pub enum AspectRatio {
 
 impl AspectRatio {
     /// すべての選択肢（画面のプルダウンの順）。
-    pub const ALL: [AspectRatio; 5] =
-        [Self::Free, Self::Square, Self::Ratio4x3, Self::Ratio3x2, Self::Ratio16x9];
+    pub const ALL: [AspectRatio; 6] =
+        [Self::Free, Self::Square, Self::Ratio5x4, Self::Ratio4x3, Self::Ratio3x2, Self::Ratio16x9];
 
     /// 横向きのときの (幅, 高さ)。自由なら None。
     fn value(self) -> Option<(u32, u32)> {
         match self {
             Self::Free => None,
             Self::Square => Some((1, 1)),
+            Self::Ratio5x4 => Some((5, 4)),
             Self::Ratio4x3 => Some((4, 3)),
             Self::Ratio3x2 => Some((3, 2)),
             Self::Ratio16x9 => Some((16, 9)),
@@ -515,5 +518,16 @@ mod tests {
         });
         let out = straighten(&image, 7.0);
         assert!(out.pixels().filter(|p| p[3] > 0).all(|p| p[0] == 0 && p[2] == 255));
+    }
+
+    #[test]
+    fn ratio_5x4_turns_into_4x5_for_portrait() {
+        assert_eq!(AspectRatio::Ratio5x4.label(), "5:4");
+        assert_eq!(AspectRatio::Ratio5x4.ratio(false), Some((5.0, 4.0)));
+        assert_eq!(AspectRatio::Ratio5x4.ratio(true), Some((4.0, 5.0)));
+        assert_eq!(serde_json::to_string(&AspectRatio::Ratio5x4).unwrap(), "\"ratio5x4\"");
+        // 縦向きの 4:5 で、1000 × 1000 の範囲は 800 × 1000 になる
+        let rect = fit_aspect(CropRect::new(0, 0, 1000, 1000), AspectRatio::Ratio5x4.ratio(true).unwrap());
+        assert_eq!(rect, CropRect::new(100, 0, 800, 1000));
     }
 }

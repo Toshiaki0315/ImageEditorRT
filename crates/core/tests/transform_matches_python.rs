@@ -120,8 +120,11 @@ fn sizes() {
 #[test]
 fn aspect_ratios() {
     let all = cases("aspect_ratios");
-    assert_eq!(all.len(), AspectRatio::ALL.len());
-    for (c, ratio) in all.iter().zip(AspectRatio::ALL) {
+    // 5:4 はこの版で足した比（旧版にはない）なので比べない
+    let ours: Vec<AspectRatio> =
+        AspectRatio::ALL.into_iter().filter(|&r| r != AspectRatio::Ratio5x4).collect();
+    assert_eq!(all.len(), ours.len());
+    for (c, ratio) in all.iter().zip(ours) {
         assert_eq!(ratio.label(), c[1].as_str().unwrap(), "{c}");
         let expected = |v: &Value| v.as_array().map(|_| aspect(v));
         assert_eq!(ratio.ratio(false), expected(&c[2]), "{c}");

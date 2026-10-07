@@ -140,6 +140,21 @@ pub async fn detect_faces(
     .await
 }
 
+/// 傾きの自動補正（水平の補正の「自動」）: プレビュー用の画像を今の回転・反転にして（水平の補正はかけずに）傾きを
+/// 求め、それを打ち消す水平の補正の角度（度）を返す。分からなければ None。
+#[tauri::command]
+pub async fn auto_straighten(
+    settings: EditSettings,
+    state: State<'_, AppState>,
+) -> Result<Option<f64>, String> {
+    let preview = {
+        let loaded = state.0.lock().map_err(|e| e.to_string())?;
+        loaded.preview.clone().ok_or("画像が読み込まれていません")?
+    };
+    blocking(move || imageeditorrt_core::horizon::straighten_angle(&settings.orientation.transpose(&preview)))
+        .await
+}
+
 /// リセット（旧版 FR-UI-42）: 読み込んだ画像を捨てて、未読込の状態に戻す。
 #[tauri::command]
 pub fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {

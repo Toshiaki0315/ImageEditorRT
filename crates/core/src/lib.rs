@@ -24,6 +24,8 @@ pub mod formats;
 pub mod frames;
 pub mod histogram;
 #[cfg(target_os = "macos")]
+pub mod horizon;
+#[cfg(target_os = "macos")]
 pub mod load;
 pub mod makernote;
 pub mod output;

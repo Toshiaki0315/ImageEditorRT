@@ -47,6 +47,8 @@ export const state = {
   opening: false,
   /** 保存中・まとめて処理中（保存・開く・リセット・終了などを止める） */
   saving: false,
+  /** 「加工をコピー」でコピーした写真の設定（加工の項目だけを使う。アプリを終了するまで覚えておく） */
+  copiedLook: null as EditSettings | null,
   /** 最後に保存したときの設定（未保存の変更の判定に使う） */
   savedSettings: null as EditSettings | null,
   /** 読み込める拡張子・保存できる拡張子・対応形式の説明（起動時に Rust から読む） */

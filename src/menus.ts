@@ -14,6 +14,8 @@ export const MENU = {
   redo: "redo",
   paste: "paste",
   text: "text",
+  copyLook: "copy-look",
+  pasteLook: "paste-look",
   actualSize: "actual_size",
   fit: "fit",
   histogram: "histogram",
@@ -32,11 +34,13 @@ function setMenuEnabled(id: string, enabled: boolean) {
   void invoke("set_menu_enabled", { id, enabled });
 }
 
-/** メニューの「元に戻す」「やり直す」「100% で表示」「画面に合わせる」を、今の状態に合わせる。 */
+/** メニューの「元に戻す」「やり直す」「加工をコピー／ペースト」「100% で表示」「画面に合わせる」を、今の状態に合わせる。 */
 export function updateMenus() {
   const editable = state.loaded !== null && !state.saving;
   setMenuEnabled(MENU.undo, editable && (parts.recorder?.canUndo() ?? false));
   setMenuEnabled(MENU.redo, editable && (parts.recorder?.canRedo() ?? false));
+  setMenuEnabled(MENU.copyLook, state.loaded !== null);
+  setMenuEnabled(MENU.pasteLook, editable && state.copiedLook !== null);
   setMenuEnabled(MENU.actualSize, state.loaded !== null && !isZoomed());
   setMenuEnabled(MENU.fit, isZoomed());
 }

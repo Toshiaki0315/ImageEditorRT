@@ -83,6 +83,10 @@ ax click "$PID" "切り抜き" >/dev/null; sleep 0.5
 check "水平の補正のスライダー" "0.3" "$(ax slider "$PID" "水平の補正" 3)"
 ax click "$PID" "加工" >/dev/null
 
+ax click "$PID" "投稿加工" >/dev/null; sleep 0.5
+check "投稿加工のタブ（強さのスライダー）" "50" "$(ax slider "$PID" "強さ" 0 2>&1)"
+ax click "$PID" "加工" >/dev/null
+
 ax click "$PID" "一覧…" >/dev/null
 wait_for 15 ax click "$PID" "セピア" || fail "テイストの一覧: 見本が出ない"
 sleep 0.5

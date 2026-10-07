@@ -9,6 +9,7 @@ import type { HistoryRecorder } from "./history";
 import { OutputSize, type SizeState } from "./output";
 import type { Panel } from "./panel";
 import { Preview } from "./preview";
+import type { PrivacyPanel } from "./privacy";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
 import type { TasteGallery } from "./tasteGallery";
@@ -68,6 +69,7 @@ export const parts = {} as {
   tasteGallery: TasteGallery;
   tasteButton: HTMLButtonElement;
   recorder: HistoryRecorder<Snapshot>;
+  privacy: PrivacyPanel;
   batchDialog: BatchDialog;
 };
 
@@ -90,6 +92,7 @@ export const saveOptions = new SaveOptionsPanel(
   $<HTMLOutputElement>("jpeg-quality-value"),
   $<HTMLInputElement>("keep-exif"),
   $<HTMLInputElement>("keep-gps"),
+  $<HTMLInputElement>("remove-gps"),
 );
 
 function extensionOf(path: string): string {

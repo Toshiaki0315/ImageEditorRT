@@ -3,11 +3,11 @@
 // 座標はどれも、回転・反転した後の原寸画像の座標（px）。
 
 import { invoke } from "@tauri-apps/api/core";
-import type { AspectRatio, CropRect, EditSettings, FrameKind, OrientOp, Orientation, ShapeType } from "./types";
+import type { AspectRatio, CropRect, EditSettings, FrameKind, OrientOp, Orientation, Region, ShapeType } from "./types";
 
 type DragMode = "new" | "move" | "resize";
 type Drag = { mode: DragMode; anchor: [number, number]; start: CropRect | null };
-type Oriented = { orientation: Orientation; crop: CropRect | null; size: [number, number] };
+type Oriented = { orientation: Orientation; crop: CropRect | null; regions: Region[]; size: [number, number] };
 /** アンドゥ／リドゥで範囲と一緒に戻す、比の選択と「縦向き」（戻した範囲と比の固定が食い違わないように） */
 export type AspectState = { ratio: AspectRatio; portrait: boolean };
 
@@ -312,9 +312,11 @@ export class CropController {
       orientation: this.settings.orientation,
       op,
       crop: this.settings.crop,
+      regions: this.settings.regions,
       size: this.size,
     });
     this.settings.orientation = result.orientation;
+    this.settings.regions = result.regions;
     // 反転すると傾きの向きも逆になる（90° 回転では同じ角度のまま）
     if ((op === "flip_horizontal" || op === "flip_vertical") && this.settings.straighten !== 0) {
       this.settings.straighten = -this.settings.straighten;

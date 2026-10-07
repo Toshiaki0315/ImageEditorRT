@@ -6,6 +6,7 @@ use imageeditorrt_core::formats;
 use imageeditorrt_core::frames::FrameType;
 use imageeditorrt_core::output::{self, SizeResult, SizeState};
 use imageeditorrt_core::pipeline::{self, EditSettings};
+use imageeditorrt_core::privacy::Region;
 use imageeditorrt_core::save;
 use imageeditorrt_core::shapes::ShapeType;
 use imageeditorrt_core::text::{TextFont, TextPosition};
@@ -91,15 +92,16 @@ pub fn crop_fit(rect: Option<CropRect>, aspect: AspectChoice, size: (u32, u32)) 
     crop::fit_to_aspect(rect, aspect, size)
 }
 
-/// 回転・反転（範囲も一緒に回す）。
+/// 回転・反転（トリミング範囲・投稿加工の範囲も一緒に回す）。
 #[tauri::command]
 pub fn crop_orient(
     orientation: Orientation,
     op: OrientOp,
     crop: Option<CropRect>,
+    regions: Vec<Region>,
     size: (u32, u32),
 ) -> Oriented {
-    crop::orient(orientation, op, crop, size)
+    crop::orient(orientation, op, crop, &regions, size)
 }
 
 /// 「出力」タブのサイズ変更: 欄に出す幅・高さと、編集設定に渡す幅・高さ。

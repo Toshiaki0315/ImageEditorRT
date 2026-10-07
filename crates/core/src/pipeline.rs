@@ -1,6 +1,6 @@
 //! 編集設定 (EditSettings) と、それを画像にかける処理の流れ（旧版の core/pipeline.py を移したもの）。
 //!
-//! 処理順（旧版 §5.1）: 回転・反転 →（水平の補正）→ トリミング → リサイズ → 露出 → 明るさ → コントラスト →
+//! 処理順（旧版 §5.1）: 回転・反転 →（水平の補正 → 投稿加工のぼかし・モザイク）→ トリミング → リサイズ → 露出 → 明るさ → コントラスト →
 //! 色温度 →（ハイライト／シャドウ）→ 彩度 → ディテール（ノイズ除去 → ぼかし → シャープ） → ジオラマ → フィルター →
 //! 周辺減光 → 経年劣化 → 文字。
 //! フレーム・形（#13）は、トリミングの後の比への切り抜きと、経年劣化の後にここへ足す。
@@ -18,6 +18,7 @@ pub use crate::filters::FilterType;
 pub use crate::frames::FrameType;
 use crate::frames::{self, FRAME_COLOR};
 use crate::histogram::{compute_histogram, Histogram};
+use crate::privacy::{self, Region};
 use crate::shapes;
 pub use crate::shapes::ShapeType;
 use crate::text;
@@ -82,6 +83,8 @@ pub struct EditSettings {
     pub shape: ShapeType,
     /// 角丸の半径（短辺に対する % 0〜50）
     pub corner_radius: u32,
+    /// 投稿加工で隠す範囲（ぼかし・モザイク）。回転・反転の直後にかける（旧版にはない）
+    pub regions: Vec<Region>,
 }
 
 impl Default for EditSettings {
@@ -116,6 +119,7 @@ impl Default for EditSettings {
             frame: FrameType::None,
             shape: ShapeType::Rectangle,
             corner_radius: shapes::CORNER_RADIUS_DEFAULT,
+            regions: Vec::new(),
         }
     }
 }
@@ -153,18 +157,20 @@ impl EditSettings {
     }
 }
 
-/// 回転・反転し、水平の補正をかけた画像を返す（大きさは回転・反転した後のもの）。
-fn orient(image: &RgbaImage, settings: &EditSettings) -> RgbaImage {
-    let image = settings.orientation.transpose(image);
-    if settings.straighten == 0.0 {
-        return image;
+/// 回転・反転し、水平の補正と投稿加工の範囲（ぼかし・モザイク）をかけた画像を返す（大きさは回転・反転した
+/// 後のもの）。image は原寸を factor 倍にした画像。
+fn orient(image: &RgbaImage, settings: &EditSettings, factor: f64) -> RgbaImage {
+    let mut image = settings.orientation.transpose(image);
+    if settings.straighten != 0.0 {
+        image = transform::straighten(&image, settings.straighten);
     }
-    transform::straighten(&image, settings.straighten)
+    privacy::cover(&mut image, &settings.regions, factor);
+    image
 }
 
 /// 原画像に編集をかけた新しい画像を返す（原画像は変更しない）。保存に使う。
 pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<RgbaImage, SizeError> {
-    let mut image = orient(original, settings);
+    let mut image = orient(original, settings, 1.0);
     if let Some(rect) = effective_crop(image.dimensions(), settings.crop, settings.frame, settings.shape) {
         image = transform::crop(&image, rect);
     }
@@ -237,7 +243,7 @@ pub fn render_preview_with_histogram(
     factor: f64,
     trimmed: bool,
 ) -> (RgbaImage, Histogram) {
-    let image = orient(image, settings);
+    let image = orient(image, settings, factor);
     let scaled = scale_settings(settings, factor);
     let mut rect = effective_crop(image.dimensions(), scaled.crop, settings.frame, settings.shape);
     // ディテール・ジオラマの半径は、保存時と同じく実際に切り抜く範囲（なければ全体）の短辺を基準にする
@@ -778,5 +784,30 @@ mod tests {
         // 大きい写真は、切り抜いた写真の長辺が max_side になるまで縮める
         let big = filter_thumbnails(&image, &EditSettings::default(), 1.0, 60);
         assert!(big.iter().all(|t| t.dimensions() == (60, 40)));
+    }
+
+    #[test]
+    fn regions_are_covered_after_rotation_and_dropped_for_before() {
+        use crate::privacy::RegionKind;
+        let image = RgbaImage::from_fn(80, 40, |x, y| Rgba([(x * 3) as u8, (y * 5) as u8, 0, 255]));
+        // 90° 回した後（40×80）の座標の範囲
+        let region = crate::privacy::Region {
+            kind: RegionKind::Mosaic,
+            rect: CropRect::new(0, 0, 20, 20),
+            strength: 100,
+        };
+        let settings = EditSettings {
+            orientation: Orientation::new(90, false),
+            regions: vec![region.clone()],
+            ..EditSettings::default()
+        };
+        let out = apply_edits(&image, &settings).unwrap();
+        let mut expected = Orientation::new(90, false).transpose(&image);
+        crate::privacy::cover(&mut expected, &[region], 1.0);
+        assert_eq!(out, expected);
+        assert_ne!(out, Orientation::new(90, false).transpose(&image));
+        // プレビューも同じ。加工前の表示では外す
+        assert_eq!(render_preview(&image, &settings, 1.0, false), out);
+        assert!(before_settings(image.dimensions(), &settings).regions.is_empty());
     }
 }

@@ -1,6 +1,6 @@
 // 設定パネルのタブ。最後に開いていたタブを覚えておき、次に起動したときも開く（旧版 FR-UI-61）。
 
-export type TabName = "adjust" | "crop" | "output" | "diorama" | "exif";
+export type TabName = "adjust" | "crop" | "output" | "diorama" | "privacy" | "exif";
 
 const STORAGE_KEY = "lastTab";
 const DEFAULT_TAB: TabName = "adjust";

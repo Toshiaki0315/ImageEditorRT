@@ -1,4 +1,5 @@
-// 「出力」タブの「保存の設定」（JPEG 品質・EXIF・位置情報）。
+// 「出力」タブの「保存の設定」（JPEG 品質・EXIF・位置情報）と、「投稿加工」タブの「位置情報を消して保存する」
+// （位置情報を残すかの逆。どちらで変えても両方に反映する）。
 // 保存の好みなので画像を開いても戻さず、アプリを終了しても残す（旧版 FR-UI-56）。
 
 /** Rust の save::SaveOptions。 */
@@ -15,12 +16,14 @@ export class SaveOptionsPanel {
     private readonly qualityValue: HTMLOutputElement,
     private readonly keepExif: HTMLInputElement,
     private readonly keepGps: HTMLInputElement,
+    private readonly removeGps: HTMLInputElement,
   ) {
     this.options = load();
     quality.addEventListener("input", () => this.update({ quality: Number(quality.value) }));
     quality.addEventListener("dblclick", () => this.update({ quality: DEFAULT_OPTIONS.quality }));
     keepExif.addEventListener("change", () => this.update({ keepExif: keepExif.checked }));
     keepGps.addEventListener("change", () => this.update({ keepGps: keepGps.checked }));
+    removeGps.addEventListener("change", () => this.update({ keepGps: !removeGps.checked }));
     this.show();
   }
 
@@ -44,8 +47,10 @@ export class SaveOptionsPanel {
     this.qualityValue.textContent = String(this.options.quality);
     this.keepExif.checked = this.options.keepExif;
     this.keepGps.checked = this.options.keepGps;
-    // 位置情報は EXIF を残すときだけ選べる
+    // 位置情報は EXIF を残すときだけ選べる（残さなければ位置情報も消える）
     this.keepGps.disabled = !this.options.keepExif;
+    this.removeGps.checked = !this.options.keepExif || !this.options.keepGps;
+    this.removeGps.disabled = !this.options.keepExif;
   }
 }
 

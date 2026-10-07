@@ -23,6 +23,7 @@ import {
 } from "./files";
 import { MENU, setMenuChecked } from "./menus";
 import { Panel } from "./panel";
+import { PrivacyPanel } from "./privacy";
 import { loadPresets, onPresetMenu, showPresetMenu } from "./presetsUi";
 import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
 import { TasteGallery } from "./tasteGallery";
@@ -71,10 +72,12 @@ async function createParts() {
     userChanged,
     (trimmed) => {
       preview.trimmed = trimmed;
+      updatePrivacyActive();
       settingsChanged();
     },
     () => output.rotate(),
   );
+  parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, userChanged);
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
   parts.textButton = $<HTMLButtonElement>("text-button");
@@ -82,6 +85,18 @@ async function createParts() {
   parts.tasteButton = $<HTMLButtonElement>("taste-button");
   parts.batchDialog = new BatchDialog(state.extensions);
   setupHistory();
+}
+
+/** 回転・反転した後の原寸の大きさ（画像がなければ null）。 */
+function orientedSize(): [number, number] | null {
+  const { loaded, settings } = state;
+  if (!loaded) return null;
+  return settings.orientation.rotation % 180 === 0 ? [loaded.width, loaded.height] : [loaded.height, loaded.width];
+}
+
+/** 投稿加工の範囲は「投稿加工」タブを開いていて、切り抜いた表示でないときだけ描く・選べる。 */
+function updatePrivacyActive() {
+  parts.privacy.setActive(tabs.selected() === "privacy" && !preview.trimmed);
 }
 
 /** ボタン・プレビューの操作をつなぐ。 */
@@ -104,13 +119,18 @@ function connectControls() {
   });
   preview.onResize = () => {
     parts.crop.draw();
+    parts.privacy.draw();
     void updateGuide();
     placeBadge();
   };
   dom.canvas.addEventListener("dblclick", (event) => void onPreviewDoubleClick(event));
   setupCompare();
   tabs.setEnabled("exif", false);
-  tabs.onSelect = () => void updateGuide();
+  tabs.onSelect = () => {
+    updatePrivacyActive();
+    void updateGuide();
+  };
+  updatePrivacyActive();
   setupDrop();
 }
 

@@ -24,6 +24,7 @@ export function userChanged() {
 export function settingsChanged() {
   if (!state.loaded) return;
   // 出力の幅・高さは範囲・フレームなどで変わるので、先に合わせてからプレビューを描く
+  parts.privacy?.show();
   void output.refresh().then(() => {
     preview.request(state.settings);
     void updateStatus();
@@ -59,7 +60,7 @@ export function setupHistory() {
   parts.recorder = new HistoryRecorder<Snapshot>({
     snapshot,
     restore,
-    isAdjusting: () => sliderDragging || parts.crop.isDragging(),
+    isAdjusting: () => sliderDragging || parts.crop.isDragging() || parts.privacy.isDragging(),
     onUpdate: updateMenus,
   });
   document.addEventListener("pointerdown", (event) => {

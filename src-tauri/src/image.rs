@@ -104,6 +104,42 @@ pub async fn filter_thumbnails(
     Ok(Response::new(body))
 }
 
+/// 顔の自動認識（投稿加工のスタンプ）: プレビュー用の画像を今の向き（回転・反転・水平の補正）にして顔を見つけ、
+/// スタンプで覆う範囲（顔より少し大きい正方形）を、回転・反転した後の原寸の座標で返す。
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn detect_faces(
+    settings: EditSettings,
+    state: State<'_, AppState>,
+) -> Result<Vec<imageeditorrt_core::transform::CropRect>, String> {
+    use imageeditorrt_core::faces;
+    use imageeditorrt_core::transform::CropRect;
+    let (preview, factor, original) = {
+        let loaded = state.0.lock().map_err(|e| e.to_string())?;
+        let original =
+            loaded.original.as_ref().map(|o| o.dimensions()).ok_or("画像が読み込まれていません")?;
+        (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor, original)
+    };
+    blocking(move || {
+        let image = pipeline::straightened(&preview, &settings);
+        let size = settings.orientation.size(original);
+        let to_original = |v: i64| (v as f64 / factor).round() as i64;
+        Ok(faces::detect_faces(&image)?
+            .into_iter()
+            .filter_map(|face| {
+                let face = CropRect::new(
+                    to_original(face.x),
+                    to_original(face.y),
+                    to_original(face.width),
+                    to_original(face.height),
+                );
+                faces::cover_rect(face, size)
+            })
+            .collect())
+    })
+    .await
+}
+
 /// リセット（旧版 FR-UI-42）: 読み込んだ画像を捨てて、未読込の状態に戻す。
 #[tauri::command]
 pub fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {

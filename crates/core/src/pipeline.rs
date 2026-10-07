@@ -160,12 +160,18 @@ impl EditSettings {
 /// 回転・反転し、水平の補正と投稿加工の範囲（ぼかし・モザイク）をかけた画像を返す（大きさは回転・反転した
 /// 後のもの）。image は原寸を factor 倍にした画像。
 fn orient(image: &RgbaImage, settings: &EditSettings, factor: f64) -> RgbaImage {
-    let mut image = settings.orientation.transpose(image);
-    if settings.straighten != 0.0 {
-        image = transform::straighten(&image, settings.straighten);
-    }
+    let mut image = straightened(image, settings);
     privacy::cover(&mut image, &settings.regions, factor);
     image
+}
+
+/// 回転・反転し、水平の補正をかけた画像（投稿加工の範囲の座標と同じ向き。顔の認識に使う）。
+pub fn straightened(image: &RgbaImage, settings: &EditSettings) -> RgbaImage {
+    let image = settings.orientation.transpose(image);
+    if settings.straighten == 0.0 {
+        return image;
+    }
+    transform::straighten(&image, settings.straighten)
 }
 
 /// 原画像に編集をかけた新しい画像を返す（原画像は変更しない）。保存に使う。

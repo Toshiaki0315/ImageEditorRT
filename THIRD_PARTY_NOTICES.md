@@ -119,3 +119,9 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
+
+## テスト用の顔写真（crates/core/tests/fixtures/face.jpg）
+
+顔の自動認識のテストに使う写真。NASA が撮影したニール・アームストロングの公式ポートレート（S69-31741）を、
+Wikimedia Commons の「File:Neil_Armstrong_pose.jpg」から取得し、長辺 320px に縮小したもの。
+アメリカ合衆国政府の著作物のため、パブリックドメイン（著作権の制限なし）。アプリの配布物には含まれない。

@@ -8,7 +8,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { $, dom, histogramView, hooks, output, parts, preview, state, tabs, zoomView } from "./app";
 import { BatchDialog } from "./batchDialog";
 import { bench, benchSave, verdict } from "./bench";
-import { CropController } from "./crop";
+import { CropController, degreesText } from "./crop";
 import { redo, settingsChanged, setupHistory, undo, userChanged } from "./editing";
 import {
   openDialog,
@@ -77,6 +77,13 @@ async function createParts() {
     },
     () => output.rotate(),
   );
+  parts.crop.findTilt = () =>
+    invoke<number | null>("auto_straighten", { settings: state.settings }).catch((error) => {
+      void showError("傾きを求められません", error);
+      return undefined;
+    });
+  parts.crop.onAutoStraighten = (degrees) =>
+    notify(degrees === null ? "傾きが分かりませんでした（水平線や長い直線が見つかりません）" : `傾きを ${degreesText(degrees)} 直しました`);
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
   parts.privacy.detectFaces = () =>

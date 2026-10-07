@@ -49,6 +49,11 @@ export class CropController {
   private readonly cornerValue = $<HTMLOutputElement>("corner-radius-value");
   private readonly straighten = $<HTMLInputElement>("straighten");
   private readonly straightenValue = $<HTMLOutputElement>("straighten-value");
+  private readonly autoStraighten = $<HTMLButtonElement>("auto-straighten");
+  /** 傾きを求める（水平の補正の角度。分からなければ null、求められなければ undefined） */
+  findTilt: () => Promise<number | null | undefined> = async () => null;
+  /** 傾きの自動補正の結果を知らせる（直した角度。分からなければ null） */
+  onAutoStraighten: (degrees: number | null) => void = () => {};
   /** 向きのある比の、横向きの名前（「縦向き」で名前を縦の形にするため） */
   private readonly ratioNames = new Map<string, string>();
   /** フレーム・円で比を固定したときに覚えておく、比のプルダウンの選択 */
@@ -102,6 +107,7 @@ export class CropController {
     this.corner.addEventListener("dblclick", () => this.setCorner(CORNER_RADIUS_DEFAULT));
     this.straighten.addEventListener("input", () => this.setStraighten(Number(this.straighten.value)));
     this.straighten.addEventListener("dblclick", () => this.setStraighten(0));
+    this.autoStraighten.addEventListener("click", () => void this.straightenAutomatically());
     this.portrait.addEventListener("change", () => void this.aspectChanged());
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) {
       button.addEventListener("click", () => void this.orient(button.dataset.orient as OrientOp));
@@ -254,6 +260,19 @@ export class CropController {
     this.onChange();
   }
 
+  /** 傾きを求めて、水平の補正に入れる（元に戻せる。スライダーで微調整できる）。 */
+  private async straightenAutomatically() {
+    this.autoStraighten.disabled = true;
+    try {
+      const degrees = await this.findTilt();
+      if (degrees === undefined) return;
+      if (degrees !== null) this.setStraighten(degrees);
+      this.onAutoStraighten(degrees);
+    } finally {
+      this.autoStraighten.disabled = this.size === null;
+    }
+  }
+
   // --- 範囲・比・向き ----------------------------------------------------------
 
   private aspectChoice() {
@@ -377,7 +396,7 @@ export class CropController {
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) button.disabled = !loaded;
     this.straighten.value = String(this.settings.straighten);
     this.straightenValue.textContent = degreesText(this.settings.straighten);
-    this.straighten.disabled = !loaded;
+    this.straighten.disabled = this.autoStraighten.disabled = !loaded;
     // 範囲・フレーム・形（矩形以外）のどれもなければ「トリミング実行」は押せず、全体の表示に戻す
     const canTrim = loaded && (crop !== null || this.settings.frame !== "none" || this.settings.shape !== "rectangle");
     if (!canTrim && this.isTrimmed()) this.setTrimmed(false);

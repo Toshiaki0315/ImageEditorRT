@@ -13,8 +13,14 @@ export async function showError(title: string, error: unknown, withFormats = fal
   await message(text, { title, kind: "warning" });
 }
 
-/** ステータスバー: ファイル名・原寸・出力の大きさ（と、読み込みのときのお知らせ・extra）。 */
+/** 知らせた文を、続けて起きる描き直し（知らせた操作で設定が変わったときなど）でも残しておく時間（ms） */
+const NOTICE_MS = 4000;
+/** 最後に知らせた文と、その時刻 */
+let notice: { text: string; at: number } | null = null;
+
+/** ステータスバー: ファイル名・原寸・出力の大きさ（と、読み込みのときのお知らせ・extra・少し前に知らせた文）。 */
 export async function updateStatus(extra?: string) {
+  if (!extra && notice && performance.now() - notice.at < NOTICE_MS) extra = notice.text;
   const { loaded, notes } = state;
   if (!loaded) {
     dom.status.textContent = notes.length ? notes.join("／") : NO_IMAGE_MESSAGE;
@@ -35,6 +41,7 @@ export async function updateStatus(extra?: string) {
 
 /** ステータスバーで知らせる（画像がなければ、知らせる文だけを出す）。 */
 export function notify(text: string) {
+  notice = { text, at: performance.now() };
   if (state.loaded) void updateStatus(text);
   else dom.status.textContent = text;
 }

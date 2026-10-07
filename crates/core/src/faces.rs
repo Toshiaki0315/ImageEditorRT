@@ -139,7 +139,7 @@ pub fn cover_rect(face: CropRect, (width, height): (u32, u32)) -> Option<CropRec
 }
 
 /// RGBA の画像を CGImage にする（sRGB）。
-fn cg_image(image: &RgbaImage) -> Option<CFRetained<CGImage>> {
+pub(crate) fn cg_image(image: &RgbaImage) -> Option<CFRetained<CGImage>> {
     let (width, height) = (image.width() as usize, image.height() as usize);
     // CoreGraphics は乗算済みのアルファで持つので、色にアルファを掛けて渡す
     let mut pixels: Vec<u8> = image

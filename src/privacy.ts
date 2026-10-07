@@ -29,7 +29,7 @@ export class PrivacyPanel {
   /** 顔の認識（スタンプで覆う範囲を返す。見つからなければ空、認識できなければ null） */
   detectFaces: () => Promise<CropRect[] | null> = async () => [];
   /** 顔の認識の結果を知らせる */
-  onFaces: (count: number) => void = () => {};
+  onFaces: (count: number, kind: RegionKind) => void = () => {};
   private readonly toolButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-region-tool]")];
   private readonly stampButtons: HTMLButtonElement[] = [];
   /** 新しく置くスタンプの絵文字（スタンプを選んでいないときに選ぶ） */
@@ -83,7 +83,7 @@ export class PrivacyPanel {
       this.selected = null;
       this.changed();
     });
-    this.facesButton.addEventListener("click", () => void this.stampFaces());
+    this.facesButton.addEventListener("click", () => void this.coverFaces());
     this.overlay.addEventListener("pointerdown", (e) => this.pointerDown(e));
     this.overlay.addEventListener("pointermove", (e) => this.pointerMove(e));
     this.overlay.addEventListener("pointerup", (e) => this.pointerUp(e));
@@ -184,19 +184,25 @@ export class PrivacyPanel {
     this.show();
   }
 
-  /** 顔を見つけて、それぞれに次に置くスタンプを置く（置いたスタンプは手で置いたものと同じく直せる）。 */
-  private async stampFaces() {
+  /**
+   * 顔を見つけて、それぞれをタブに出ている隠し方（ぼかし・モザイク・スタンプ）・強さ・絵文字で隠す
+   * （範囲を選んでいればその範囲の設定。足した範囲は手で足したものと同じく直せる）。
+   */
+  private async coverFaces() {
+    const region = this.current();
+    const kind = region?.kind ?? this.tool;
+    const strength = region?.strength ?? this.nextStrength;
+    const stamp = region?.kind === "stamp" ? region.stamp : this.nextStamp;
     this.facesButton.disabled = true;
     try {
       const faces = await this.detectFaces();
       if (faces === null) return;
       if (faces.length > 0) {
-        for (const rect of faces) this.settings.regions.push({ kind: "stamp", rect, strength: this.nextStrength, stamp: this.nextStamp });
-        this.tool = "stamp";
+        for (const rect of faces) this.settings.regions.push({ kind, rect, strength, stamp });
         this.selected = null;
         this.changed();
       }
-      this.onFaces(faces.length);
+      this.onFaces(faces.length, kind);
     } finally {
       this.show();
     }

@@ -16,6 +16,8 @@
   "saturation": 0,
   "brightness": 0,
   "contrast": 0,
+  "highlights": 0,
+  "shadows": 0,
   "exposure": 0.0,
   "sharpen": 0,
   "blur": 0,

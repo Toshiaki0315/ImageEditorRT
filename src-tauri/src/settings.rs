@@ -92,6 +92,12 @@ pub fn crop_fit(rect: Option<CropRect>, aspect: AspectChoice, size: (u32, u32)) 
     crop::fit_to_aspect(rect, aspect, size)
 }
 
+/// 投稿加工で選べるスタンプの絵文字（画面の並びの順）。
+#[tauri::command]
+pub fn stamp_list() -> Vec<&'static str> {
+    imageeditorrt_core::privacy::STAMPS.to_vec()
+}
+
 /// 回転・反転（トリミング範囲・投稿加工の範囲も一緒に回す）。
 #[tauri::command]
 pub fn crop_orient(

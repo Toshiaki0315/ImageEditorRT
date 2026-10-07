@@ -71,10 +71,10 @@ export type EditSettings = {
 };
 
 /** 投稿加工の隠し方（Rust の privacy::RegionKind）。 */
-export type RegionKind = "blur" | "mosaic";
+export type RegionKind = "blur" | "mosaic" | "stamp";
 
-/** 投稿加工で隠す範囲 1 つ（Rust の privacy::Region）。強さは 1〜100。 */
-export type Region = { kind: RegionKind; rect: CropRect; strength: number };
+/** 投稿加工で隠す範囲 1 つ（Rust の privacy::Region）。強さは 1〜100（スタンプでは使わない）、stamp はスタンプの絵文字。 */
+export type Region = { kind: RegionKind; rect: CropRect; strength: number; stamp: string };
 
 /** フレーム（Rust の frames::FrameType）。 */
 export type FrameKind = "none" | "polaroid" | "instax_mini";

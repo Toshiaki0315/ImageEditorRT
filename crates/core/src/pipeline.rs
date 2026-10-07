@@ -2,7 +2,7 @@
 //!
 //! 処理順（旧版 §5.1）: 回転・反転 →（水平の補正 → 投稿加工のぼかし・モザイク）→ トリミング → リサイズ → 露出 → 明るさ → コントラスト →
 //! 色温度 →（ハイライト／シャドウ）→ 彩度 → ディテール（ノイズ除去 → ぼかし → シャープ） → ジオラマ → フィルター →
-//! 周辺減光 → 経年劣化 → 文字。
+//! 周辺減光 → 経年劣化 →（投稿加工のスタンプ）→ 文字。
 //! フレーム・形（#13）は、トリミングの後の比への切り抜きと、経年劣化の後にここへ足す。
 
 use image::{imageops, RgbaImage};
@@ -83,7 +83,7 @@ pub struct EditSettings {
     pub shape: ShapeType,
     /// 角丸の半径（短辺に対する % 0〜50）
     pub corner_radius: u32,
-    /// 投稿加工で隠す範囲（ぼかし・モザイク）。回転・反転の直後にかける（旧版にはない）
+    /// 投稿加工で隠す範囲（ぼかし・モザイクは回転・反転の直後に、スタンプは経年劣化の後にかける。旧版にはない）
     pub regions: Vec<Region>,
 }
 
@@ -171,12 +171,17 @@ fn orient(image: &RgbaImage, settings: &EditSettings, factor: f64) -> RgbaImage 
 /// 原画像に編集をかけた新しい画像を返す（原画像は変更しない）。保存に使う。
 pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<RgbaImage, SizeError> {
     let mut image = orient(original, settings, 1.0);
-    if let Some(rect) = effective_crop(image.dimensions(), settings.crop, settings.frame, settings.shape) {
+    let photo = effective_crop(image.dimensions(), settings.crop, settings.frame, settings.shape);
+    if let Some(rect) = photo {
         image = transform::crop(&image, rect);
     }
+    let photo = photo.unwrap_or(CropRect::whole(image.dimensions()));
     let size =
         transform::fit_size(image.dimensions(), settings.width, settings.height, settings.keep_aspect)?;
     let image = transform::resize_to(&image, size);
+    // スタンプの位置: 原寸の座標を、切り抜いてリサイズした後の画像の座標にする
+    let scale = (f64::from(size.0) / photo.width as f64, f64::from(size.1) / photo.height as f64);
+    let stamp_place = (scale, (photo.x as f64 * scale.0, photo.y as f64 * scale.1));
 
     let reference = f64::from(image.width().min(image.height()));
     let image = apply_detail(apply_basic_adjustments(image, settings), settings, reference, None);
@@ -184,6 +189,7 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
     let mut image = image;
     adjust::vignette(&mut image, settings.vignette);
     adjust::aging(&mut image, settings.aging);
+    privacy::stamp(&mut image, &settings.regions, stamp_place.0, stamp_place.1);
     Ok(apply_shape_and_frame(image, settings))
 }
 
@@ -253,9 +259,12 @@ pub fn render_preview_with_histogram(
     let adjusted = apply_detail(apply_basic_adjustments(image, settings), settings, reference, output);
     // ジオラマの帯は写真（実際に切り抜く範囲）に対する位置に置き、全体表示では外側にも続ける
     let mut rendered = apply_diorama_and_filter(adjusted, settings, rect);
+    // スタンプの位置のずれ（切り抜いた表示なら、切り抜いた範囲の左上の分）
+    let mut stamp_offset = (0.0, 0.0);
     if trimmed {
         if let Some(r) = rect.take() {
             rendered = transform::crop(&rendered, r);
+            stamp_offset = (r.x as f64, r.y as f64);
         }
     }
     match rect {
@@ -269,6 +278,7 @@ pub fn render_preview_with_histogram(
     }
     // 経年劣化は画素ごとの色の変化と固定模様の粒子なので、表示範囲全体にかける
     adjust::aging(&mut rendered, settings.aging);
+    privacy::stamp(&mut rendered, &settings.regions, (factor, factor), stamp_offset);
     let photo = rect.unwrap_or(CropRect::whole(rendered.dimensions()));
     let mask =
         shapes::shape_mask((photo.width as u32, photo.height as u32), settings.shape, settings.corner_radius);
@@ -795,6 +805,7 @@ mod tests {
             kind: RegionKind::Mosaic,
             rect: CropRect::new(0, 0, 20, 20),
             strength: 100,
+            ..crate::privacy::Region::default()
         };
         let settings = EditSettings {
             orientation: Orientation::new(90, false),
@@ -809,5 +820,43 @@ mod tests {
         // プレビューも同じ。加工前の表示では外す
         assert_eq!(render_preview(&image, &settings, 1.0, false), out);
         assert!(before_settings(image.dimensions(), &settings).regions.is_empty());
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn stamps_follow_crop_and_resize_and_keep_their_colors() {
+        use crate::privacy::{Region, RegionKind};
+        let image = RgbaImage::from_pixel(200, 100, Rgba([0, 0, 0, 255]));
+        let stamp =
+            Region { kind: RegionKind::Stamp, rect: CropRect::new(100, 20, 40, 40), ..Region::default() };
+        // (80, 0) から 100 × 100 を切り抜き、50 × 50 にする → スタンプは (10, 10)〜(30, 30)
+        let settings = EditSettings {
+            crop: Some(CropRect::new(80, 0, 100, 100)),
+            width: Some(50),
+            filter: FilterType::Sepia,
+            regions: vec![stamp],
+            ..EditSettings::default()
+        };
+        let out = apply_edits(&image, &settings).unwrap();
+        let plain = apply_edits(&image, &EditSettings { regions: vec![], ..settings.clone() }).unwrap();
+        let changed: Vec<(u32, u32)> = out
+            .enumerate_pixels()
+            .filter(|(x, y, p)| *p != plain.get_pixel(*x, *y))
+            .map(|(x, y, _)| (x, y))
+            .collect();
+        assert!(!changed.is_empty());
+        assert!(changed.iter().all(|&(x, y)| (10..30).contains(&x) && (10..30).contains(&y)), "{changed:?}");
+        // テイスト（セピア）の後に描くので、絵文字の色（黄色の顔）が残る
+        assert!(out.pixels().any(|p| p[0] > 200 && p[1] > 150 && p[2] < 80));
+        // 切り抜いたプレビュー（0.5 倍）でも同じ位置
+        let preview = make_preview(&image, 100).0;
+        let shown = render_preview(&preview, &settings, 0.5, true);
+        let blank =
+            render_preview(&preview, &EditSettings { regions: vec![], ..settings.clone() }, 0.5, true);
+        assert_eq!(shown.dimensions(), (50, 50));
+        assert!(shown
+            .enumerate_pixels()
+            .filter(|(x, y, p)| *p != blank.get_pixel(*x, *y))
+            .all(|(x, y, _)| (10..30).contains(&x) && (10..30).contains(&y)));
     }
 }

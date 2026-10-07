@@ -1,4 +1,4 @@
-// 「投稿加工」タブ（旧版にはない）: 範囲のぼかし・モザイク。プレビューの上のドラッグで範囲を足し、選んで動かす・
+// 「投稿加工」タブ（旧版にはない）: 範囲のぼかし・モザイク・絵文字のスタンプ。プレビューの上のドラッグで範囲を足し、選んで動かす・
 // 大きさを変える・強さと隠し方を変える。範囲は回転・反転した後の原寸の画像の座標で持つ（トリミング範囲と同じ）。
 // 位置情報の削除のチェックは saveOptions.ts が受け持つ。
 
@@ -26,6 +26,9 @@ export class PrivacyPanel {
   private readonly deleteButton = $<HTMLButtonElement>("region-delete");
   private readonly clearButton = $<HTMLButtonElement>("region-clear");
   private readonly toolButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-region-tool]")];
+  private readonly stampButtons: HTMLButtonElement[] = [];
+  /** 新しく置くスタンプの絵文字（スタンプを選んでいないときに選ぶ） */
+  private nextStamp: string;
   private tool: RegionKind = "blur";
   /** 新しく足す範囲の強さ（範囲を選んでいないときにスライダーで変える） */
   private nextStrength = STRENGTH_DEFAULT;
@@ -39,9 +42,27 @@ export class PrivacyPanel {
 
   /**
    * @param size 回転・反転した後の原寸の大きさ（画像がなければ null）
+   * @param stamps 選べるスタンプの絵文字（stamp_list）
    * @param onChange 範囲を変えたとき（履歴に積み、プレビューを描き直す）
    */
-  constructor(settings: EditSettings, canvas: HTMLCanvasElement, size: () => Point | null, onChange: () => void) {
+  constructor(
+    settings: EditSettings,
+    canvas: HTMLCanvasElement,
+    size: () => Point | null,
+    stamps: string[],
+    onChange: () => void,
+  ) {
+    this.nextStamp = stamps[0] ?? "😊";
+    const grid = $<HTMLElement>("stamp-grid");
+    for (const stamp of stamps) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "stamp";
+      button.textContent = stamp;
+      button.addEventListener("click", () => this.setStamp(stamp));
+      this.stampButtons.push(button);
+      grid.append(button);
+    }
     this.settings = settings;
     this.canvas = canvas;
     this.size = size;
@@ -86,10 +107,17 @@ export class PrivacyPanel {
       button.setAttribute("aria-pressed", String(button.dataset.regionTool === (region?.kind ?? this.tool)));
       button.disabled = !loaded;
     }
+    const kind = region?.kind ?? this.tool;
     const strength = region?.strength ?? this.nextStrength;
     this.strength.value = String(strength);
     this.strengthValue.textContent = String(strength);
-    this.strength.disabled = !loaded;
+    // 強さはぼかし・モザイクだけ、スタンプの絵はスタンプだけ
+    this.strength.disabled = !loaded || kind === "stamp";
+    const stamp = region?.kind === "stamp" ? region.stamp : this.nextStamp;
+    for (const button of this.stampButtons) {
+      button.setAttribute("aria-pressed", String(button.textContent === stamp));
+      button.disabled = !loaded || kind !== "stamp";
+    }
     this.deleteButton.disabled = region === null;
     this.clearButton.disabled = this.settings.regions.length === 0;
     this.draw();
@@ -143,6 +171,18 @@ export class PrivacyPanel {
     const region = this.current();
     if (region && region.kind !== kind) {
       region.kind = kind;
+      this.changed();
+      return;
+    }
+    this.show();
+  }
+
+  /** スタンプの絵文字（選んでいるスタンプ、なければ次に置くスタンプ）。 */
+  private setStamp(stamp: string) {
+    this.nextStamp = stamp;
+    const region = this.current();
+    if (region?.kind === "stamp" && region.stamp !== stamp) {
+      region.stamp = stamp;
       this.changed();
       return;
     }
@@ -259,7 +299,7 @@ export class PrivacyPanel {
       const rect = rectFromPoints(drag.anchor, point, size);
       if (this.selected === null) {
         if (rect.width === 0 && rect.height === 0) return;
-        this.settings.regions.push({ kind: this.tool, rect, strength: this.nextStrength });
+        this.settings.regions.push({ kind: this.tool, rect, strength: this.nextStrength, stamp: this.nextStamp });
         this.selected = this.settings.regions.length - 1;
       } else {
         this.settings.regions[this.selected].rect = rect;

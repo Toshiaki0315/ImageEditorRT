@@ -150,6 +150,30 @@ button:disabled {
   stroke-width: 2;
 }
 
+.stamp-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.stamp {
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.stamp[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.stamp:disabled {
+  opacity: 0.4;
+}
+
 .tools button[aria-pressed="true"] {
   background: var(--accent);
   color: #ffffff;

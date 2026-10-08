@@ -186,6 +186,31 @@ pub fn normalize_name(name: &str) -> String {
     name.trim_matches(is_python_space).chars().take(PRESET_NAME_MAX).collect()
 }
 
+/// 読み込んだプリセット（imported）を一覧の末尾に足した新しい一覧と、足した数を返す（プリセットの読み込み。
+/// 旧版にはない）。同じ名前があれば「名前 (2)」「名前 (3)」… と空いている名前に変えて足す（今のものは消さない）。
+pub fn merge_presets(presets: &[Preset], imported: Vec<Preset>) -> (Vec<Preset>, usize) {
+    let mut list = presets.to_vec();
+    let count = imported.len();
+    for mut preset in imported {
+        if list.iter().any(|p| p.name == preset.name) {
+            let base = preset.name.clone();
+            let free =
+                (2..).map(|n| format!("{base} ({n})")).find(|name| list.iter().all(|p| &p.name != name));
+            preset.name = free.expect("空いている名前は必ずある");
+        }
+        list.push(preset);
+    }
+    (list, count)
+}
+
+/// プリセットのファイル（書き出したもの・presets.json）を読む。ファイルがない・形式が正しくなければエラー。
+pub fn read_presets_file(path: &Path) -> Result<Vec<Preset>, PresetError> {
+    if !path.is_file() {
+        return Err(PresetError(format!("プリセットのファイルがありません: {}", path.display())));
+    }
+    load_presets(path)
+}
+
 /// 同じ名前があれば置き換え、なければ末尾に加えた新しい一覧を返す。
 pub fn upsert_preset(presets: &[Preset], preset: Preset) -> Vec<Preset> {
     let mut list = presets.to_vec();
@@ -593,5 +618,33 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
         assert_eq!(set.apply(&EditSettings::default()).logo, set.logo);
+    }
+
+    #[test]
+    fn export_then_import_with_renamed_duplicates() {
+        let dir = std::env::temp_dir().join(format!("imageeditorrt-preset-io-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let sepia = Preset {
+            filter: FilterType::Sepia,
+            ..Preset::from_settings("セピア", &EditSettings::default())
+        };
+        let warm =
+            Preset { temperature: 5000, ..Preset::from_settings("暖かく", &EditSettings::default()) };
+        let file = dir.join("書き出し.json");
+        save_presets(&file, &[sepia.clone(), warm.clone()]).unwrap();
+        let imported = read_presets_file(&file).unwrap();
+        assert_eq!(imported, vec![sepia.clone(), warm.clone()]);
+        // 「セピア」はもうあるので「セピア (2)」、それもあれば「セピア (3)」
+        let existing = vec![sepia.clone(), Preset { name: "セピア (2)".into(), ..sepia.clone() }];
+        let (merged, added) = merge_presets(&existing, imported);
+        assert_eq!(added, 2);
+        let names: Vec<&str> = merged.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, ["セピア", "セピア (2)", "セピア (3)", "暖かく"]);
+        assert_eq!(merged[2].filter, FilterType::Sepia);
+        // ない・壊れたファイル
+        assert!(read_presets_file(&dir.join("none.json")).is_err());
+        std::fs::write(dir.join("broken.json"), "not json").unwrap();
+        assert!(read_presets_file(&dir.join("broken.json")).is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

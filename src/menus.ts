@@ -21,6 +21,8 @@ export const MENU = {
   fit: "fit",
   histogram: "histogram",
   presetSave: "preset-save",
+  presetExport: "preset-export",
+  presetImport: "preset-import",
   /** 後ろに一覧の中の番号が付く */
   presetApply: "preset-apply:",
   presetDelete: "preset-delete:",

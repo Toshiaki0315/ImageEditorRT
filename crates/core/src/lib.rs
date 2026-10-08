@@ -10,6 +10,7 @@ pub mod background;
 pub mod batch;
 pub mod blur;
 pub mod crop;
+pub mod curve;
 #[cfg(target_os = "macos")]
 pub mod decode;
 pub mod diorama;

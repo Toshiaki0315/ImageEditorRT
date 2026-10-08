@@ -72,7 +72,17 @@ export type EditSettings = {
   background: BackgroundMode;
   /** 背景のぼかしの強さ 1〜100（背景を「ぼかす」とき） */
   backgroundBlur: number;
+  /** トーンカーブの点（[x, y]。x は 0〜255 で増えていく順、両端は x = 0・255） */
+  toneCurve: [number, number][];
+  /** 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタの 8 色） */
+  hsl: HslAdjust[];
 };
+
+/** 色ごとの調整の 1 色分（Rust の curve::HslAdjust）。色相 -30〜30、彩度・明るさ -100〜100。 */
+export type HslAdjust = { hue: number; saturation: number; lightness: number };
+
+/** 既定の色ごとの調整（すべて 0）。 */
+export const neutralHsl = (): HslAdjust[] => Array.from({ length: 8 }, () => ({ hue: 0, saturation: 0, lightness: 0 }));
 
 /** 背景の扱い（Rust の background::Background）。 */
 export type BackgroundMode = "keep" | "transparent" | "white" | "blur";
@@ -124,6 +134,11 @@ export function defaultSettings(): EditSettings {
     regions: [],
     background: "keep",
     backgroundBlur: 50,
+    toneCurve: [
+      [0, 0],
+      [255, 255],
+    ],
+    hsl: neutralHsl(),
   };
 }
 

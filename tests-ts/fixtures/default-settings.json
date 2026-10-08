@@ -44,5 +44,57 @@
   "cornerRadius": 10,
   "regions": [],
   "background": "keep",
-  "backgroundBlur": 50
+  "backgroundBlur": 50,
+  "toneCurve": [
+    [
+      0,
+      0
+    ],
+    [
+      255,
+      255
+    ]
+  ],
+  "hsl": [
+    {
+      "hue": 0,
+      "saturation": 0,
+      "lightness": 0
+    },
+    {
+      "hue": 0,
+      "saturation": 0,
+      "lightness": 0
+    },
+    {
+      "hue": 0,
+      "saturation": 0,
+      "lightness": 0
+    },
+    {
+      "hue": 0,
+      "saturation": 0,
+      "lightness": 0
+    },
+    {
+      "hue": 0,
+      "saturation": 0,
+      "lightness": 0
+    },
+    {
+      "hue": 0,
+      "saturation": 0,
+      "lightness": 0
+    },
+    {
+      "hue": 0,
+      "saturation": 0,
+      "lightness": 0
+    },
+    {
+      "hue": 0,
+      "saturation": 0,
+      "lightness": 0
+    }
+  ]
 }

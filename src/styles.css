@@ -144,6 +144,36 @@ button:disabled {
   stroke-width: 1;
 }
 
+/* トーンカーブ・色ごとの調整 */
+.tone-curve {
+  display: block;
+  margin: 4px 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.hsl-bands {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+
+.hsl-band {
+  font-size: 11px;
+  padding: 3px 0;
+  border: 2px solid transparent;
+  border-left: 6px solid var(--band);
+}
+
+.hsl-band[aria-pressed="true"] {
+  border-color: var(--accent);
+  border-left-color: var(--band);
+}
+
 /* 投稿加工の範囲（選んでいる範囲はアクセントの色） */
 .privacy-overlay .edge.selected {
   stroke: var(--accent);

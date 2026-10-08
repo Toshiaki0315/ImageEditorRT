@@ -1,6 +1,7 @@
 // 設定のスライダー（「加工」「ジオラマ」タブ）。範囲・刻み・値の表示は旧版と同じ（FR-UI-21〜28・53・60）。
 
-import type { EditSettings, FilterType } from "./types";
+import { identityCurve } from "./curve";
+import { type EditSettings, type FilterType, neutralHsl } from "./types";
 
 /** スライダーで変える数値の項目。 */
 type NumberKey = { [K in keyof EditSettings]: EditSettings[K] extends number ? K : never }[keyof EditSettings];
@@ -122,13 +123,17 @@ export class Panel {
     autoRow.append(autoButton);
     adjustPage.append(autoRow);
     this.build(adjustPage, COLOR);
+    // トーンカーブ・色ごとの調整（colorPanel.ts が中身を作る）
+    const extra = document.createElement("div");
+    extra.id = "color-extra";
+    adjustPage.append(extra);
     this.heading(adjustPage, "ディテール");
     this.build(adjustPage, DETAIL);
     const reset = document.createElement("button");
     reset.type = "button";
     reset.className = "reset-adjustments";
     reset.textContent = "加工をリセット";
-    reset.title = "テイスト・色の調整・ディテールを既定値に戻します（切り抜き・サイズ・ジオラマはそのまま）";
+    reset.title = "テイスト・色の調整（トーンカーブ・色ごとの調整を含む）・ディテールを既定値に戻します（切り抜き・サイズ・ジオラマはそのまま）";
     reset.addEventListener("click", () => this.resetAdjustments());
     adjustPage.append(reset);
     this.heading(dioramaPage, "ジオラマ（ミニチュア風）");
@@ -212,6 +217,8 @@ export class Panel {
   resetAdjustments() {
     this.settings.filter = "none";
     for (const slider of [...STRENGTH, ...COLOR, ...DETAIL]) this.settings[slider.key] = slider.initial;
+    this.settings.toneCurve = identityCurve();
+    this.settings.hsl = neutralHsl();
     this.show();
     this.onChange();
   }

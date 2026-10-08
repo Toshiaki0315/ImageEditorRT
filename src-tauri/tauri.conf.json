@@ -48,7 +48,21 @@
           "tiff",
           "bmp",
           "heic",
-          "heif"
+          "heif",
+          "dng",
+          "cr2",
+          "cr3",
+          "crw",
+          "nef",
+          "nrw",
+          "arw",
+          "srf",
+          "raf",
+          "orf",
+          "rw2",
+          "pef",
+          "srw",
+          "rwl"
         ],
         "contentTypes": [
           "public.png",
@@ -57,7 +71,8 @@
           "public.tiff",
           "com.microsoft.bmp",
           "public.heic",
-          "public.heif"
+          "public.heif",
+          "public.camera-raw-image"
         ],
         "role": "Editor",
         "rank": "Alternate"

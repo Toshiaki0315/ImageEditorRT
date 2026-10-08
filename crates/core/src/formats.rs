@@ -16,14 +16,24 @@ pub enum Format {
     Bmp,
     /// HEIC / HEIF（読み込みのみ）
     Heif,
+    /// カメラの RAW（読み込みのみ。現像は macOS の ImageIO。旧版にはない）
+    Raw,
 }
 
+/// カメラの RAW の拡張子（小文字・ドットなし）。DNG・キヤノン・ニコン・ソニー・富士フイルム・オリンパス／OM・
+/// パナソニック・ペンタックス・サムスン・ライカ。
+pub const RAW_EXTENSIONS: [&str; 14] =
+    ["dng", "cr2", "cr3", "crw", "nef", "nrw", "arw", "srf", "raf", "orf", "rw2", "pef", "srw", "rwl"];
+
 /// 読み込める拡張子（小文字・ドットなし）。
-pub const SUPPORTED_EXTENSIONS: [&str; 9] =
-    ["png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic", "heif"];
+pub const SUPPORTED_EXTENSIONS: [&str; 23] = [
+    "png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic", "heif", "dng", "cr2", "cr3", "crw", "nef",
+    "nrw", "arw", "srf", "raf", "orf", "rw2", "pef", "srw", "rwl",
+];
 
 /// エラーのダイアログに添える、対応形式の説明。
-pub const FORMATS_TEXT: &str = "PNG / JPEG / GIF / TIFF / BMP（HEIC / HEIF は読み込みのみ）";
+pub const FORMATS_TEXT: &str =
+    "PNG / JPEG / GIF / TIFF / BMP（HEIC / HEIF・カメラの RAW（DNG・CR2・CR3・NEF・ARW・RAF など）は読み込みのみ）";
 
 impl Format {
     /// 拡張子から形式を決める（大文字・小文字は区別しない）。読めない拡張子なら None。
@@ -36,6 +46,7 @@ impl Format {
             "tif" | "tiff" => Some(Self::Tiff),
             "bmp" => Some(Self::Bmp),
             "heic" | "heif" => Some(Self::Heif),
+            raw if RAW_EXTENSIONS.contains(&raw) => Some(Self::Raw),
             _ => None,
         }
     }
@@ -49,6 +60,8 @@ impl Format {
             "public.tiff" => Some(Self::Tiff),
             "com.microsoft.bmp" => Some(Self::Bmp),
             "public.heic" | "public.heif" => Some(Self::Heif),
+            // カメラの RAW は、どのメーカーのものも「…raw-image」（com.adobe.raw-image・com.canon.cr3-raw-image など）
+            raw if raw.ends_with("raw-image") => Some(Self::Raw),
             _ => None,
         }
     }
@@ -62,6 +75,7 @@ impl Format {
             Self::Tiff => "TIFF",
             Self::Bmp => "BMP",
             Self::Heif => "HEIC",
+            Self::Raw => "RAW",
         }
     }
 }
@@ -91,6 +105,20 @@ mod tests {
         for ext in SUPPORTED_EXTENSIONS {
             assert!(is_supported(Path::new(&format!("a.{ext}"))), "{ext}");
         }
+    }
+
+    #[test]
+    fn camera_raw() {
+        for name in ["a.DNG", "b.cr3", "c.NEF", "d.arw", "e.RAF", "f.orf", "g.rw2", "h.pef"] {
+            assert_eq!(Format::from_path(Path::new(name)), Some(Format::Raw), "{name}");
+        }
+        for uti in
+            ["com.adobe.raw-image", "com.canon.cr3-raw-image", "com.sony.arw-raw-image", "com.fuji.raw-image"]
+        {
+            assert_eq!(Format::from_uti(uti), Some(Format::Raw), "{uti}");
+        }
+        assert!(RAW_EXTENSIONS.iter().all(|ext| SUPPORTED_EXTENSIONS.contains(ext)));
+        assert_eq!(Format::Raw.name(), "RAW");
     }
 
     #[test]

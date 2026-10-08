@@ -439,6 +439,9 @@ mod tests {
     fn suffixes_and_names() {
         assert_eq!(save_suffix(Path::new("/a/photo.JPG")), "JPG");
         assert_eq!(save_suffix(Path::new("/a/photo.heic")), "jpg");
+        // RAW には保存できないので JPEG
+        assert_eq!(save_suffix(Path::new("/a/IMG_0001.CR3")), "jpg");
+        assert!(!is_savable(Path::new("x.dng")));
         let names: Vec<_> = edited_names(Path::new("/a/photo.png"), Path::new("/b")).take(3).collect();
         assert_eq!(
             names,

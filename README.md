@@ -13,7 +13,7 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 - 並べて 1 枚に（2〜4 枚のコラージュ）
 - 加工前との比較・100% 表示・ヒストグラム・元に戻す／やり直す・プリセット・まとめて処理
 - EXIF の表示（GPS・主なメーカーの MakerNote）と保存（EXIF・位置情報を残すかを選べる）
-- PNG / JPEG / GIF / TIFF / BMP を読み書き、HEIC / HEIF は読み込みのみ
+- PNG / JPEG / GIF / TIFF / BMP を読み書き、HEIC / HEIF・カメラの RAW（DNG・CR2・CR3・NEF・ARW・RAF など）は読み込みのみ
 
 ## 実行環境
 
@@ -47,7 +47,7 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 |---|---|
 | アプリ | [Tauri](https://tauri.app/) 2.12・tauri-plugin-dialog |
 | 画像処理 | Rust 1.99（`rust-toolchain.toml` で固定）・image 0.25・rayon（並列）・fast_image_resize（プレビューの縮小）・jpeg-encoder |
-| 画像の読み込み | macOS の ImageIO（objc2-image-io。HEIC と EXIF の向きの補正もここ） |
+| 画像の読み込み | macOS の ImageIO（objc2-image-io。HEIC・RAW の現像と EXIF の向きの補正もここ） |
 | 顔・文字・水平線・被写体の認識 | macOS の Vision（objc2-vision・objc2-core-video。投稿加工・傾きの自動補正・背景を消す） |
 | EXIF | kamadak-exif（標準のタグ）・自前の読み取り（MakerNote は旧版の exifread と同じ読み方） |
 | 文字 | ab_glyph（macOS のフォント） |

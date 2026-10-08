@@ -4,7 +4,7 @@
 # 使い方:
 #   scripts/ui_smoke.sh
 #
-# - 確かめること: 画像を開く・スライダー・元に戻す／やり直す・色ごとの調整・自動補正・水平の補正（自動を含む）・テイストの一覧・加工のコピー＆ペースト・並べて 1 枚に（ダイアログ）・100% 表示と戻す・リセット（キャンセル・破棄）・終了
+# - 確かめること: 画像を開く・スライダー・元に戻す／やり直す・色ごとの調整・自動補正・水平の補正（自動を含む）・テイストの一覧・加工のコピー＆ペースト・並べて 1 枚に（ダイアログ）・最近使った項目・100% 表示と戻す・リセット（キャンセル・破棄）・終了
 # - 開発版（npm run tauri dev）を使う（インストールしたアプリと環境設定を共有しないため）
 # - 操作は開発版のプロセスだけに向けたアクセシビリティの操作で行い、キー入力は送らない。クリップボードは触らない
 # - ターミナル（またはこのスクリプトを動かすアプリ）に、システム設定の「プライバシーとセキュリティ >
@@ -58,7 +58,8 @@ IMAGE="$WORK/smoke.png"
 cp src-tauri/icons/icon.png "$IMAGE"
 
 echo "==> 開発版を起動（初回はビルドに数分かかる）"
-(npm run tauri dev -- -- -- "$IMAGE" >"$LOG" 2>&1 &)
+# プリセット・最近使った項目は一時フォルダに置く（使っている人のデータに触れない）
+(IMAGEEDITORRT_DATA_DIR="$WORK/data" npm run tauri dev -- -- -- "$IMAGE" >"$LOG" 2>&1 &)
 if ! wait_for 600 pgrep -f "target/debug/imageeditorrt"; then
     echo "開発版が起動しませんでした（$LOG）" >&2
     cat "$LOG" >&2
@@ -134,6 +135,8 @@ ax click "$PID" "撮影日を入れる" >/dev/null; sleep 0.5
 check "撮影日を入れる（画像に撮影日時がないので文字は空のまま、元に戻せる）" "true" "$(ax menu-enabled "$PID" "編集" "元に戻す")"
 ax click "$PID" "文字を消す" >/dev/null; sleep 0.3
 ax click "$PID" "閉じる" >/dev/null; sleep 0.3
+
+check "最近使った項目（開いた画像が載る）" "smoke.png" "$(ax submenu-items "$PID" "ファイル" "最近使った項目")"
 
 ax menu "$PID" "表示" "100% で表示" >/dev/null
 wait_for 15 sh -c "[ \"\$(osascript '$LIB' menu-enabled $PID 表示 画面に合わせる)\" = true ]" || true

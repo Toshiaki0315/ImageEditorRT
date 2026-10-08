@@ -24,6 +24,7 @@ pub async fn open_path(
     window: WebviewWindow,
 ) -> Result<OpenInfo, String> {
     let path = PathBuf::from(path);
+    let opened_path = path.clone();
     let name = file_name(&path);
     let prepared = blocking(move || {
         let start = Instant::now();
@@ -38,7 +39,10 @@ pub async fn open_path(
         Ok(prepare(name, loaded.decoded, decode_ms, loaded.exif, source))
     })
     .await?;
-    store(&state, &window, prepared)
+    let info = store(&state, &window, prepared)?;
+    // 開けたファイルを「最近使った項目」に足す
+    crate::recent::opened(tauri::Manager::app_handle(&window), &opened_path);
+    Ok(info)
 }
 
 /// プレビューに設定をかけて返す。trimmed なら切り抜いた範囲だけを表示する。

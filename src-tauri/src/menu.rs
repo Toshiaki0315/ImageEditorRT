@@ -56,11 +56,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&quit)
         .build()?;
     let open = MenuItemBuilder::with_id(OPEN, "開く…").accelerator("CmdOrCtrl+O").build(app)?;
+    // 最近使った項目（中身は起動後に recent::refresh_menu が作る）
+    let recent = SubmenuBuilder::with_id(app, crate::recent::MENU_ID, "最近使った項目").build()?;
     let save = MenuItemBuilder::with_id(SAVE, "保存…").accelerator("CmdOrCtrl+S").build(app)?;
     let batch = MenuItemBuilder::with_id(BATCH, "まとめて処理…").build(app)?;
     let collage = MenuItemBuilder::with_id(COLLAGE, "並べて 1 枚に…").build(app)?;
     let file = SubmenuBuilder::new(app, "ファイル")
         .item(&open)
+        .item(&recent)
         .item(&save)
         .item(&batch)
         .item(&collage)
@@ -128,9 +131,17 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     Menu::with_items(app, &[&app_menu, &file, &edit, &view, &window])
 }
 
-/// メニューの項目が選ばれたとき、画面に知らせる。
+/// メニューの項目が選ばれたとき、画面に知らせる（最近使った項目はここで処理する）。
 pub fn on_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
+    if crate::recent::on_menu(app, event.id().as_ref()) {
+        return;
+    }
     let _ = app.emit(MENU_EVENT, event.id().as_ref());
+}
+
+/// メニューバーの中から ID のサブメニューを探す（ほかのサブメニューの中にあるもの）。
+pub fn find_submenu<R: Runtime>(app: &AppHandle<R>, id: &str) -> Option<tauri::menu::Submenu<R>> {
+    find(app, id).ok().flatten().and_then(|item| item.as_submenu().cloned())
 }
 
 /// チェックの付く項目の状態を変える（画面の環境設定に合わせる）。

@@ -106,7 +106,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 | やりたいこと | 操作 |
 |---|---|
-| 画像を開く | ウィンドウにドロップ・⌘O・⌘V（クリップボードの画像・Finder でコピーしたファイル）・Finder の「このアプリケーションで開く」 |
+| 画像を開く | ウィンドウにドロップ・⌘O・⌘V（クリップボードの画像・Finder でコピーしたファイル）・Finder の「このアプリケーションで開く」・「ファイル > 最近使った項目」 |
 | 加工する | 右の「加工」タブ（テイストと強さ・露出〜経年劣化・ディテール）。「自動補正」で露出・コントラスト・色温度をおまかせで入れられる。「一覧…」で今の写真にかけた見本を見比べてテイストを選べる。スライダーはダブルクリックで既定値 |
 | 切り抜く | 「切り抜き」タブで比を選び（SNS の縦長は「縦向き」で 4:5・9:16）、プレビューをドラッグ。背景を消す（透明・白）・ぼかす・回転・反転・水平の補正（±45°。「傾きを自動で直す」も）・フレーム・形（角丸・円）もここ |
 | 大きさを変える | 「出力」タブで幅・高さ、または「よく使う大きさ」（Instagram 1080px・X 1600px など）。保存の設定（JPEG 品質・EXIF・位置情報・ファイルの大きさの上限）も |
@@ -124,6 +124,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 
 - **旧版との違い**: 文字の形は Pillow（FreeType）ではなく ab_glyph で描くので、縁や位置が 1px 程度違うことがある。テイストの強さ・水平の補正・ハイライト／シャドウ・テイストの一覧・投稿加工・トーンカーブ・色ごとの調整・自動補正・加工のコピー＆ペースト・背景を消す・並べて 1 枚に・未保存のまま終了するときの確認は、この版で足した機能。
 - **保存される場所**:
+  - 最近使った項目: `~/Library/Application Support/ImageEditorRT/recent.json`
   - プリセット: `~/Library/Application Support/ImageEditorRT/presets.json`（まだなければ旧版の `~/Library/Application Support/ImageEditor/presets.json` を読む。旧版のファイルは書き換えない）
   - 想定外のエラーのログ: `~/Library/Logs/ImageEditorRT/imageeditorrt.log`
   - 画面の環境設定（最後に開いたタブ・ヒストグラムの表示・保存の設定など）: アプリの WebView の中

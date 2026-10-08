@@ -64,6 +64,8 @@ pub fn run() {
             image::auto_straighten,
             image::auto_adjust,
             image::prepare_background,
+            image::collage_choices,
+            image::make_collage,
             image::render_actual_size,
             image::close_image,
             image::diorama_guide,

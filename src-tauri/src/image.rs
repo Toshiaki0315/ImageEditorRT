@@ -7,7 +7,7 @@ use imageeditorrt_core::exif_info::ExifInfo;
 use imageeditorrt_core::formats::Format;
 use imageeditorrt_core::pipeline::{self, EditSettings};
 use imageeditorrt_core::transform::CropRect;
-use imageeditorrt_core::{decode, load, save};
+use imageeditorrt_core::{collage, decode, load, save};
 use tauri::ipc::Response;
 use tauri::{State, WebviewWindow};
 
@@ -298,6 +298,42 @@ pub async fn open_clipboard_image(
         let exif = ExifInfo { empty: true, ..ExifInfo::default() };
         let source = Source { format: Some(Format::Png), pasted: true, ..Source::default() };
         Ok(prepare(save::PASTED_NAME.into(), decoded, elapsed_ms(start), exif, source))
+    })
+    .await?;
+    store(&state, &window, prepared)
+}
+
+/// 「並べて 1 枚に」の並べ方（値・名前・枚数）。
+type LayoutChoice = (collage::CollageLayout, &'static str, usize);
+
+/// 「並べて 1 枚に」の選択肢: 並べ方と縦横比。
+#[tauri::command]
+pub fn collage_choices() -> (Vec<LayoutChoice>, Vec<(u32, u32)>) {
+    let layouts = collage::CollageLayout::ALL.iter().map(|&l| (l, l.label(), l.count())).collect();
+    (layouts, collage::ASPECTS.to_vec())
+}
+
+/// 「並べて 1 枚に」: paths の写真を並べた 1 枚を作り、元のファイルのない画像として開く（PNG 扱い・EXIF なし）。
+#[tauri::command]
+pub async fn make_collage(
+    paths: Vec<String>,
+    options: collage::CollageOptions,
+    state: State<'_, AppState>,
+    window: WebviewWindow,
+) -> Result<OpenInfo, String> {
+    let start = Instant::now();
+    let prepared = blocking(move || {
+        let mut images = Vec::with_capacity(paths.len());
+        for path in &paths {
+            let path = PathBuf::from(path);
+            let loaded = load::load_file(&path).map_err(|e| e.message(&file_name(&path)))?;
+            images.push(loaded.decoded.image);
+        }
+        let image = collage::make_collage(&images, &options);
+        let decoded = decode::Decoded { image, format: Format::Png, frame_count: 1 };
+        let exif = ExifInfo { empty: true, ..ExifInfo::default() };
+        let source = Source { format: Some(Format::Png), pasted: true, ..Source::default() };
+        Ok(prepare(collage::COLLAGE_NAME.into(), decoded, elapsed_ms(start), exif, source))
     })
     .await?;
     store(&state, &window, prepared)

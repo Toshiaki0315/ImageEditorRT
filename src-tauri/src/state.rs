@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use image::RgbaImage;
+use image::{GrayImage, RgbaImage};
+use imageeditorrt_core::background::{self, Background};
 use imageeditorrt_core::decode;
 use imageeditorrt_core::exif_info::ExifInfo;
 use imageeditorrt_core::formats::{self, Format};
@@ -23,6 +24,30 @@ pub(crate) struct Loaded {
     pub(crate) preview: Option<Arc<RgbaImage>>,
     pub(crate) factor: f64,
     pub(crate) source: Source,
+    /// 被写体のマスク（背景を消す。プレビュー用の画像と同じ大きさ・同じ向き）。まだ作っていなければ None、
+    /// 作ったが被写体がなければ Some(None)。画像ごとに 1 回だけ作る
+    pub(crate) mask: Option<Option<Arc<GrayImage>>>,
+}
+
+impl Loaded {
+    /// settings の背景の扱いでかけるマスク（そのまま・マスクがなければ None）。
+    pub(crate) fn background(&self, settings_background: Background) -> Option<(Arc<GrayImage>, Background)> {
+        if settings_background == Background::Keep {
+            return None;
+        }
+        self.mask.clone().flatten().map(|mask| (mask, settings_background))
+    }
+}
+
+/// image（原本またはプレビュー用の画像）に、背景を消すマスクをかける（なければそのまま）。重いので別のスレッドで呼ぶ。
+pub(crate) fn with_background(
+    image: Arc<RgbaImage>,
+    mask: Option<(Arc<GrayImage>, Background)>,
+) -> Arc<RgbaImage> {
+    match mask {
+        Some((mask, mode)) => Arc::new(background::apply_background(&image, &mask, mode)),
+        None => image,
+    }
 }
 
 /// 元のファイル（保存の名前・元の画像への上書きの防止・EXIF を残すのに使う）。
@@ -101,8 +126,13 @@ pub(crate) fn prepare(
         exif,
         name,
     };
-    let loaded =
-        Loaded { original: Some(Arc::new(original)), preview: Some(Arc::new(small)), factor, source };
+    let loaded = Loaded {
+        original: Some(Arc::new(original)),
+        preview: Some(Arc::new(small)),
+        factor,
+        source,
+        mask: None,
+    };
     (info, loaded)
 }
 

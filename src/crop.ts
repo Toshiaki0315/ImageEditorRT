@@ -3,7 +3,7 @@
 // 座標はどれも、回転・反転した後の原寸画像の座標（px）。
 
 import { invoke } from "@tauri-apps/api/core";
-import type { AspectRatio, CropRect, EditSettings, FrameKind, OrientOp, Orientation, Region, ShapeType } from "./types";
+import type { AspectRatio, BackgroundMode, CropRect, EditSettings, FrameKind, OrientOp, Orientation, Region, ShapeType } from "./types";
 
 type DragMode = "new" | "move" | "resize";
 type Drag = { mode: DragMode; anchor: [number, number]; start: CropRect | null };
@@ -50,6 +50,11 @@ export class CropController {
   private readonly straighten = $<HTMLInputElement>("straighten");
   private readonly straightenValue = $<HTMLOutputElement>("straighten-value");
   private readonly autoStraighten = $<HTMLButtonElement>("auto-straighten");
+  private readonly background = $<HTMLSelectElement>("background");
+  /** 背景を消す準備（被写体のマスクを作る）。被写体があれば true、なければ false、準備できなければ null */
+  prepareBackground: () => Promise<boolean | null> = async () => true;
+  /** 被写体が見つからなかったとき */
+  onNoSubject: () => void = () => {};
   /** 傾きを求める（水平の補正の角度。分からなければ null、求められなければ undefined） */
   findTilt: () => Promise<number | null | undefined> = async () => null;
   /** 傾きの自動補正の結果を知らせる（直した角度。分からなければ null） */
@@ -108,6 +113,7 @@ export class CropController {
     this.straighten.addEventListener("input", () => this.setStraighten(Number(this.straighten.value)));
     this.straighten.addEventListener("dblclick", () => this.setStraighten(0));
     this.autoStraighten.addEventListener("click", () => void this.straightenAutomatically());
+    this.background.addEventListener("change", () => void this.setBackground(this.background.value as BackgroundMode));
     this.portrait.addEventListener("change", () => void this.aspectChanged());
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) {
       button.addEventListener("click", () => void this.orient(button.dataset.orient as OrientOp));
@@ -260,6 +266,26 @@ export class CropController {
     this.onChange();
   }
 
+  /** 背景の扱いを変える。消すときは先に被写体のマスクを作り、被写体がなければ「そのまま」に戻す。 */
+  private async setBackground(mode: BackgroundMode) {
+    if (mode !== "keep") {
+      this.background.disabled = true;
+      try {
+        const found = await this.prepareBackground();
+        if (found !== true) {
+          if (found === false) this.onNoSubject();
+          this.updateControls();
+          return;
+        }
+      } finally {
+        this.background.disabled = this.size === null;
+      }
+    }
+    this.settings.background = mode;
+    this.updateControls();
+    this.onChange();
+  }
+
   /** 傾きを求めて、水平の補正に入れる（元に戻せる。スライダーで微調整できる）。 */
   private async straightenAutomatically() {
     this.autoStraighten.disabled = true;
@@ -397,6 +423,8 @@ export class CropController {
     this.straighten.value = String(this.settings.straighten);
     this.straightenValue.textContent = degreesText(this.settings.straighten);
     this.straighten.disabled = this.autoStraighten.disabled = !loaded;
+    this.background.value = this.settings.background;
+    this.background.disabled = !loaded;
     // 範囲・フレーム・形（矩形以外）のどれもなければ「トリミング実行」は押せず、全体の表示に戻す
     const canTrim = loaded && (crop !== null || this.settings.frame !== "none" || this.settings.shape !== "rectangle");
     if (!canTrim && this.isTrimmed()) this.setTrimmed(false);

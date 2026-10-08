@@ -10,6 +10,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::adjust::{self, Lut};
+pub use crate::background::Background;
 pub use crate::diorama::DioramaDirection;
 use crate::diorama::{self, DioramaSettings};
 use crate::effects;
@@ -85,6 +86,9 @@ pub struct EditSettings {
     pub corner_radius: u32,
     /// 投稿加工で隠す範囲（ぼかし・モザイクは回転・反転の直後に、スタンプは経年劣化の後にかける。旧版にはない）
     pub regions: Vec<Region>,
+    /// 背景を消す（旧版にはない）。被写体のマスクが要るので、ここの処理ではかけず、アプリ本体が元の画像に
+    /// 前もってかける（`background::apply_background`）
+    pub background: Background,
 }
 
 impl Default for EditSettings {
@@ -120,6 +124,7 @@ impl Default for EditSettings {
             shape: ShapeType::Rectangle,
             corner_radius: shapes::CORNER_RADIUS_DEFAULT,
             regions: Vec::new(),
+            background: Background::Keep,
         }
     }
 }

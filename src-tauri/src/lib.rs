@@ -63,6 +63,7 @@ pub fn run() {
             image::detect_text,
             image::auto_straighten,
             image::auto_adjust,
+            image::prepare_background,
             image::render_actual_size,
             image::close_image,
             image::diorama_guide,

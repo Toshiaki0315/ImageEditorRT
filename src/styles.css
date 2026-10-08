@@ -556,6 +556,12 @@ button[aria-pressed="true"] {
   resize: vertical;
 }
 
+.insert-buttons {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 6px;
+}
+
 .logo-row {
   display: flex;
   align-items: center;

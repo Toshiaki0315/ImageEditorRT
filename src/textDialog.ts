@@ -54,6 +54,8 @@ export class TextDialog {
     this.opacity.addEventListener("input", () => this.update({ opacity: Number(this.opacity.value) }));
     this.position.addEventListener("change", () => this.update({ position: this.position.value as TextPosition }));
     $<HTMLButtonElement>("text-clear").addEventListener("click", () => this.update({ text: "" }));
+    $<HTMLButtonElement>("insert-date").addEventListener("click", () => this.insert("{日付}"));
+    $<HTMLButtonElement>("insert-date-time").addEventListener("click", () => this.insert("{日時}"));
     $<HTMLButtonElement>("text-close").addEventListener("click", () => this.dialog.close());
     this.show();
   }
@@ -103,6 +105,15 @@ export class TextDialog {
     this.settings.logo = { ...this.settings.logo, ...change };
     this.show();
     this.onChange();
+  }
+
+  /** 文字の欄のカーソルの位置（選んでいればその部分）に、差し込みを入れる。 */
+  private insert(placeholder: string) {
+    const { selectionStart: start, selectionEnd: end, value } = this.text;
+    const text = value.slice(0, start) + placeholder + value.slice(end);
+    this.update({ text });
+    this.text.focus();
+    this.text.setSelectionRange(start + placeholder.length, start + placeholder.length);
   }
 
   private update(change: Partial<EditSettings["text"]>) {

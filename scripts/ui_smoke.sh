@@ -77,6 +77,11 @@ wait_for 10 sh -c "osascript '$LIB' texts $PID | grep -q 'この並べ方では'
 check "並べて 1 枚に（ダイアログ）" "この並べ方では 2 枚使います" "$(ax texts "$PID" | grep 'この並べ方では' || true)"
 ax click "$PID" "キャンセル" >/dev/null; sleep 0.5
 
+ax menu "$PID" "ファイル" "まとめて処理…" >/dev/null
+wait_for 10 sh -c "osascript '$LIB' texts $PID | grep -q '投稿加工'" || true
+check "まとめて処理（投稿加工の欄）" "投稿加工" "$(ax texts "$PID" | grep '投稿加工' | head -1 || true)"
+ax click "$PID" "キャンセル" >/dev/null; sleep 0.5
+
 check "スライダーを動かす" "3" "$(ax slider "$PID" "明るさ" 3)"
 sleep 1 # 変更が落ち着いてから履歴に積まれる
 check "元に戻す（メニューが使える）" "true" "$(ax menu-enabled "$PID" "編集" "元に戻す")"

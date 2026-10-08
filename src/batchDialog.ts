@@ -42,6 +42,12 @@ export class BatchDialog {
   private readonly progressText = $<HTMLElement>("batch-progress-text");
   private readonly progressBar = $<HTMLProgressElement>("batch-progress-bar");
   private readonly cancel = $<HTMLButtonElement>("batch-cancel");
+  private readonly removeGps = $<HTMLInputElement>("batch-remove-gps");
+  private readonly faces = $<HTMLInputElement>("batch-faces");
+  private readonly text = $<HTMLInputElement>("batch-text");
+  private readonly cover = $<HTMLSelectElement>("batch-cover");
+  private readonly strength = $<HTMLInputElement>("batch-strength");
+  private readonly strengthValue = $<HTMLOutputElement>("batch-strength-value");
   private outDir: string | null = null;
 
   constructor(private readonly extensions: string[]) {
@@ -54,6 +60,8 @@ export class BatchDialog {
     $("batch-choose-out").addEventListener("click", () => void this.chooseOutDir());
     this.resize.addEventListener("change", () => (this.longSide.disabled = !this.resize.checked));
     this.longSide.addEventListener("input", () => this.updateStart());
+    this.strength.addEventListener("input", () => (this.strengthValue.textContent = this.strength.value));
+    for (const check of [this.faces, this.text]) check.addEventListener("change", () => this.updatePrivacy());
     this.cancel.addEventListener("click", () => {
       this.cancel.disabled = true;
       this.progressText.textContent = CANCELLING_TEXT;
@@ -72,6 +80,7 @@ export class BatchDialog {
     this.longSide.value = String(Math.min(Math.max(Math.round(start.longSide), MIN_SIDE), MAX_SIDE));
     this.longSide.disabled = !start.resize;
     this.setOutDir(null);
+    this.updatePrivacy();
     // 開いている画像があれば最初から一覧に入れておく（貼り付けた画像などファイルがなければ入れない）
     const current = await invoke<string | null>("batch_current_source");
     if (current) await this.addPaths([current]);
@@ -106,6 +115,13 @@ export class BatchDialog {
         settings: start.settings,
         longSide: this.resize.checked ? Number(this.longSide.value) : null,
         save: start.save,
+        privacy: {
+          removeGps: this.removeGps.checked,
+          faces: this.faces.checked,
+          text: this.text.checked,
+          kind: this.cover.value,
+          strength: Number(this.strength.value),
+        },
       });
     } finally {
       unlisten();
@@ -154,6 +170,12 @@ export class BatchDialog {
     this.outLabel.textContent = path ?? NO_OUTPUT_TEXT;
     this.outLabel.title = path ?? "";
     this.updateStart();
+  }
+
+  /** 顔・文字を隠すときだけ、隠し方と強さを選べる。 */
+  private updatePrivacy() {
+    const hiding = this.faces.checked || this.text.checked;
+    this.cover.disabled = this.strength.disabled = !hiding;
   }
 
   /** 画像と保存先がそろうまで「開始」は押せない。 */

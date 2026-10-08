@@ -1,19 +1,20 @@
 //! 複数の画像に同じ加工をまとめてかけて保存する（一括処理。Python 版の core/batch.py と同じ）。
 //!
 //! かける加工はプリセットと同じ組み合わせ（テイスト・色の調整・ディテール・ジオラマ・フレーム・形・
-//! 文字）。トリミング範囲と回転・反転は画像ごとに違うのでかけない（フレーム・円のときは各画像の
+//! 文字）と、選べば投稿加工（位置情報を消す・顔や文字を見つけて隠す）。トリミング範囲と回転・反転は画像ごとに違うのでかけない（フレーム・円のときは各画像の
 //! 中央をその比で切り抜く）。元の画像は変えない。
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::formats;
 use crate::pipeline::{effective_crop, EditSettings};
 use crate::presets::Preset;
+use crate::privacy::{Region, RegionKind};
 use crate::save::{self, SaveOptions};
-use crate::transform::{SizeError, MAX_SIZE, MIN_SIZE};
+use crate::transform::{CropRect, SizeError, MAX_SIZE, MIN_SIZE};
 
 /// 一括処理の設定。long_side を指定すると、写真の長辺をその px にリサイズする（フレームはその外側に付く）。
 #[derive(Clone, Debug, PartialEq)]
@@ -21,6 +22,74 @@ pub struct BatchOptions {
     pub look: Preset,
     pub long_side: Option<u32>,
     pub save: SaveOptions,
+    /// 投稿加工（位置情報を消す・顔や文字を見つけて隠す。旧版にはない）
+    pub privacy: BatchPrivacy,
+}
+
+/// まとめて処理の投稿加工。顔・文字は 1 枚ごとに見つけ、kind・strength・stamp で隠す。
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct BatchPrivacy {
+    /// 保存の設定にかかわらず、位置情報を残さない
+    pub remove_gps: bool,
+    pub faces: bool,
+    pub text: bool,
+    pub kind: RegionKind,
+    pub strength: u32,
+    pub stamp: String,
+}
+
+impl Default for BatchPrivacy {
+    fn default() -> Self {
+        Self {
+            remove_gps: false,
+            faces: false,
+            text: false,
+            kind: RegionKind::Blur,
+            strength: crate::privacy::STRENGTH_DEFAULT,
+            stamp: crate::privacy::STAMP_DEFAULT.into(),
+        }
+    }
+}
+
+impl BatchOptions {
+    /// 保存の設定（位置情報を消すなら、位置情報を残さない）。
+    pub fn save_options(&self) -> SaveOptions {
+        SaveOptions { keep_gps: self.save.keep_gps && !self.privacy.remove_gps, ..self.save }
+    }
+}
+
+/// 画像（回転・反転しない、向きは読み込み時に直してある）の顔・文字を見つけ、隠す範囲を返す。
+/// 速さのため、プレビューと同じ長辺 1600px に縮めた画像で探し、原寸の座標に直す。
+#[cfg(target_os = "macos")]
+pub fn privacy_regions(image: &image::RgbaImage, privacy: &BatchPrivacy) -> Result<Vec<Region>, String> {
+    if !privacy.faces && !privacy.text {
+        return Ok(Vec::new());
+    }
+    let size = image.dimensions();
+    let (small, factor) = crate::pipeline::make_preview(image, crate::pipeline::PREVIEW_MAX_SIDE);
+    let to_original = |r: CropRect| {
+        let scale = |v: i64| (v as f64 / factor).round() as i64;
+        CropRect::new(scale(r.x), scale(r.y), scale(r.width), scale(r.height))
+    };
+    let mut rects = Vec::new();
+    if privacy.faces {
+        let faces = crate::faces::detect_faces(&small)?;
+        rects.extend(faces.into_iter().filter_map(|r| crate::faces::cover_rect(to_original(r), size)));
+    }
+    if privacy.text {
+        let texts = crate::text_regions::detect_text(&small)?;
+        rects.extend(texts.into_iter().filter_map(|r| crate::transform::clamp_crop(to_original(r), size)));
+    }
+    Ok(rects
+        .into_iter()
+        .map(|rect| Region {
+            kind: privacy.kind,
+            rect,
+            strength: privacy.strength,
+            stamp: privacy.stamp.clone(),
+        })
+        .collect())
 }
 
 /// 1 枚分の結果。成功なら保存先、失敗なら理由。
@@ -106,12 +175,13 @@ pub fn process_image(source: &Path, out_dir: &Path, options: &BatchOptions) -> R
 
     let loaded = crate::load::load_file(source).map_err(|e| e.to_string())?;
     let decoded = loaded.decoded;
-    let settings = batch_settings(options, decoded.image.dimensions()).map_err(|e| e.to_string())?;
+    let mut settings = batch_settings(options, decoded.image.dimensions()).map_err(|e| e.to_string())?;
+    settings.regions = privacy_regions(&decoded.image, &options.privacy)?;
     let edited = crate::pipeline::apply_edits(&decoded.image, &settings).map_err(|e| e.to_string())?;
     let path = output_path(source, out_dir);
     std::fs::create_dir_all(out_dir).map_err(|e| format!("保存先のフォルダを作れません（{e}）"))?;
     let is_tiff = decoded.format == Format::Tiff;
-    save::save_edited(&edited, &path, options.save, loaded.raw_exif.as_deref(), is_tiff)
+    save::save_edited(&edited, &path, options.save_options(), loaded.raw_exif.as_deref(), is_tiff)
         .map_err(|e| e.to_string())?;
     Ok(path)
 }

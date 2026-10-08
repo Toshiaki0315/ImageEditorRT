@@ -5,20 +5,20 @@
 //! 傾いていなければ 0° か 90° を向くはず、という考え方。建物・階段・水平線などに効く）。
 
 use image::RgbaImage;
-use objc2::rc::Retained;
-use objc2::AllocAnyThread;
-use objc2_foundation::{NSArray, NSDictionary};
-use objc2_vision::{VNDetectHorizonRequest, VNImageRequestHandler, VNRequest};
+use objc2_vision::VNDetectHorizonRequest;
 
-use crate::faces::cg_image;
 use crate::transform::STRAIGHTEN_MAX;
+use crate::vision::perform;
 
 /// 画像の水平線を見つけ、その傾きを打ち消す水平の補正の角度（度、正は時計回り、-45〜45° に収め 0.1° 刻み）を返す。
 /// 水平線が見つからなければ None。
 pub fn straighten_angle(image: &RgbaImage) -> Result<Option<f64>, String> {
-    let cg = cg_image(image).ok_or("画像を水平線の認識に渡せません")?;
-    // GPU を使えない環境では CPU だけでやり直す（顔の認識と同じ）
-    let horizon = detect(&cg, false).or_else(|_| detect(&cg, true))?.map(f64::to_degrees);
+    // SAFETY: 引数のない初期化
+    let done = perform(image, "水平線", || unsafe { VNDetectHorizonRequest::new() })?;
+    // SAFETY: 認識が終わった後に、見つけた水平線の角度（ラジアン）を読むだけ
+    let horizon = unsafe { done.request.results() }
+        .filter(|r| r.count() > 0)
+        .map(|r| unsafe { r.objectAtIndex(0).angle() }.to_degrees());
     // 写真の傾きは、反時計回り（右が上がっている）を正とする。打ち消すには同じだけ時計回りに回す
     Ok(horizon.or_else(|| line_tilt(image)).map(|degrees| {
         let degrees = degrees.clamp(-STRAIGHTEN_MAX, STRAIGHTEN_MAX);
@@ -148,34 +148,6 @@ pub fn line_tilt(image: &RgbaImage) -> Option<f64> {
             sum > half
         })
         .map(|l| l.1)
-}
-
-/// 水平線の傾き（ラジアン）。cpu_only なら CPU だけで認識する。
-fn detect(cg: &objc2_core_graphics::CGImage, cpu_only: bool) -> Result<Option<f64>, String> {
-    // SAFETY: CGImage は認識が終わるまで生きている。オプションは空
-    let handler = unsafe {
-        VNImageRequestHandler::initWithCGImage_options(
-            VNImageRequestHandler::alloc(),
-            cg,
-            &NSDictionary::new(),
-        )
-    };
-    // SAFETY: 引数のない初期化
-    let request = unsafe { VNDetectHorizonRequest::new() };
-    if cpu_only {
-        // SAFETY: 認識の前に設定を変えるだけ
-        #[allow(deprecated)]
-        unsafe {
-            request.setUsesCPUOnly(true)
-        };
-    }
-    let requests: Retained<NSArray<VNRequest>> =
-        NSArray::from_retained_slice(&[Retained::into_super(Retained::into_super(request.clone()))]);
-    handler.performRequests_error(&requests).map_err(|e| format!("水平線を認識できません（{e}）"))?;
-    // SAFETY: 認識が終わった後に結果を読む
-    let results = unsafe { request.results() };
-    // SAFETY: 結果の角度を読むだけ
-    Ok(results.filter(|r| r.count() > 0).map(|r| unsafe { r.objectAtIndex(0).angle() }))
 }
 
 #[cfg(test)]

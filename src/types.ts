@@ -76,7 +76,12 @@ export type EditSettings = {
   toneCurve: [number, number][];
   /** 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタの 8 色） */
   hsl: HslAdjust[];
+  /** ロゴの透かし（path が空ならなし） */
+  logo: LogoSettings;
 };
+
+/** ロゴの透かし（Rust の logo::LogoSettings）。size は写真の短辺に対する %、opacity は %。 */
+export type LogoSettings = { path: string; position: TextPosition; size: number; opacity: number };
 
 /** 色ごとの調整の 1 色分（Rust の curve::HslAdjust）。色相 -30〜30、彩度・明るさ -100〜100。 */
 export type HslAdjust = { hue: number; saturation: number; lightness: number };
@@ -139,6 +144,7 @@ export function defaultSettings(): EditSettings {
       [255, 255],
     ],
     hsl: neutralHsl(),
+    logo: { path: "", position: "bottom_right", size: 15, opacity: 80 },
   };
 }
 

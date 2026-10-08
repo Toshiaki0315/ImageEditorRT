@@ -114,6 +114,7 @@ async function createParts() {
   };
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
+  parts.textDialog.logoExtensions = state.extensions;
   parts.textButton = $<HTMLButtonElement>("text-button");
   parts.tasteGallery = new TasteGallery(filters, settings, (filter) => parts.panel.selectFilter(filter));
   parts.tasteButton = $<HTMLButtonElement>("taste-button");

@@ -96,5 +96,11 @@
       "saturation": 0,
       "lightness": 0
     }
-  ]
+  ],
+  "logo": {
+    "path": "",
+    "position": "bottom_right",
+    "size": 15.0,
+    "opacity": 80
+  }
 }

@@ -158,6 +158,19 @@
       <label class="row">不透明度 <input id="text-opacity" type="range" min="0" max="100" step="1" /><output id="text-opacity-value"></output></label>
       <label class="row">位置 <select id="text-position"></select></label>
       <p class="note">大きさは写真の短辺に対する % です。「フレームの余白」はポラロイド・チェキの広い余白に入れます（フレームがなければ写真の下中央）。フレームの余白の文字は「トリミング実行」の表示で確認できます。</p>
+      <h2>ロゴ</h2>
+      <div class="row logo-row">
+        ロゴ
+        <span id="logo-name" class="logo-name">（なし）</span>
+        <span class="buttons">
+          <button type="button" id="logo-choose">画像を選ぶ…</button>
+          <button type="button" id="logo-clear">外す</button>
+        </span>
+      </div>
+      <label class="row">大きさ <input id="logo-size" type="range" min="2" max="60" step="0.5" /><output id="logo-size-value"></output></label>
+      <label class="row">不透明度 <input id="logo-opacity" type="range" min="0" max="100" step="1" /><output id="logo-opacity-value"></output></label>
+      <label class="row">位置 <select id="logo-position"></select></label>
+      <p class="note">PNG などの画像を、写真の短辺に対する大きさで重ねます（透過はそのまま）。画像はファイルの場所で覚えるので、移動・削除すると描かれません。</p>
       <div class="buttons dialog-buttons">
         <button type="button" id="text-clear">文字を消す</button>
         <button type="button" id="text-close">閉じる</button>

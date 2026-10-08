@@ -13,6 +13,7 @@ use crate::curve::{self, HslAdjust, HSL_BANDS};
 use crate::diorama::DioramaDirection;
 use crate::filters::FilterType;
 use crate::frames::FrameType;
+use crate::logo::LogoSettings;
 use crate::pipeline::{EditSettings, FILTER_STRENGTH_FULL, FILTER_STRENGTH_MAX};
 use crate::shapes::ShapeType;
 use crate::text::{TextFont, TextPosition, TextSettings};
@@ -77,6 +78,9 @@ pub struct Preset {
     pub tone_curve: Vec<[u8; 2]>,
     #[serde(skip_serializing_if = "is_neutral_hsl")]
     pub hsl: [HslAdjust; HSL_BANDS],
+    /// ロゴの透かし（旧版にはない。ファイルの場所で覚える）。ロゴがなければファイルに書かない
+    #[serde(skip_serializing_if = "LogoSettings::is_empty")]
+    pub logo: LogoSettings,
 }
 
 fn is_identity_curve(points: &Vec<[u8; 2]>) -> bool {
@@ -117,6 +121,7 @@ impl Preset {
             text: s.text.clone(),
             tone_curve: s.tone_curve.clone(),
             hsl: s.hsl,
+            logo: s.logo.clone(),
         }
     }
 
@@ -148,6 +153,7 @@ impl Preset {
             text: self.text.clone(),
             tone_curve: self.tone_curve.clone(),
             hsl: self.hsl,
+            logo: self.logo.clone(),
             ..settings.clone()
         }
     }
@@ -398,6 +404,7 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
             "text" => p.text = text_from_value(raw)?,
             "tone_curve" => p.tone_curve = curve_from_value(raw)?,
             "hsl" => p.hsl = hsl_from_value(raw)?,
+            "logo" => p.logo = enum_value(raw)?,
             "exposure" => p.exposure = python_float(raw)?,
             "brightness" => p.brightness = int_value(number()?)?,
             "contrast" => p.contrast = int_value(number()?)?,
@@ -552,5 +559,17 @@ mod tests {
         assert_eq!((wide.hsl[0].hue, wide.hsl[7].lightness), (30, -100));
         let applied = set.apply(&EditSettings::default());
         assert_eq!((applied.tone_curve, applied.hsl), (set.tone_curve, set.hsl));
+    }
+
+    #[test]
+    fn logo_is_written_only_when_set() {
+        let plain = Preset::from_settings("A", &EditSettings::default());
+        assert!(!presets_json(std::slice::from_ref(&plain)).contains("logo"));
+        let logo = LogoSettings { path: "/Users/me/logo.png".into(), size: 12.5, ..LogoSettings::default() };
+        let set = Preset { logo, ..plain };
+        let text = presets_json(std::slice::from_ref(&set));
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
+        assert_eq!(set.apply(&EditSettings::default()).logo, set.logo);
     }
 }

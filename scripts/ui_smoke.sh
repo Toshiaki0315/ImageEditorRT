@@ -123,6 +123,11 @@ ax menu "$PID" "編集" "加工をコピー" >/dev/null; sleep 0.5
 check "加工をコピー → ペーストが使える" "true" "$(ax menu-enabled "$PID" "編集" "加工をペースト")"
 ax menu "$PID" "編集" "加工をペースト" >/dev/null; sleep 0.5
 
+ax menu "$PID" "編集" "文字・透かし…" >/dev/null
+wait_for 10 sh -c "osascript '$LIB' texts $PID | grep -q '（なし）'" || true
+check "文字・透かし（ロゴの欄）" "（なし）" "$(ax texts "$PID" | grep '（なし）' | head -1 || true)"
+ax click "$PID" "閉じる" >/dev/null; sleep 0.3
+
 ax menu "$PID" "表示" "100% で表示" >/dev/null
 wait_for 15 sh -c "[ \"\$(osascript '$LIB' menu-enabled $PID 表示 画面に合わせる)\" = true ]" || true
 check "100% で表示" "true" "$(ax menu-enabled "$PID" "表示" "画面に合わせる")"

@@ -33,6 +33,7 @@ pub mod histogram;
 pub mod horizon;
 #[cfg(target_os = "macos")]
 pub mod load;
+pub mod logo;
 pub mod makernote;
 pub mod output;
 pub mod pillow;

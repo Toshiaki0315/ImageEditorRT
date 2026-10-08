@@ -50,6 +50,8 @@ export class BatchDialog {
   private readonly cover = $<HTMLSelectElement>("batch-cover");
   private readonly strength = $<HTMLInputElement>("batch-strength");
   private readonly strengthValue = $<HTMLOutputElement>("batch-strength-value");
+  private readonly naming = $<HTMLSelectElement>("batch-naming");
+  private readonly prefix = $<HTMLInputElement>("batch-prefix");
   private outDir: string | null = null;
 
   constructor(private readonly extensions: string[]) {
@@ -60,6 +62,8 @@ export class BatchDialog {
       this.updateStart();
     });
     $("batch-choose-out").addEventListener("click", () => void this.chooseOutDir());
+    // 連番のときだけ、前に付ける名前を入れられる
+    this.naming.addEventListener("change", () => (this.prefix.disabled = this.naming.value !== "sequence"));
     this.resize.addEventListener("change", () => (this.longSide.disabled = !this.resize.checked));
     this.longSide.addEventListener("input", () => this.updateStart());
     // よく使う大きさ: 長辺の欄に入れ、リサイズするにする
@@ -134,6 +138,10 @@ export class BatchDialog {
           kind: this.cover.value,
           strength: Number(this.strength.value),
         },
+        naming:
+          this.naming.value === "sequence"
+            ? { kind: "sequence", prefix: this.prefix.value }
+            : { kind: this.naming.value },
       });
     } finally {
       unlisten();

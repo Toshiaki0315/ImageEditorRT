@@ -231,6 +231,15 @@
             </select>
             強さ <input type="range" id="batch-strength" min="1" max="100" step="1" value="50" /><output id="batch-strength-value">50</output>
           </span>
+          <span>保存名</span>
+          <span class="batch-resize">
+            <select id="batch-naming">
+              <option value="original">元の名前</option>
+              <option value="with_date">元の名前＋撮影日</option>
+              <option value="sequence">連番</option>
+            </select>
+            <input type="text" id="batch-prefix" placeholder="写真" title="連番の前に付ける名前（写真_001 …）" disabled />
+          </span>
           <span>保存先</span>
           <span class="batch-out">
             <span id="batch-out-dir" class="batch-out-dir">（まだ選んでいません）</span>

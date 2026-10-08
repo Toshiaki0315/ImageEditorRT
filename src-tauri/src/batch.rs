@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use imageeditorrt_core::batch::{self, BatchOptions, BatchPrivacy};
+use imageeditorrt_core::batch::{self, BatchOptions, BatchPrivacy, OutputNaming};
 use imageeditorrt_core::pipeline::EditSettings;
 use imageeditorrt_core::presets::Preset;
 use imageeditorrt_core::save::SaveOptions;
@@ -77,6 +77,7 @@ pub async fn run_batch(
     long_side: Option<u32>,
     save: SaveOptions,
     privacy: BatchPrivacy,
+    naming: OutputNaming,
     app: AppHandle,
     presets: State<'_, PresetStore>,
     batch_state: State<'_, BatchState>,
@@ -85,7 +86,7 @@ pub async fn run_batch(
         Some(name) => presets.find(name).ok_or_else(|| format!("プリセット「{name}」がありません"))?,
         None => Preset::from_settings(CURRENT_LOOK, &settings),
     };
-    let options = BatchOptions { look, long_side, save, privacy };
+    let options = BatchOptions { look, long_side, save, privacy, naming };
     let sources: Vec<PathBuf> = sources.into_iter().map(PathBuf::from).collect();
     let out_dir = PathBuf::from(out_dir);
     batch_state.0.store(false, Ordering::SeqCst);
@@ -95,9 +96,15 @@ pub async fn run_batch(
         move || {
             let total = sources.len();
             save_pool().install(|| {
+                // 連番の名前のため、何枚目かを数える（run_batch は一覧の順に 1 枚ずつ呼ぶ）
+                let mut index = 0;
                 batch::run_batch(
                     &sources,
-                    |source| guarded(|| batch::process_image(source, &out_dir, &options)),
+                    |source| {
+                        let at = index;
+                        index += 1;
+                        guarded(|| batch::process_image_at(source, at, &out_dir, &options))
+                    },
                     |done, source| {
                         let name =
                             source.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();

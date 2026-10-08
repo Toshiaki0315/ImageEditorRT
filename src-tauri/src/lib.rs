@@ -13,6 +13,7 @@ mod image;
 mod menu;
 mod open;
 mod presets;
+mod recent;
 mod saving;
 mod settings;
 mod state;
@@ -42,11 +43,15 @@ pub fn run() {
         .manage(AppState::default())
         .manage(presets::PresetStore::default())
         .manage(batch::BatchState::default())
+        .manage(recent::RecentStore::default())
         .manage(open::Pending::from_args(std::env::args_os().skip(1)))
         .menu(menu::build)
         .on_menu_event(menu::on_event)
         .setup(|app| {
             diagnostics::set_app(app.handle().clone());
+            // 最近使った項目を読み、メニューに出す
+            app.state::<recent::RecentStore>().load();
+            recent::refresh_menu(app.handle());
             // 計測ではウィンドウが隠れていると描画が止まるので、前に出す
             if bench::bench_mode() {
                 if let Some(window) = app.get_webview_window("main") {

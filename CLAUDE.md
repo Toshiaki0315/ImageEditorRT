@@ -107,6 +107,7 @@ src-tauri/                # Tauri のアプリ本体（コマンドで core を�
   src/clipboard.rs        # クリップボード（NSPasteboard）を読む（貼り付け。書き換えない）
   src/diagnostics.rs      # 想定外のエラーのログ（~/Library/Logs/ImageEditorRT/）と起動確認（--smoke-test）
   src/presets.rs          # プリセットの一覧・保存・削除・当てはめと「プリセット ▾」のメニュー
+  src/recent.rs           # 最近使った項目（recent.json・「ファイル > 最近使った項目」のメニュー）
   tauri.conf.json
 src/                      # 画面（TypeScript）
   main.ts                 # 入り口: 部品を作り、メニュー・イベントを機能につなぐ（計測モードも）

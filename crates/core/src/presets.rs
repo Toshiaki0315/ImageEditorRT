@@ -211,8 +211,20 @@ pub fn default_preset_name(presets: &[Preset]) -> String {
 
 /// 保存先 `~/Library/Application Support/ImageEditorRT/presets.json`。
 pub fn presets_path() -> Option<PathBuf> {
-    application_support().map(|d| d.join(APP_FOLDER).join(FILE_NAME))
+    app_data_path(FILE_NAME)
 }
+
+/// アプリのデータのファイル `~/Library/Application Support/ImageEditorRT/<name>`（最近使った項目など）。
+/// 環境変数 IMAGEEDITORRT_DATA_DIR があればそのフォルダ（画面の通しの確認で、使っている人のデータに触れないため）。
+pub fn app_data_path(name: &str) -> Option<PathBuf> {
+    if let Some(dir) = std::env::var_os(DATA_DIR_ENV).filter(|d| !d.is_empty()) {
+        return Some(PathBuf::from(dir).join(name));
+    }
+    application_support().map(|d| d.join(APP_FOLDER).join(name))
+}
+
+/// アプリのデータの置き場所を変える環境変数。
+pub const DATA_DIR_ENV: &str = "IMAGEEDITORRT_DATA_DIR";
 
 /// 旧版の保存先 `~/Library/Application Support/ImageEditor/presets.json`。
 pub fn legacy_presets_path() -> Option<PathBuf> {

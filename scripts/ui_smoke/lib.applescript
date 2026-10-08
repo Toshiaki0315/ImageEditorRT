@@ -79,6 +79,11 @@ on run argv
 		else if requested is "menu" then
 			click menu item (item 4 of argv) of menu 1 of menu bar item (item 3 of argv) of menu bar 1 of p
 			return "ok"
+		else if requested is "submenu-items" then
+			-- メニューの中のサブメニューの項目の名前（改行で区切る）
+			set names to name of every menu item of menu 1 of menu item (item 4 of argv) of menu 1 of menu bar item (item 3 of argv) of menu bar 1 of p
+			set AppleScript's text item delimiters to linefeed
+			return names as text
 		else if requested is "menu-enabled" then
 			return enabled of menu item (item 4 of argv) of menu 1 of menu bar item (item 3 of argv) of menu bar 1 of p
 		end if

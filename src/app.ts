@@ -10,6 +10,7 @@ import { HistogramView } from "./histogram";
 import type { HistoryRecorder } from "./history";
 import { OutputSize, type SizeState } from "./output";
 import type { Panel } from "./panel";
+import type { PhotoControls } from "./photoControls";
 import { Preview } from "./preview";
 import type { PrivacyPanel } from "./privacy";
 import { SaveOptionsPanel } from "./saveOptions";
@@ -69,6 +70,7 @@ export const parts = {} as {
   panel: Panel;
   colorPanel: ColorPanel;
   crop: CropController;
+  photoControls: PhotoControls;
   textDialog: TextDialog;
   /** 「加工」タブの「文字…」のボタン（設定パネルを作った後に取る） */
   textButton: HTMLButtonElement;
@@ -89,6 +91,8 @@ export const hooks = {
   userChanged: () => {},
   /** プレビューを描き直せなかったとき */
   previewError: (_error: unknown) => {},
+  /** 設定が変わったとき、肌をなめらかにするための顔を必要なら探す（assist.ts。探し終えたら redraw） */
+  prepareFaces: (_redraw: () => void) => {},
 };
 
 export const preview = new Preview(dom.stage, dom.canvas, (error) => hooks.previewError(error));
@@ -97,15 +101,15 @@ export const histogramView = new HistogramView($<HTMLCanvasElement>("histogram")
 export const tabs = new Tabs(document.querySelector(".side")!);
 export const exifView = new ExifView($("page-exif"));
 export const output = new OutputSize(state.settings, () => hooks.userChanged());
-export const saveOptions = new SaveOptionsPanel(
-  $<HTMLInputElement>("jpeg-quality"),
-  $<HTMLOutputElement>("jpeg-quality-value"),
-  $<HTMLInputElement>("keep-exif"),
-  $<HTMLInputElement>("keep-gps"),
-  $<HTMLInputElement>("remove-gps"),
-  $<HTMLInputElement>("limit-size"),
-  $<HTMLInputElement>("limit-mb"),
-);
+export const saveOptions = new SaveOptionsPanel({
+  quality: $<HTMLInputElement>("jpeg-quality"),
+  qualityValue: $<HTMLOutputElement>("jpeg-quality-value"),
+  keepExif: $<HTMLInputElement>("keep-exif"),
+  keepGps: $<HTMLInputElement>("keep-gps"),
+  removeGps: $<HTMLInputElement>("remove-gps"),
+  limit: $<HTMLInputElement>("limit-size"),
+  limitMb: $<HTMLInputElement>("limit-mb"),
+});
 
 function extensionOf(path: string): string {
   const name = path.split("/").pop() ?? "";

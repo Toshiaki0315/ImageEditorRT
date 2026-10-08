@@ -1,11 +1,10 @@
 // 設定の変更の知らせと、元に戻す／やり直す（旧版 FR-UI-43）・未保存の変更の確認。
 
-import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { output, parts, preview, type Snapshot, state } from "./app";
+import { hooks, output, parts, preview, type Snapshot, state } from "./app";
 import { HistoryRecorder, sameValue } from "./history";
 import { updateMenus } from "./menus";
-import { notify, showError, updateStatus } from "./status";
+import { updateStatus } from "./status";
 import { defaultSettings } from "./types";
 import { scheduleZoomRender, updateGuide } from "./view";
 
@@ -24,21 +23,11 @@ export function userChanged() {
 /** 設定が変わったとき: プレビューとステータスバー（出力の大きさ）を更新する。 */
 export function settingsChanged() {
   if (!state.loaded) return;
-  // 肌をなめらかにするときは、先に顔を探しておく（画像ごとに 1 回。探し終えたら描き直す）
-  if (state.settings.skinSmooth > 0 && !state.facesPrepared) {
-    state.facesPrepared = true;
-    void invoke<number>("prepare_faces")
-      .then((count) => {
-        if (count === 0) notify("顔が見つからないので、肌をなめらかにする処理はかかりません");
-        settingsChanged();
-      })
-      .catch((error) => {
-        state.facesPrepared = false;
-        void showError("顔を認識できません", error);
-      });
-  }
+  // 肌をなめらかにするときの顔の準備（assist.ts）。探し終えたら描き直す
+  hooks.prepareFaces(settingsChanged);
   // 出力の幅・高さは範囲・フレームなどで変わるので、先に合わせてからプレビューを描く
   parts.privacy?.show();
+  parts.photoControls?.show();
   parts.colorPanel?.show();
   void output.refresh().then(() => {
     preview.request(state.settings);

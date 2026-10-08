@@ -1,9 +1,10 @@
 // 「切り抜き」タブの回転・反転とトリミング、プレビュー上のドラッグでの範囲の選択（旧版 FR-UI-30〜36・55）。
+// 同じタブの「水平の補正」「背景」は photoControls.ts。
 // 範囲の計算は Rust（core/crop.rs）に任せ、ここではマウスの操作・数値の欄・線の描画だけを行う。
 // 座標はどれも、回転・反転した後の原寸画像の座標（px）。
 
 import { invoke } from "@tauri-apps/api/core";
-import type { AspectRatio, BackgroundMode, CropRect, EditSettings, FrameKind, OrientOp, Orientation, Region, ShapeType } from "./types";
+import type { AspectRatio, CropRect, EditSettings, FrameKind, OrientOp, Orientation, Region, ShapeType } from "./types";
 
 type DragMode = "new" | "move" | "resize";
 type Drag = { mode: DragMode; anchor: [number, number]; start: CropRect | null };
@@ -20,16 +21,12 @@ const TRIM_TEXT = "トリミング実行";
 const FOLLOW = "follow";
 const FOLLOW_TEXT = "フレーム・円に合わせる";
 const CORNER_RADIUS_DEFAULT = 10;
-const BACKGROUND_BLUR_DEFAULT = 50;
 const EDIT_RANGE_TEXT = "範囲を編集";
 /** 縦向きを選べる比（自由と 1:1 には向きがない） */
 const HAS_ORIENTATION: AspectRatio[] = ["ratio5x4", "ratio4x3", "ratio3x2", "ratio16x9"];
 
 /** 比の名前を縦の形にする（「16:9」→「9:16」）。 */
 export const portraitName = (name: string) => name.split(":").reverse().join(":");
-
-/** 角度を「+1.5°」「-0.3°」「0.0°」のように表示する。 */
-export const degreesText = (degrees: number) => `${degrees > 0 ? "+" : ""}${degrees.toFixed(1)}°`;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -48,20 +45,6 @@ export class CropController {
   private readonly shape = $<HTMLSelectElement>("shape");
   private readonly corner = $<HTMLInputElement>("corner-radius");
   private readonly cornerValue = $<HTMLOutputElement>("corner-radius-value");
-  private readonly straighten = $<HTMLInputElement>("straighten");
-  private readonly straightenValue = $<HTMLOutputElement>("straighten-value");
-  private readonly autoStraighten = $<HTMLButtonElement>("auto-straighten");
-  private readonly background = $<HTMLSelectElement>("background");
-  private readonly backgroundBlur = $<HTMLInputElement>("background-blur");
-  private readonly backgroundBlurValue = $<HTMLOutputElement>("background-blur-value");
-  /** 背景を消す準備（被写体のマスクを作る）。被写体があれば true、なければ false、準備できなければ null */
-  prepareBackground: () => Promise<boolean | null> = async () => true;
-  /** 被写体が見つからなかったとき */
-  onNoSubject: () => void = () => {};
-  /** 傾きを求める（水平の補正の角度。分からなければ null、求められなければ undefined） */
-  findTilt: () => Promise<number | null | undefined> = async () => null;
-  /** 傾きの自動補正の結果を知らせる（直した角度。分からなければ null） */
-  onAutoStraighten: (degrees: number | null) => void = () => {};
   /** 向きのある比の、横向きの名前（「縦向き」で名前を縦の形にするため） */
   private readonly ratioNames = new Map<string, string>();
   /** フレーム・円で比を固定したときに覚えておく、比のプルダウンの選択 */
@@ -113,12 +96,6 @@ export class CropController {
     this.corner.addEventListener("input", () => this.setCorner(Number(this.corner.value)));
     // ダブルクリックで既定値に戻す（旧版 FR-UI-53。角丸以外の形では操作できない）
     this.corner.addEventListener("dblclick", () => this.setCorner(CORNER_RADIUS_DEFAULT));
-    this.straighten.addEventListener("input", () => this.setStraighten(Number(this.straighten.value)));
-    this.straighten.addEventListener("dblclick", () => this.setStraighten(0));
-    this.autoStraighten.addEventListener("click", () => void this.straightenAutomatically());
-    this.background.addEventListener("change", () => void this.setBackground(this.background.value as BackgroundMode));
-    this.backgroundBlur.addEventListener("input", () => this.setBackgroundBlur(Number(this.backgroundBlur.value)));
-    this.backgroundBlur.addEventListener("dblclick", () => this.setBackgroundBlur(BACKGROUND_BLUR_DEFAULT));
     this.portrait.addEventListener("change", () => void this.aspectChanged());
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) {
       button.addEventListener("click", () => void this.orient(button.dataset.orient as OrientOp));
@@ -262,56 +239,6 @@ export class CropController {
     this.onChange();
   }
 
-  /** 水平の補正（0.1° 刻み。大きさは変わらないので、範囲はそのまま）。 */
-  private setStraighten(value: number) {
-    const degrees = Number((Math.round(value * 10) / 10).toFixed(1));
-    if (this.settings.straighten === degrees) return;
-    this.settings.straighten = degrees;
-    this.updateControls();
-    this.onChange();
-  }
-
-  /** 背景の扱いを変える。消すときは先に被写体のマスクを作り、被写体がなければ「そのまま」に戻す。 */
-  private async setBackground(mode: BackgroundMode) {
-    if (mode !== "keep") {
-      this.background.disabled = true;
-      try {
-        const found = await this.prepareBackground();
-        if (found !== true) {
-          if (found === false) this.onNoSubject();
-          this.updateControls();
-          return;
-        }
-      } finally {
-        this.background.disabled = this.size === null;
-      }
-    }
-    this.settings.background = mode;
-    this.updateControls();
-    this.onChange();
-  }
-
-  /** 背景のぼかしの強さ（背景を「ぼかす」とき）。 */
-  private setBackgroundBlur(value: number) {
-    if (this.settings.backgroundBlur === value) return;
-    this.settings.backgroundBlur = value;
-    this.updateControls();
-    this.onChange();
-  }
-
-  /** 傾きを求めて、水平の補正に入れる（元に戻せる。スライダーで微調整できる）。 */
-  private async straightenAutomatically() {
-    this.autoStraighten.disabled = true;
-    try {
-      const degrees = await this.findTilt();
-      if (degrees === undefined) return;
-      if (degrees !== null) this.setStraighten(degrees);
-      this.onAutoStraighten(degrees);
-    } finally {
-      this.autoStraighten.disabled = this.size === null;
-    }
-  }
-
   // --- 範囲・比・向き ----------------------------------------------------------
 
   private aspectChoice() {
@@ -433,14 +360,6 @@ export class CropController {
     this.corner.disabled = !loaded || this.settings.shape !== "rounded";
     this.clear.disabled = !loaded || !crop;
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) button.disabled = !loaded;
-    this.straighten.value = String(this.settings.straighten);
-    this.straightenValue.textContent = degreesText(this.settings.straighten);
-    this.straighten.disabled = this.autoStraighten.disabled = !loaded;
-    this.background.value = this.settings.background;
-    this.background.disabled = !loaded;
-    this.backgroundBlur.value = String(this.settings.backgroundBlur);
-    this.backgroundBlurValue.textContent = String(this.settings.backgroundBlur);
-    this.backgroundBlur.disabled = !loaded || this.settings.background !== "blur";
     // 範囲・フレーム・形（矩形以外）のどれもなければ「トリミング実行」は押せず、全体の表示に戻す
     const canTrim = loaded && (crop !== null || this.settings.frame !== "none" || this.settings.shape !== "rectangle");
     if (!canTrim && this.isTrimmed()) this.setTrimmed(false);

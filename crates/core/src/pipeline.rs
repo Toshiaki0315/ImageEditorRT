@@ -21,6 +21,8 @@ pub use crate::filters::FilterType;
 pub use crate::frames::FrameType;
 use crate::frames::{self, FRAME_COLOR};
 use crate::histogram::{compute_histogram, Histogram};
+use crate::logo;
+pub use crate::logo::LogoSettings;
 use crate::privacy::{self, Region};
 use crate::shapes;
 pub use crate::shapes::ShapeType;
@@ -97,6 +99,8 @@ pub struct EditSettings {
     pub tone_curve: Vec<[u8; 2]>,
     /// 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタ。旧版にはない）
     pub hsl: [HslAdjust; HSL_BANDS],
+    /// ロゴの透かし（文字と同じく写真の上・フレームの余白に描く。旧版にはない）
+    pub logo: LogoSettings,
 }
 
 impl Default for EditSettings {
@@ -136,6 +140,7 @@ impl Default for EditSettings {
             background_blur: crate::background::BLUR_DEFAULT,
             tone_curve: curve::identity_curve(),
             hsl: [HslAdjust::default(); HSL_BANDS],
+            logo: LogoSettings::default(),
         }
     }
 }
@@ -226,7 +231,7 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
     Ok(apply_shape_and_frame(image, settings))
 }
 
-/// 形で切り抜き、文字を描き、フレームを付ける（形の外側は、フレームがあればフレームの白、なければ透明）。
+/// 形で切り抜き、文字・ロゴを描き、フレームを付ける（形の外側は、フレームがあればフレームの白、なければ透明）。
 ///
 /// 文字は写真の上ならフレームの前に、フレームの余白ならフレームを付けた後にその余白へ描く
 /// （大きさの基準はどちらも写真の短辺。旧版 FR-TXT-05）。
@@ -237,19 +242,36 @@ fn apply_shape_and_frame(mut image: RgbaImage, settings: &EditSettings) -> RgbaI
         image = shapes::apply_shape(&image, settings.shape, settings.corner_radius, fill);
     }
     let on_margin = settings.text.position == TextPosition::FrameMargin && has_frame;
+    let logo_on_margin = settings.logo.position == TextPosition::FrameMargin && has_frame;
     if !on_margin {
         text::draw_text(&mut image, &photo_text(settings), None, None);
     }
+    if !logo_on_margin {
+        logo::draw_logo(&mut image, &photo_logo(settings), None, None);
+    }
     let photo_size = image.dimensions();
     let mut framed = frames::add_frame(&image, settings.frame);
-    if on_margin {
+    if on_margin || logo_on_margin {
         if let Some((l, t, r, b)) = frames::margin_box(photo_size, settings.frame) {
             let area = (i64::from(l), i64::from(t), i64::from(r), i64::from(b));
             let reference = f64::from(photo_size.0.min(photo_size.1));
-            text::draw_text(&mut framed, &settings.text, Some(area), Some(reference));
+            if on_margin {
+                text::draw_text(&mut framed, &settings.text, Some(area), Some(reference));
+            }
+            if logo_on_margin {
+                logo::draw_logo(&mut framed, &settings.logo, Some(area), Some(reference));
+            }
         }
     }
     framed
+}
+
+/// 写真の上に描くロゴの設定（フレームがないのに「フレームの余白」なら下中央に描く）。
+fn photo_logo(settings: &EditSettings) -> LogoSettings {
+    match settings.logo.position {
+        TextPosition::FrameMargin => LogoSettings { position: TextPosition::Bottom, ..settings.logo.clone() },
+        _ => settings.logo.clone(),
+    }
 }
 
 /// 写真の上に描く文字の設定（フレームがないのに「フレームの余白」なら下中央に描く）。
@@ -322,9 +344,12 @@ pub fn render_preview_with_histogram(
     // 全体表示ではフレーム・形は付けない（形は画面でマスクと輪郭を重ねて見せる）。写真の上の文字は
     // 切り抜く範囲（なければ全体）に描く。フレームの余白の文字は「トリミング実行」の表示で見える
     let on_margin = settings.text.position == TextPosition::FrameMargin && settings.frame != FrameType::None;
+    let area = rect.map(|r| (r.x, r.y, r.right(), r.bottom()));
     if !on_margin {
-        let area = rect.map(|r| (r.x, r.y, r.right(), r.bottom()));
         text::draw_text(&mut rendered, &photo_text(settings), area, None);
+    }
+    if !(settings.logo.position == TextPosition::FrameMargin && settings.frame != FrameType::None) {
+        logo::draw_logo(&mut rendered, &photo_logo(settings), area, None);
     }
     (rendered, histogram)
 }
@@ -926,5 +951,46 @@ mod tests {
         // 既定値なら何も変えない（JSON の既定値も同じ）
         let s: EditSettings = serde_json::from_str("{}").unwrap();
         assert_eq!((s.tone_curve, s.hsl), (curve::identity_curve(), [HslAdjust::default(); HSL_BANDS]));
+    }
+
+    #[test]
+    fn logo_is_drawn_on_the_photo_and_in_the_frame_margin() {
+        let dir = std::env::temp_dir().join(format!("imageeditorrt-pipeline-logo-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("logo.png");
+        RgbaImage::from_pixel(20, 20, Rgba([255, 0, 0, 255])).save(&path).unwrap();
+        let logo = LogoSettings {
+            path: path.to_string_lossy().into_owned(),
+            size: 20.0,
+            opacity: 100,
+            ..LogoSettings::default()
+        };
+        let black = RgbaImage::from_pixel(200, 200, Rgba([0, 0, 0, 255]));
+        let red = |image: &RgbaImage| image.pixels().filter(|p| p[0] > 200 && p[1] < 50).count();
+        // 写真の右下に 40 × 40
+        let on_photo =
+            apply_edits(&black, &EditSettings { logo: logo.clone(), ..EditSettings::default() }).unwrap();
+        assert_eq!(red(&on_photo), 1600);
+        assert_eq!(
+            render_preview(
+                &black,
+                &EditSettings { logo: logo.clone(), ..EditSettings::default() },
+                1.0,
+                false
+            ),
+            on_photo
+        );
+        // フレームの余白: 写真（黒）には入らない
+        let margin = EditSettings {
+            frame: FrameType::Polaroid,
+            logo: LogoSettings { position: TextPosition::FrameMargin, ..logo },
+            ..EditSettings::default()
+        };
+        let framed = apply_edits(&black, &margin).unwrap();
+        let (l, t, _, _) = frames::frame_margins(FrameType::Polaroid, (200, 200));
+        let in_photo = (t..t + 200).flat_map(|y| (l..l + 200).map(move |x| (x, y)));
+        assert_eq!(in_photo.filter(|&(x, y)| framed.get_pixel(x, y)[0] > 200).count(), 0);
+        assert!(red(&framed) > 100);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

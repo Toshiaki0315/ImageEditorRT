@@ -1,6 +1,7 @@
 // 「文字・透かし」のダイアログ（旧版 FR-UI-47）。開いたまま調整でき、変更はすぐ設定とプレビューに反映する。
 
-import type { EditSettings, TextFont, TextPosition } from "./types";
+import { open } from "@tauri-apps/plugin-dialog";
+import type { EditSettings, LogoSettings, TextFont, TextPosition } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -17,6 +18,15 @@ export class TextDialog {
   private readonly opacity = $<HTMLInputElement>("text-opacity");
   private readonly opacityValue = $<HTMLOutputElement>("text-opacity-value");
   private readonly position = $<HTMLSelectElement>("text-position");
+  private readonly logoName = $<HTMLElement>("logo-name");
+  private readonly logoClear = $<HTMLButtonElement>("logo-clear");
+  private readonly logoSize = $<HTMLInputElement>("logo-size");
+  private readonly logoSizeValue = $<HTMLOutputElement>("logo-size-value");
+  private readonly logoOpacity = $<HTMLInputElement>("logo-opacity");
+  private readonly logoOpacityValue = $<HTMLOutputElement>("logo-opacity-value");
+  private readonly logoPosition = $<HTMLSelectElement>("logo-position");
+  /** ロゴに選べる画像の拡張子 */
+  logoExtensions: string[] = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic"];
 
   constructor(
     private readonly settings: EditSettings,
@@ -25,7 +35,15 @@ export class TextDialog {
     private readonly onChange: () => void,
   ) {
     for (const [value, label] of fonts) this.font.add(new Option(label, value));
-    for (const [value, label] of positions) this.position.add(new Option(label, value));
+    for (const [value, label] of positions) {
+      this.position.add(new Option(label, value));
+      this.logoPosition.add(new Option(label, value));
+    }
+    $<HTMLButtonElement>("logo-choose").addEventListener("click", () => void this.chooseLogo());
+    this.logoClear.addEventListener("click", () => this.updateLogo({ path: "" }));
+    this.logoSize.addEventListener("input", () => this.updateLogo({ size: Number(this.logoSize.value) }));
+    this.logoOpacity.addEventListener("input", () => this.updateLogo({ opacity: Number(this.logoOpacity.value) }));
+    this.logoPosition.addEventListener("change", () => this.updateLogo({ position: this.logoPosition.value as TextPosition }));
     this.text.addEventListener("input", () => this.update({ text: this.text.value }));
     this.font.addEventListener("change", () => this.update({ font: this.font.value as TextFont }));
     this.size.addEventListener("input", () => {
@@ -61,6 +79,30 @@ export class TextDialog {
     this.opacity.value = String(t.opacity);
     this.opacityValue.textContent = `${t.opacity}%`;
     this.position.value = t.position;
+    const logo = this.settings.logo;
+    this.logoName.textContent = logo.path ? (logo.path.split("/").pop() ?? logo.path) : "（なし）";
+    this.logoName.title = logo.path;
+    this.logoClear.disabled = !logo.path;
+    this.logoSize.value = String(logo.size);
+    this.logoSizeValue.textContent = `${logo.size}%`;
+    this.logoOpacity.value = String(logo.opacity);
+    this.logoOpacityValue.textContent = `${logo.opacity}%`;
+    this.logoPosition.value = logo.position;
+  }
+
+  private async chooseLogo() {
+    const path = await open({
+      title: "ロゴの画像を選ぶ",
+      multiple: false,
+      filters: [{ name: "画像ファイル", extensions: this.logoExtensions }],
+    });
+    if (typeof path === "string") this.updateLogo({ path });
+  }
+
+  private updateLogo(change: Partial<LogoSettings>) {
+    this.settings.logo = { ...this.settings.logo, ...change };
+    this.show();
+    this.onChange();
   }
 
   private update(change: Partial<EditSettings["text"]>) {

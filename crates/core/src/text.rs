@@ -20,7 +20,7 @@ pub const TEXT_SIZE_DEFAULT: f32 = 5.0;
 /// 不透明度（%）の既定値。
 pub const TEXT_OPACITY_DEFAULT: u32 = 80;
 /// 写真の端からの余白（短辺に対する比率）。
-const TEXT_MARGIN_RATIO: f64 = 0.03;
+pub(crate) const TEXT_MARGIN_RATIO: f64 = 0.03;
 /// 行間（文字の大きさに対する比率）。
 const LINE_SPACING_RATIO: f64 = 0.25;
 
@@ -118,7 +118,7 @@ impl TextPosition {
     }
 
     /// 横・縦のそろえ方（0 = 左・上、0.5 = 中央、1 = 右・下）。
-    fn anchor(self) -> (f64, f64) {
+    pub(crate) fn anchor(self) -> (f64, f64) {
         match self {
             Self::TopLeft => (0.0, 0.0),
             Self::Top => (0.5, 0.0),

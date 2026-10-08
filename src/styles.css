@@ -556,6 +556,20 @@ button[aria-pressed="true"] {
   resize: vertical;
 }
 
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dialog-buttons {
   justify-content: space-between;
 }

@@ -20,6 +20,7 @@ const TRIM_TEXT = "トリミング実行";
 const FOLLOW = "follow";
 const FOLLOW_TEXT = "フレーム・円に合わせる";
 const CORNER_RADIUS_DEFAULT = 10;
+const BACKGROUND_BLUR_DEFAULT = 50;
 const EDIT_RANGE_TEXT = "範囲を編集";
 /** 縦向きを選べる比（自由と 1:1 には向きがない） */
 const HAS_ORIENTATION: AspectRatio[] = ["ratio5x4", "ratio4x3", "ratio3x2", "ratio16x9"];
@@ -51,6 +52,8 @@ export class CropController {
   private readonly straightenValue = $<HTMLOutputElement>("straighten-value");
   private readonly autoStraighten = $<HTMLButtonElement>("auto-straighten");
   private readonly background = $<HTMLSelectElement>("background");
+  private readonly backgroundBlur = $<HTMLInputElement>("background-blur");
+  private readonly backgroundBlurValue = $<HTMLOutputElement>("background-blur-value");
   /** 背景を消す準備（被写体のマスクを作る）。被写体があれば true、なければ false、準備できなければ null */
   prepareBackground: () => Promise<boolean | null> = async () => true;
   /** 被写体が見つからなかったとき */
@@ -114,6 +117,8 @@ export class CropController {
     this.straighten.addEventListener("dblclick", () => this.setStraighten(0));
     this.autoStraighten.addEventListener("click", () => void this.straightenAutomatically());
     this.background.addEventListener("change", () => void this.setBackground(this.background.value as BackgroundMode));
+    this.backgroundBlur.addEventListener("input", () => this.setBackgroundBlur(Number(this.backgroundBlur.value)));
+    this.backgroundBlur.addEventListener("dblclick", () => this.setBackgroundBlur(BACKGROUND_BLUR_DEFAULT));
     this.portrait.addEventListener("change", () => void this.aspectChanged());
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) {
       button.addEventListener("click", () => void this.orient(button.dataset.orient as OrientOp));
@@ -286,6 +291,14 @@ export class CropController {
     this.onChange();
   }
 
+  /** 背景のぼかしの強さ（背景を「ぼかす」とき）。 */
+  private setBackgroundBlur(value: number) {
+    if (this.settings.backgroundBlur === value) return;
+    this.settings.backgroundBlur = value;
+    this.updateControls();
+    this.onChange();
+  }
+
   /** 傾きを求めて、水平の補正に入れる（元に戻せる。スライダーで微調整できる）。 */
   private async straightenAutomatically() {
     this.autoStraighten.disabled = true;
@@ -425,6 +438,9 @@ export class CropController {
     this.straighten.disabled = this.autoStraighten.disabled = !loaded;
     this.background.value = this.settings.background;
     this.background.disabled = !loaded;
+    this.backgroundBlur.value = String(this.settings.backgroundBlur);
+    this.backgroundBlurValue.textContent = String(this.settings.backgroundBlur);
+    this.backgroundBlur.disabled = !loaded || this.settings.background !== "blur";
     // 範囲・フレーム・形（矩形以外）のどれもなければ「トリミング実行」は押せず、全体の表示に戻す
     const canTrim = loaded && (crop !== null || this.settings.frame !== "none" || this.settings.shape !== "rectangle");
     if (!canTrim && this.isTrimmed()) this.setTrimmed(false);

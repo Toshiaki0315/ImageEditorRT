@@ -43,5 +43,6 @@
   "shape": "rectangle",
   "cornerRadius": 10,
   "regions": [],
-  "background": "keep"
+  "background": "keep",
+  "backgroundBlur": 50
 }

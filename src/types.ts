@@ -70,10 +70,12 @@ export type EditSettings = {
   regions: Region[];
   /** 背景を消す（そのまま・透明・白） */
   background: BackgroundMode;
+  /** 背景のぼかしの強さ 1〜100（背景を「ぼかす」とき） */
+  backgroundBlur: number;
 };
 
 /** 背景の扱い（Rust の background::Background）。 */
-export type BackgroundMode = "keep" | "transparent" | "white";
+export type BackgroundMode = "keep" | "transparent" | "white" | "blur";
 
 /** 投稿加工の隠し方（Rust の privacy::RegionKind）。 */
 export type RegionKind = "blur" | "mosaic" | "stamp";
@@ -121,6 +123,7 @@ export function defaultSettings(): EditSettings {
     cornerRadius: 10,
     regions: [],
     background: "keep",
+    backgroundBlur: 50,
   };
 }
 

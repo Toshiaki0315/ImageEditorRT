@@ -10,6 +10,8 @@ use imageeditorrt_core::decode;
 use imageeditorrt_core::exif_info::ExifInfo;
 use imageeditorrt_core::formats::{self, Format};
 use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
+use imageeditorrt_core::skin;
+use imageeditorrt_core::transform::CropRect;
 use serde::Serialize;
 use tauri::WebviewWindow;
 
@@ -27,28 +29,58 @@ pub(crate) struct Loaded {
     /// 被写体のマスク（背景を消す。プレビュー用の画像と同じ大きさ・同じ向き）。まだ作っていなければ None、
     /// 作ったが被写体がなければ Some(None)。画像ごとに 1 回だけ作る
     pub(crate) mask: Option<Option<Arc<GrayImage>>>,
+    /// 顔の枠（肌をなめらかに。プレビュー用の画像の座標、回転・反転する前）。まだ探していなければ None
+    pub(crate) faces: Option<Arc<Vec<CropRect>>>,
 }
 
 impl Loaded {
-    /// settings の背景の扱いでかける処理（そのまま・マスクがなければ None）。
-    pub(crate) fn background(&self, settings: &EditSettings) -> Option<BackgroundJob> {
-        if settings.background == Background::Keep {
-            return None;
-        }
-        self.mask.clone().flatten().map(|mask| (mask, settings.background, settings.background_blur))
+    /// settings で元の画像に前もってかける処理（肌をなめらかに・背景）。どちらもなければ None。
+    pub(crate) fn prepare_job(&self, settings: &EditSettings) -> Option<PrepareJob> {
+        let skin = self
+            .faces
+            .clone()
+            .filter(|faces| settings.skin_smooth > 0 && !faces.is_empty())
+            .map(|faces| (faces, settings.skin_smooth));
+        let background = (settings.background != Background::Keep)
+            .then(|| {
+                self.mask.clone().flatten().map(|mask| (mask, settings.background, settings.background_blur))
+            })
+            .flatten();
+        let preview_width = self.preview.as_ref().map_or(1, |p| p.width());
+        (skin.is_some() || background.is_some()).then_some(PrepareJob { skin, background, preview_width })
     }
 }
 
-/// 背景にかける処理（マスク・扱い・ぼかしの強さ）。
-pub(crate) type BackgroundJob = (Arc<GrayImage>, Background, u32);
+/// 元の画像（回転・反転する前）に、ほかの加工より前にかける処理。顔の枠・マスクはプレビュー用の画像の大きさ。
+pub(crate) struct PrepareJob {
+    /// 肌をなめらかにする顔の枠と強さ
+    skin: Option<(Arc<Vec<CropRect>>, u32)>,
+    /// 背景のマスク・扱い・ぼかしの強さ
+    background: Option<(Arc<GrayImage>, Background, u32)>,
+    /// プレビュー用の画像の幅（顔の枠をかける画像の大きさに直すため）
+    preview_width: u32,
+}
 
-/// image（原本またはプレビュー用の画像）に、背景を消す・ぼかす処理をかける（なければそのまま）。
+/// image（原本またはプレビュー用の画像）に、肌をなめらかに・背景を消す／ぼかす処理をかける（なければそのまま）。
 /// 重いので別のスレッドで呼ぶ。
-pub(crate) fn with_background(image: Arc<RgbaImage>, job: Option<BackgroundJob>) -> Arc<RgbaImage> {
-    match job {
-        Some((mask, mode, blur)) => Arc::new(background::apply_background(&image, &mask, mode, blur)),
-        None => image,
+pub(crate) fn with_prepare(image: Arc<RgbaImage>, job: Option<PrepareJob>) -> Arc<RgbaImage> {
+    let Some(job) = job else { return image };
+    let mut image = Arc::unwrap_or_clone(image);
+    if let Some((faces, amount)) = &job.skin {
+        let scale = f64::from(image.width()) / f64::from(job.preview_width.max(1));
+        let scaled: Vec<CropRect> = faces
+            .iter()
+            .map(|r| {
+                let v = |n: i64| (n as f64 * scale).round() as i64;
+                CropRect::new(v(r.x), v(r.y), v(r.width), v(r.height))
+            })
+            .collect();
+        skin::smooth_skin(&mut image, &scaled, *amount);
     }
+    if let Some((mask, mode, blur)) = &job.background {
+        image = background::apply_background(&image, mask, *mode, *blur);
+    }
+    Arc::new(image)
 }
 
 /// 元のファイル（保存の名前・元の画像への上書きの防止・EXIF を残すのに使う）。
@@ -133,6 +165,7 @@ pub(crate) fn prepare(
         factor,
         source,
         mask: None,
+        faces: None,
     };
     (info, loaded)
 }

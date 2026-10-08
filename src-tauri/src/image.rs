@@ -14,7 +14,7 @@ use tauri::{State, WebviewWindow};
 #[cfg(target_os = "macos")]
 use crate::clipboard;
 use crate::state::{
-    blocking, elapsed_ms, file_name, prepare, store, with_background, AppState, Loaded, OpenInfo, Source,
+    blocking, elapsed_ms, file_name, prepare, store, with_prepare, AppState, Loaded, OpenInfo, Source,
 };
 use crate::APP_NAME;
 
@@ -60,12 +60,12 @@ pub async fn render_preview(
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let preview = loaded.preview.clone().ok_or("画像が読み込まれていません")?;
         let settings = shown_settings(&loaded, settings, comparing);
-        let mask = loaded.background(&settings);
+        let mask = loaded.prepare_job(&settings);
         (preview, loaded.factor, settings, mask)
     };
     let ((image, histogram), render_time) = blocking(move || {
         let start = Instant::now();
-        let preview = with_background(preview, mask);
+        let preview = with_prepare(preview, mask);
         Ok((pipeline::render_preview_with_histogram(&preview, &settings, factor, trimmed), start.elapsed()))
     })
     .await?;
@@ -92,11 +92,11 @@ pub async fn filter_thumbnails(
 ) -> Result<Response, String> {
     let (preview, factor, mask) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        let mask = loaded.background(&settings);
+        let mask = loaded.prepare_job(&settings);
         (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor, mask)
     };
     let thumbnails = blocking(move || {
-        let preview = with_background(preview, mask);
+        let preview = with_prepare(preview, mask);
         Ok(pipeline::filter_thumbnails(&preview, &settings, factor, pipeline::THUMBNAIL_MAX_SIDE))
     })
     .await?;
@@ -219,6 +219,28 @@ pub async fn prepare_background(state: State<'_, AppState>) -> Result<bool, Stri
     Ok(found)
 }
 
+/// 肌をなめらかにする準備: 顔をまだ探していなければ、プレビュー用の画像から探して覚える（画像ごとに 1 回）。
+/// 見つけた顔の数を返す。
+#[tauri::command]
+pub async fn prepare_faces(state: State<'_, AppState>) -> Result<usize, String> {
+    let preview = {
+        let loaded = state.0.lock().map_err(|e| e.to_string())?;
+        if let Some(faces) = &loaded.faces {
+            return Ok(faces.len());
+        }
+        loaded.preview.clone().ok_or("画像が読み込まれていません")?
+    };
+    let source = preview.clone();
+    let faces = blocking(move || imageeditorrt_core::faces::detect_faces(&source)).await?;
+    let count = faces.len();
+    let mut loaded = state.0.lock().map_err(|e| e.to_string())?;
+    // 探している間に別の画像を開いていれば、覚えない
+    if loaded.preview.as_ref().is_some_and(|p| std::sync::Arc::ptr_eq(p, &preview)) {
+        loaded.faces = Some(std::sync::Arc::new(faces));
+    }
+    Ok(count)
+}
+
 /// リセット（旧版 FR-UI-42）: 読み込んだ画像を捨てて、未読込の状態に戻す。
 #[tauri::command]
 pub fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {
@@ -253,11 +275,11 @@ pub async fn render_actual_size(
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let original = loaded.original.clone().ok_or("画像が読み込まれていません")?;
         let settings = shown_settings(&loaded, settings, comparing);
-        let mask = loaded.background(&settings);
+        let mask = loaded.prepare_job(&settings);
         (original, settings, mask)
     };
     let image = blocking(move || {
-        pipeline::apply_edits(&with_background(original, mask), &settings).map_err(|e| e.to_string())
+        pipeline::apply_edits(&with_prepare(original, mask), &settings).map_err(|e| e.to_string())
     })
     .await?;
     let (width, height) = image.dimensions();

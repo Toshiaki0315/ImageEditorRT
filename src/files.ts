@@ -40,6 +40,7 @@ export function showLoaded(info: OpenInfo, openNotes: string[]) {
   state.savedSettings = null;
   dom.beforeButton.disabled = dom.resetButton.disabled = dom.saveButton.disabled = false;
   Object.assign(state.settings, defaultSettings());
+  state.facesPrepared = false;
   parts.panel.show();
   dom.placeholder.hidden = true;
   preview.trimmed = false;

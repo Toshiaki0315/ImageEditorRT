@@ -81,6 +81,13 @@ pub struct Preset {
     /// ロゴの透かし（旧版にはない。ファイルの場所で覚える）。ロゴがなければファイルに書かない
     #[serde(skip_serializing_if = "LogoSettings::is_empty")]
     pub logo: LogoSettings,
+    /// 肌をなめらかに（旧版にはない）。0 以外のときだけファイルに書く
+    #[serde(skip_serializing_if = "is_zero_u32")]
+    pub skin_smooth: u32,
+}
+
+fn is_zero_u32(value: &u32) -> bool {
+    *value == 0
 }
 
 fn is_identity_curve(points: &Vec<[u8; 2]>) -> bool {
@@ -122,6 +129,7 @@ impl Preset {
             tone_curve: s.tone_curve.clone(),
             hsl: s.hsl,
             logo: s.logo.clone(),
+            skin_smooth: s.skin_smooth,
         }
     }
 
@@ -154,6 +162,7 @@ impl Preset {
             tone_curve: self.tone_curve.clone(),
             hsl: self.hsl,
             logo: self.logo.clone(),
+            skin_smooth: self.skin_smooth,
             ..settings.clone()
         }
     }
@@ -405,6 +414,7 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
             "tone_curve" => p.tone_curve = curve_from_value(raw)?,
             "hsl" => p.hsl = hsl_from_value(raw)?,
             "logo" => p.logo = enum_value(raw)?,
+            "skin_smooth" => p.skin_smooth = int_value::<u32>(number()?)?.min(100),
             "exposure" => p.exposure = python_float(raw)?,
             "brightness" => p.brightness = int_value(number()?)?,
             "contrast" => p.contrast = int_value(number()?)?,

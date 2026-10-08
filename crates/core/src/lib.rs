@@ -46,6 +46,7 @@ pub mod resize;
 pub mod sample;
 pub mod save;
 pub mod shapes;
+pub mod skin;
 pub mod text;
 #[cfg(target_os = "macos")]
 pub mod text_regions;

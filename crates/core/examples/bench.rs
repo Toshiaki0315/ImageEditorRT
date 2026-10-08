@@ -42,6 +42,28 @@ fn main() {
     let heavy = EditSettings::heavy();
     let (best, median, rendered) = measure(15, || render_preview(&preview, &heavy, 1.0, false));
     println!("プレビュー更新（重い設定）: 最小 {} / 中央値 {}", ms(best), ms(median));
+    // 0.7〜0.8 で足した機能を全部（トーンカーブ・色ごとの調整・ハイライト／シャドウ・投稿加工の範囲・スタンプ・ロゴ）
+    let everything = everything_settings(preview.dimensions());
+    let (best_all, median_all, _) = measure(15, || render_preview(&preview, &everything, 1.0, false));
+    println!(
+        "プレビュー更新（重い設定＋新しい機能を全部）: 最小 {} / 中央値 {}",
+        ms(best_all),
+        ms(median_all)
+    );
+    // 前もってかける処理（肌をなめらかに・背景のぼかし）。顔の枠・マスクは作ってあるものとする
+    let (faces, mask) = prepare_sources(preview.dimensions());
+    let sources = imageeditorrt_core::prepare::Sources {
+        faces: Some(&faces),
+        mask: Some(&mask),
+        preview_width: preview.width(),
+    };
+    let (best_prep, median_prep, _) =
+        measure(15, || imageeditorrt_core::prepare::prepare(&preview, &everything, &sources));
+    println!(
+        "前もってかける処理（肌＋背景のぼかし、プレビュー）: 最小 {} / 中央値 {}",
+        ms(best_prep),
+        ms(median_prep)
+    );
     let light = EditSettings { exposure: 0.7, saturation: 20, ..EditSettings::default() };
     let (best_light, median_light, _) = measure(15, || render_preview(&preview, &light, 1.0, false));
     println!("プレビュー更新（露出＋彩度だけ）: 最小 {} / 中央値 {}", ms(best_light), ms(median_light));
@@ -53,6 +75,20 @@ fn main() {
     let (full12, _, _) =
         measure(3, || imageeditorrt_core::pipeline::apply_edits(&original12, &heavy).unwrap());
     println!("原寸処理 4000x3000 / 12MP（重い設定）: {}", ms(full12));
+    // 12MP に新しい機能を全部（前もってかける処理の材料はプレビューの大きさのものを原寸に合わせる）
+    let small12 = fit_long_side(&original12, PREVIEW_MAX_SIDE);
+    let everything12 = everything_settings(original12.dimensions());
+    let (faces12, mask12) = prepare_sources(small12.dimensions());
+    let sources12 = imageeditorrt_core::prepare::Sources {
+        faces: Some(&faces12),
+        mask: Some(&mask12),
+        preview_width: small12.width(),
+    };
+    let (all12, _, _) = measure(3, || {
+        let prepared = imageeditorrt_core::prepare::prepare(&original12, &everything12, &sources12).unwrap();
+        imageeditorrt_core::pipeline::apply_edits(&prepared, &everything12).unwrap()
+    });
+    println!("原寸処理 12MP（重い設定＋新しい機能を全部＋肌・背景のぼかし）: {}", ms(all12));
 
     // Rust → WebView への受け渡しのやり方の候補ごとの、変換の時間
     let raw_bytes = rendered.as_raw().len();
@@ -91,4 +127,55 @@ fn main() {
     let out = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/bench_heavy_preview.png");
     rendered.save(out).unwrap();
     println!("重い設定のプレビュー: {out}");
+}
+
+/// 0.7〜0.8 で足した機能を全部かける設定（重い設定に足す）。
+fn everything_settings((width, height): (u32, u32)) -> EditSettings {
+    use imageeditorrt_core::background::Background;
+    use imageeditorrt_core::pipeline::HslAdjust;
+    use imageeditorrt_core::privacy::{Region, RegionKind};
+    use imageeditorrt_core::transform::CropRect;
+    let mut hsl = [HslAdjust::default(); 8];
+    hsl[5] = HslAdjust { hue: 10, saturation: -30, lightness: 10 };
+    hsl[3] = HslAdjust { hue: -5, saturation: 20, lightness: 0 };
+    let region = |kind, x: u32| Region {
+        kind,
+        rect: CropRect::new(
+            i64::from(width * x / 10),
+            i64::from(height / 4),
+            i64::from(width / 8),
+            i64::from(height / 6),
+        ),
+        strength: 60,
+        ..Region::default()
+    };
+    EditSettings {
+        straighten: 2.5,
+        highlights: -30,
+        shadows: 40,
+        tone_curve: vec![[0, 0], [64, 80], [192, 210], [255, 255]],
+        hsl,
+        regions: vec![
+            region(RegionKind::Blur, 1),
+            region(RegionKind::Mosaic, 4),
+            region(RegionKind::Stamp, 7),
+        ],
+        skin_smooth: 60,
+        background: Background::Blur,
+        ..EditSettings::heavy()
+    }
+}
+
+/// 前もってかける処理の材料（顔 3 つ・左右半分のマスク）。
+fn prepare_sources(
+    (width, height): (u32, u32),
+) -> (Vec<imageeditorrt_core::transform::CropRect>, image::GrayImage) {
+    use imageeditorrt_core::transform::CropRect;
+    let side = i64::from(width.min(height) / 6);
+    let faces = (0..3)
+        .map(|i| CropRect::new(i64::from(width) / 4 * (i + 1), i64::from(height) / 3, side, side))
+        .collect();
+    let mask =
+        image::GrayImage::from_fn(width, height, |x, _| image::Luma([if x < width / 2 { 255 } else { 0 }]));
+    (faces, mask)
 }

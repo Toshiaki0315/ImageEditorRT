@@ -86,6 +86,14 @@ async function createParts() {
     });
   parts.crop.onAutoStraighten = (degrees) =>
     notify(degrees === null ? "傾きが分かりませんでした（水平線や長い直線が見つかりません）" : `傾きを ${degreesText(degrees)} 直しました`);
+  parts.crop.prepareBackground = () => {
+    notify("被写体を探しています…");
+    return invoke<boolean>("prepare_background").catch((error) => {
+      void showError("背景を消せません", error);
+      return null;
+    });
+  };
+  parts.crop.onNoSubject = () => notify("被写体が見つからないので、背景はそのままにしました");
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
   const targets = { faces: { command: "detect_faces", name: "顔" }, text: { command: "detect_text", name: "文字" } };

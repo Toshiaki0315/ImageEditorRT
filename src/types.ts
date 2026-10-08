@@ -68,7 +68,12 @@ export type EditSettings = {
   cornerRadius: number;
   /** 投稿加工で隠す範囲（回転・反転した後の原寸の座標） */
   regions: Region[];
+  /** 背景を消す（そのまま・透明・白） */
+  background: BackgroundMode;
 };
+
+/** 背景の扱い（Rust の background::Background）。 */
+export type BackgroundMode = "keep" | "transparent" | "white";
 
 /** 投稿加工の隠し方（Rust の privacy::RegionKind）。 */
 export type RegionKind = "blur" | "mosaic" | "stamp";
@@ -115,6 +120,7 @@ export function defaultSettings(): EditSettings {
     shape: "rectangle",
     cornerRadius: 10,
     regions: [],
+    background: "keep",
   };
 }
 

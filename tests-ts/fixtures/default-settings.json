@@ -42,5 +42,6 @@
   "frame": "none",
   "shape": "rectangle",
   "cornerRadius": 10,
-  "regions": []
+  "regions": [],
+  "background": "keep"
 }

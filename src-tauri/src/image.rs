@@ -13,7 +13,9 @@ use tauri::{State, WebviewWindow};
 
 #[cfg(target_os = "macos")]
 use crate::clipboard;
-use crate::state::{blocking, elapsed_ms, file_name, prepare, store, AppState, Loaded, OpenInfo, Source};
+use crate::state::{
+    blocking, elapsed_ms, file_name, prepare, store, with_background, AppState, Loaded, OpenInfo, Source,
+};
 use crate::APP_NAME;
 
 /// 画像のファイルを読み込む。読めなければ、ダイアログに出す説明を返す（旧版 FR-IO-10）。
@@ -54,13 +56,16 @@ pub async fn render_preview(
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
     // 鍵は画像を取り出すあいだだけ持ち、処理は別のスレッドで行う（その間もほかの問い合わせに答えられる）
-    let (preview, factor, settings) = {
+    let (preview, factor, settings, mask) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let preview = loaded.preview.clone().ok_or("画像が読み込まれていません")?;
-        (preview, loaded.factor, shown_settings(&loaded, settings, comparing))
+        let settings = shown_settings(&loaded, settings, comparing);
+        let mask = loaded.background(settings.background);
+        (preview, loaded.factor, settings, mask)
     };
     let ((image, histogram), render_time) = blocking(move || {
         let start = Instant::now();
+        let preview = with_background(preview, mask);
         Ok((pipeline::render_preview_with_histogram(&preview, &settings, factor, trimmed), start.elapsed()))
     })
     .await?;
@@ -85,11 +90,13 @@ pub async fn filter_thumbnails(
     settings: EditSettings,
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
-    let (preview, factor) = {
+    let (preview, factor, mask) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor)
+        let mask = loaded.background(settings.background);
+        (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor, mask)
     };
     let thumbnails = blocking(move || {
+        let preview = with_background(preview, mask);
         Ok(pipeline::filter_thumbnails(&preview, &settings, factor, pipeline::THUMBNAIL_MAX_SIDE))
     })
     .await?;
@@ -190,6 +197,28 @@ pub async fn auto_adjust(
     .await
 }
 
+/// 背景を消す準備: 被写体のマスクをまだ作っていなければ、プレビュー用の画像から作って覚える（画像ごとに 1 回）。
+/// 被写体があれば true。
+#[tauri::command]
+pub async fn prepare_background(state: State<'_, AppState>) -> Result<bool, String> {
+    let preview = {
+        let loaded = state.0.lock().map_err(|e| e.to_string())?;
+        if let Some(mask) = &loaded.mask {
+            return Ok(mask.is_some());
+        }
+        loaded.preview.clone().ok_or("画像が読み込まれていません")?
+    };
+    let source = preview.clone();
+    let mask = blocking(move || imageeditorrt_core::foreground::foreground_mask(&source)).await?;
+    let found = mask.is_some();
+    let mut loaded = state.0.lock().map_err(|e| e.to_string())?;
+    // 作っている間に別の画像を開いていれば、覚えない
+    if loaded.preview.as_ref().is_some_and(|p| std::sync::Arc::ptr_eq(p, &preview)) {
+        loaded.mask = Some(mask.map(std::sync::Arc::new));
+    }
+    Ok(found)
+}
+
 /// リセット（旧版 FR-UI-42）: 読み込んだ画像を捨てて、未読込の状態に戻す。
 #[tauri::command]
 pub fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<(), String> {
@@ -220,14 +249,17 @@ pub async fn render_actual_size(
     comparing: bool,
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
-    let (original, settings) = {
+    let (original, settings, mask) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let original = loaded.original.clone().ok_or("画像が読み込まれていません")?;
         let settings = shown_settings(&loaded, settings, comparing);
-        (original, settings)
+        let mask = loaded.background(settings.background);
+        (original, settings, mask)
     };
-    let image =
-        blocking(move || pipeline::apply_edits(&original, &settings).map_err(|e| e.to_string())).await?;
+    let image = blocking(move || {
+        pipeline::apply_edits(&with_background(original, mask), &settings).map_err(|e| e.to_string())
+    })
+    .await?;
     let (width, height) = image.dimensions();
     let pixels = image.into_raw();
     let mut body = Vec::with_capacity(8 + pixels.len());

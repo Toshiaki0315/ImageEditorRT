@@ -6,6 +6,7 @@ pub const PIXELS_PER_TASK: usize = 4096;
 
 pub mod adjust;
 pub mod auto;
+pub mod background;
 pub mod batch;
 pub mod blur;
 pub mod crop;
@@ -21,6 +22,8 @@ pub mod faces;
 #[rustfmt::skip]
 mod exifread_tables;
 pub mod filters;
+#[cfg(target_os = "macos")]
+pub mod foreground;
 pub mod formats;
 pub mod frames;
 pub mod histogram;

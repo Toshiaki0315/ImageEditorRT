@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { SIZE_PRESETS } from "./output";
 import type { EditSettings } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -42,6 +43,7 @@ export class BatchDialog {
   private readonly progressText = $<HTMLElement>("batch-progress-text");
   private readonly progressBar = $<HTMLProgressElement>("batch-progress-bar");
   private readonly cancel = $<HTMLButtonElement>("batch-cancel");
+  private readonly sizePreset = $<HTMLSelectElement>("batch-size-preset");
   private readonly removeGps = $<HTMLInputElement>("batch-remove-gps");
   private readonly faces = $<HTMLInputElement>("batch-faces");
   private readonly text = $<HTMLInputElement>("batch-text");
@@ -60,6 +62,16 @@ export class BatchDialog {
     $("batch-choose-out").addEventListener("click", () => void this.chooseOutDir());
     this.resize.addEventListener("change", () => (this.longSide.disabled = !this.resize.checked));
     this.longSide.addEventListener("input", () => this.updateStart());
+    // よく使う大きさ: 長辺の欄に入れ、リサイズするにする
+    for (const [label, px] of SIZE_PRESETS) this.sizePreset.add(new Option(label, String(px)));
+    this.sizePreset.addEventListener("change", () => {
+      if (!this.sizePreset.value) return;
+      this.longSide.value = this.sizePreset.value;
+      this.resize.checked = true;
+      this.longSide.disabled = false;
+      this.sizePreset.value = "";
+      this.updateStart();
+    });
     this.strength.addEventListener("input", () => (this.strengthValue.textContent = this.strength.value));
     for (const check of [this.faces, this.text]) check.addEventListener("change", () => this.updatePrivacy());
     this.cancel.addEventListener("click", () => {

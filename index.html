@@ -99,6 +99,11 @@
           <label class="row">幅 <input id="out-width" type="number" min="1" max="20000" step="1" /><span>px</span></label>
           <label class="row">高さ <input id="out-height" type="number" min="1" max="20000" step="1" /><span>px</span></label>
           <label class="check"><input id="keep-aspect" type="checkbox" checked /> 縦横比を保持</label>
+          <label class="row">よく使う大きさ
+            <select id="size-preset">
+              <option value="">長辺を選ぶ…</option>
+            </select>
+          </label>
           <h2>保存の設定</h2>
           <label class="row">
             JPEG 品質
@@ -207,6 +212,9 @@
           <span class="batch-resize">
             <label><input type="checkbox" id="batch-resize" />長辺を</label>
             <input type="number" id="batch-long-side" min="1" max="20000" step="1" /> px にする
+            <select id="batch-size-preset" title="よく使う大きさ">
+              <option value="">よく使う大きさ…</option>
+            </select>
           </span>
           <span>投稿加工</span>
           <span class="batch-privacy">

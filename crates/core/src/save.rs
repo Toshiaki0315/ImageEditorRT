@@ -36,13 +36,36 @@ pub struct SaveOptions {
     pub keep_exif: bool,
     /// EXIF を残すとき、位置情報 (GPS) も残す
     pub keep_gps: bool,
+    /// ファイルの大きさの上限（KB。JPEG のときだけ。None なら指定なし。旧版にはない）
+    pub max_kb: Option<u32>,
 }
 
 impl Default for SaveOptions {
     fn default() -> Self {
-        Self { quality: DEFAULT_JPEG_QUALITY, keep_exif: true, keep_gps: false }
+        Self { quality: DEFAULT_JPEG_QUALITY, keep_exif: true, keep_gps: false, max_kb: None }
     }
 }
+
+/// 保存した結果（大きさの上限に合わせて品質を下げた・縮めたかを知らせるため）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Saved {
+    /// 保存した JPEG の品質（JPEG 以外は設定の品質のまま）
+    pub quality: u8,
+    /// 保存した画像の大きさ（px）
+    pub size: (u32, u32),
+    /// ファイルの大きさ（バイト）
+    pub bytes: u64,
+    /// 上限に合わせて品質を下げた・縮めたか
+    pub fitted: bool,
+}
+
+/// 大きさの上限に合わせるときに下げる JPEG の品質の下限（これより下げるより、画像を縮める）。
+const FIT_QUALITY_MIN: u8 = 40;
+/// 上限に合わせて縮めるときの、短辺の下限（px）。
+const FIT_MIN_SIDE: u32 = 64;
+/// 上限に合わせて縮める回数の上限。
+const FIT_MAX_SHRINKS: usize = 8;
 
 /// 保存できる形式。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -312,16 +335,79 @@ pub fn save_edited(
     options: SaveOptions,
     source_exif: Option<&[u8]>,
     source_is_tiff: bool,
-) -> Result<(), SaveError> {
+) -> Result<Saved, SaveError> {
     let format = SaveFormat::from_path(path)
         .ok_or_else(|| SaveError::UnsupportedExtension(extension(path).unwrap_or_default()))?;
     // TIFF で保存するとき・TIFF から読んだ EXIF は、MakerNote を残さない（旧版と同じ）
     let keep_maker_note = format != SaveFormat::Tiff && !source_is_tiff;
-    let exif = source_exif
-        .filter(|_| options.keep_exif)
-        .and_then(|raw| prepare(raw, image.dimensions(), options.keep_gps, keep_maker_note, source_is_tiff));
-    let bytes = encode(image, format, options.quality, exif.as_deref())?;
-    std::fs::write(path, bytes).map_err(|e| SaveError::Write(e.to_string()))
+    // EXIF の画像の大きさのタグは、保存する画像の大きさに合わせる（縮めたときも）
+    let encode_at = |image: &RgbaImage, quality: u8| {
+        let exif = source_exif.filter(|_| options.keep_exif).and_then(|raw| {
+            prepare(raw, image.dimensions(), options.keep_gps, keep_maker_note, source_is_tiff)
+        });
+        encode(image, format, quality, exif.as_deref())
+    };
+    let limit = options.max_kb.filter(|_| format == SaveFormat::Jpeg).map(|kb| u64::from(kb) * 1024);
+    let (bytes, quality, size) = match limit {
+        Some(limit) => fit_jpeg(image, options.quality, limit, encode_at)?,
+        None => (encode_at(image, options.quality)?, options.quality, image.dimensions()),
+    };
+    let saved = Saved {
+        quality,
+        size,
+        bytes: bytes.len() as u64,
+        fitted: quality != options.quality || size != image.dimensions(),
+    };
+    std::fs::write(path, bytes).map_err(|e| SaveError::Write(e.to_string()))?;
+    Ok(saved)
+}
+
+/// 大きさの上限に合わせた JPEG（バイト列・品質・画像の大きさ）。
+type Fitted = (Vec<u8>, u8, (u32, u32));
+
+/// JPEG を limit バイト以下にする: いちばん高い品質（quality 以下、40 以上）を探し、それでも収まらなければ
+/// 画像を縮めて（Lanczos）探し直す。どうしても収まらなければ、いちばん小さくしたものを返す。
+/// 返すのはバイト列・品質・画像の大きさ。
+fn fit_jpeg(
+    image: &RgbaImage,
+    quality: u8,
+    limit: u64,
+    encode_at: impl Fn(&RgbaImage, u8) -> Result<Vec<u8>, SaveError>,
+) -> Result<Fitted, SaveError> {
+    let first = encode_at(image, quality)?;
+    if first.len() as u64 <= limit {
+        return Ok((first, quality, image.dimensions()));
+    }
+    let mut current = image.clone();
+    for _ in 0..=FIT_MAX_SHRINKS {
+        // 品質を 2 分探索（収まるいちばん高い品質）
+        let lowest = encode_at(&current, FIT_QUALITY_MIN.min(quality))?;
+        if lowest.len() as u64 <= limit {
+            let (mut low, mut high) = (FIT_QUALITY_MIN.min(quality), quality);
+            let mut best = (lowest, low);
+            while low < high {
+                let middle = (low + high).div_ceil(2);
+                let bytes = encode_at(&current, middle)?;
+                if bytes.len() as u64 <= limit {
+                    best = (bytes, middle);
+                    low = middle;
+                } else {
+                    high = middle - 1;
+                }
+            }
+            return Ok((best.0, best.1, current.dimensions()));
+        }
+        // 縮める（ファイルの大きさはおおむね画素の数に比例するので、収まりそうな倍率より少し小さく）
+        let (width, height) = current.dimensions();
+        if width.min(height) <= FIT_MIN_SIDE {
+            return Ok((lowest, FIT_QUALITY_MIN.min(quality), (width, height)));
+        }
+        let ratio = ((limit as f64 / lowest.len() as f64).sqrt() * 0.95).clamp(0.3, 0.95);
+        let size = |v: u32| ((f64::from(v) * ratio).round() as u32).max(1);
+        current = crate::transform::resize_to(&current, (size(width), size(height)));
+    }
+    let bytes = encode_at(&current, FIT_QUALITY_MIN.min(quality))?;
+    Ok((bytes, FIT_QUALITY_MIN.min(quality), current.dimensions()))
 }
 
 #[cfg(test)]
@@ -414,5 +500,41 @@ mod tests {
             save_edited(&RgbaImage::new(1, 1), Path::new("/tmp/x.heic"), SaveOptions::default(), None, false)
                 .unwrap_err();
         assert_eq!(err.to_string(), "対応していない拡張子です: .heic");
+    }
+
+    #[test]
+    fn jpeg_fits_within_the_size_limit() {
+        let dir = std::env::temp_dir().join(format!("imageeditorrt-fit-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // 細かい模様の写真（大きなファイルになる）
+        let image = RgbaImage::from_fn(800, 600, |x, y| {
+            image::Rgba([
+                ((x * 7 + y * 3) % 256) as u8,
+                ((x * x + y) % 256) as u8,
+                ((y * 11) % 256) as u8,
+                255,
+            ])
+        });
+        let path = dir.join("fit.jpg");
+        let full = save_edited(&image, &path, SaveOptions::default(), None, false).unwrap();
+        assert!(!full.fitted);
+        // 半分の大きさに収める: 品質を下げ、できるだけ高い品質
+        let limit_kb = (full.bytes / 2 / 1024) as u32;
+        let options = SaveOptions { max_kb: Some(limit_kb), ..SaveOptions::default() };
+        let saved = save_edited(&image, &path, options, None, false).unwrap();
+        assert!(saved.fitted && saved.bytes <= u64::from(limit_kb) * 1024, "{saved:?}");
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), saved.bytes);
+        let one_more = encode(&image, SaveFormat::Jpeg, saved.quality + 1, None).unwrap();
+        assert!(saved.size != image.dimensions() || one_more.len() as u64 > u64::from(limit_kb) * 1024);
+        // とても小さい上限: 縮めて収める
+        let tiny = SaveOptions { max_kb: Some(20), ..SaveOptions::default() };
+        let saved = save_edited(&image, &path, tiny, None, false).unwrap();
+        assert!(saved.size.0 < 800 && saved.bytes <= 20 * 1024, "{saved:?}");
+        // 収まっていれば何も変えない。PNG には効かない
+        let roomy = SaveOptions { max_kb: Some(100_000), ..SaveOptions::default() };
+        assert!(!save_edited(&image, &path, roomy, None, false).unwrap().fitted);
+        let png = save_edited(&image, &dir.join("fit.png"), tiny, None, false).unwrap();
+        assert!(!png.fitted);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

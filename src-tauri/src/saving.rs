@@ -11,7 +11,7 @@ use tauri::State;
 
 #[cfg(target_os = "macos")]
 use crate::clipboard;
-use crate::state::{file_name, AppState, Source};
+use crate::state::{AppState, Source};
 
 /// 保存ダイアログの初期のパス `<元の名前>_edited.<拡張子>`（重ならない名前）。
 ///
@@ -74,7 +74,7 @@ pub async fn save_image(
     settings: EditSettings,
     options: SaveOptions,
     state: State<'_, AppState>,
-) -> Result<String, SaveFailure> {
+) -> Result<save::Saved, SaveFailure> {
     let path = PathBuf::from(path);
     if !save::is_savable(&path) {
         let message = SaveError::UnsupportedExtension(
@@ -92,8 +92,7 @@ pub async fn save_image(
     if source.path.as_deref().is_some_and(|p| save::is_same_file(&path, p)) {
         return Err(SaveFailure { kind: "sameFile", message: SAME_FILE_MESSAGE.into() });
     }
-    let name = file_name(&path);
-    tauri::async_runtime::spawn_blocking(move || {
+    let saved = tauri::async_runtime::spawn_blocking(move || {
         save_pool().install(|| {
             // 背景を消すマスクはプレビューの大きさなので、原寸に広げてかける
             let original = crate::state::with_background(original, mask);
@@ -105,7 +104,7 @@ pub async fn save_image(
     })
     .await
     .map_err(SaveFailure::other)??;
-    Ok(name)
+    Ok(saved)
 }
 
 #[cfg(test)]

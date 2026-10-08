@@ -184,6 +184,16 @@ export async function saveDialog() {
   }
 }
 
+/** Rust の save::Saved（保存した品質・大きさ・ファイルの大きさ、上限に合わせたか）。 */
+type Saved = { quality: number; size: [number, number]; bytes: number; fitted: boolean };
+
+/** 大きさの上限に合わせて品質を下げた・縮めたときの知らせ。 */
+function fittedNote(saved: Saved): string {
+  if (!saved.fitted) return "";
+  const kb = Math.round(saved.bytes / 1024);
+  return `（大きさに合わせて品質 ${saved.quality}・${saved.size[0]}×${saved.size[1]} px・${kb} KB）`;
+}
+
 /** 保存する。元の画像と同じファイルなら "sameFile" を返す。 */
 async function saveTo(path: string): Promise<"done" | "sameFile" | "failed"> {
   const name = path.split("/").pop() ?? path;
@@ -191,9 +201,9 @@ async function saveTo(path: string): Promise<"done" | "sameFile" | "failed"> {
   void updateStatus(`保存中… ${name}`);
   try {
     const saved = structuredClone(state.settings);
-    await invoke<string>("save_image", { path, settings: saved, options: saveOptions.value() });
+    const result = await invoke<Saved>("save_image", { path, settings: saved, options: saveOptions.value() });
     state.savedSettings = saved;
-    void updateStatus(`保存しました: ${name}`);
+    void updateStatus(`保存しました: ${name}${fittedNote(result)}`);
     return "done";
   } catch (error) {
     void updateStatus();

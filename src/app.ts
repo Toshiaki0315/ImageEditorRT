@@ -2,6 +2,7 @@
 // ここでは機能のファイルを読み込まない（部品のコールバックだけ、呼ばれたときに機能を呼ぶ）。
 
 import type { BatchDialog } from "./batchDialog";
+import type { ColorPanel } from "./colorPanel";
 import type { CropController } from "./crop";
 import { ExifView } from "./exif";
 import { HistogramView } from "./histogram";
@@ -63,6 +64,7 @@ export type Snapshot = { settings: EditSettings; aspect: AspectState; size: Size
 /** 画面の部品のうち、起動時に Rust から選択肢を読んでから作るもの（setup で入れる）。 */
 export const parts = {} as {
   panel: Panel;
+  colorPanel: ColorPanel;
   crop: CropController;
   textDialog: TextDialog;
   /** 「加工」タブの「文字…」のボタン（設定パネルを作った後に取る） */

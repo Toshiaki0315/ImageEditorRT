@@ -8,6 +8,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { $, dom, histogramView, hooks, output, parts, preview, state, tabs, zoomView } from "./app";
 import { BatchDialog } from "./batchDialog";
 import { bench, benchSave, verdict } from "./bench";
+import { ColorPanel } from "./colorPanel";
 import { CropController, degreesText } from "./crop";
 import { redo, settingsChanged, setupHistory, undo, userChanged } from "./editing";
 import {
@@ -63,6 +64,7 @@ async function createParts() {
   const { settings } = state;
   const filters = await invoke<[FilterType, string][]>("filter_types");
   parts.panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, userChanged);
+  parts.colorPanel = new ColorPanel($("color-extra"), settings, userChanged);
   const ratios = await invoke<[AspectRatio, string][]>("aspect_ratios");
   const [frames, shapes] = await invoke<[[FrameKind, string][], [ShapeType, string][]]>("frame_shape_types");
   parts.crop = new CropController(

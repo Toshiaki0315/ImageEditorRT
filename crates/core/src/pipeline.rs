@@ -1,7 +1,7 @@
 //! 編集設定 (EditSettings) と、それを画像にかける処理の流れ（旧版の core/pipeline.py を移したもの）。
 //!
 //! 処理順（旧版 §5.1）: 回転・反転 →（水平の補正 → 投稿加工のぼかし・モザイク）→ トリミング → リサイズ → 露出 → 明るさ → コントラスト →
-//! 色温度 →（ハイライト／シャドウ）→ 彩度 → ディテール（ノイズ除去 → ぼかし → シャープ） → ジオラマ → フィルター →
+//! 色温度 →（トーンカーブ → ハイライト／シャドウ）→ 彩度 →（色ごとの調整） → ディテール（ノイズ除去 → ぼかし → シャープ） → ジオラマ → フィルター →
 //! 周辺減光 → 経年劣化 →（投稿加工のスタンプ）→ 文字。
 //! フレーム・形（#13）は、トリミングの後の比への切り抜きと、経年劣化の後にここへ足す。
 
@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::adjust::{self, Lut};
 pub use crate::background::Background;
+use crate::curve;
+pub use crate::curve::{HslAdjust, HSL_BANDS};
 pub use crate::diorama::DioramaDirection;
 use crate::diorama::{self, DioramaSettings};
 use crate::effects;
@@ -91,6 +93,10 @@ pub struct EditSettings {
     pub background: Background,
     /// 背景のぼかしの強さ 1〜100（背景を「ぼかす」とき）
     pub background_blur: u32,
+    /// トーンカーブの点（x は 0〜255 で増えていく順、両端は x = 0・255。旧版にはない）
+    pub tone_curve: Vec<[u8; 2]>,
+    /// 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタ。旧版にはない）
+    pub hsl: [HslAdjust; HSL_BANDS],
 }
 
 impl Default for EditSettings {
@@ -128,6 +134,8 @@ impl Default for EditSettings {
             regions: Vec::new(),
             background: Background::Keep,
             background_blur: crate::background::BLUR_DEFAULT,
+            tone_curve: curve::identity_curve(),
+            hsl: [HslAdjust::default(); HSL_BANDS],
         }
     }
 }
@@ -508,8 +516,8 @@ fn scale(value: i64, factor: f64) -> i64 {
     }
 }
 
-/// フィルターの前にかける基本補正（露出 → 明るさ → コントラスト → 色温度 → ハイライト／シャドウ → 彩度）。
-/// 露出〜色温度は 1 つの変換表にまとめて 1 回でかける。
+/// フィルターの前にかける基本補正（露出 → 明るさ → コントラスト → 色温度 → トーンカーブ → ハイライト／シャドウ →
+/// 彩度 → 色ごとの調整）。露出〜トーンカーブは 1 つの変換表にまとめて 1 回でかける。
 fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> RgbaImage {
     let mut lut: Lut = adjust::identity_lut();
     if settings.exposure != 0.0 {
@@ -524,6 +532,9 @@ fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> Rgb
     if settings.temperature != adjust::TEMPERATURE_NEUTRAL {
         lut = adjust::compose(&lut, &adjust::temperature_lut(settings.temperature));
     }
+    if settings.tone_curve != curve::identity_curve() {
+        lut = adjust::compose(&lut, &curve::curve_lut(&settings.tone_curve));
+    }
     if lut != adjust::identity_lut() {
         adjust::apply_lut(&mut image, &lut);
     }
@@ -531,6 +542,7 @@ fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> Rgb
     if settings.saturation != 0 {
         adjust::saturation(&mut image, settings.saturation);
     }
+    curve::apply_hsl(&mut image, &settings.hsl);
     image
 }
 
@@ -897,5 +909,22 @@ mod tests {
         let photo = photo_for_analysis(&image, &settings, 0.5);
         assert_eq!(photo.dimensions(), (30, 20));
         assert_eq!(photo.get_pixel(0, 0), image.get_pixel(10, 5));
+    }
+
+    #[test]
+    fn tone_curve_and_hsl_are_applied() {
+        let image = RgbaImage::from_fn(64, 8, |x, y| Rgba([(x * 4) as u8, (y * 30) as u8, 200, 255]));
+        let curved =
+            EditSettings { tone_curve: vec![[0, 0], [128, 190], [255, 255]], ..EditSettings::default() };
+        let out = apply_edits(&image, &curved).unwrap();
+        let row = curve::curve_row(&curved.tone_curve);
+        assert_eq!(out.get_pixel(32, 0)[0], row[128]);
+        let mut hsl = [HslAdjust::default(); HSL_BANDS];
+        hsl[5].saturation = -100;
+        let gray = apply_edits(&image, &EditSettings { hsl, ..EditSettings::default() }).unwrap();
+        assert_ne!(gray, image);
+        // 既定値なら何も変えない（JSON の既定値も同じ）
+        let s: EditSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!((s.tone_curve, s.hsl), (curve::identity_curve(), [HslAdjust::default(); HSL_BANDS]));
     }
 }

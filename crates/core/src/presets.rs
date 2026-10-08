@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::curve::{self, HslAdjust, HSL_BANDS};
 use crate::diorama::DioramaDirection;
 use crate::filters::FilterType;
 use crate::frames::FrameType;
@@ -71,6 +72,19 @@ pub struct Preset {
     pub shape: ShapeType,
     pub corner_radius: u32,
     pub text: TextSettings,
+    /// トーンカーブ・色ごとの調整（旧版にはない）。ファイルには既定以外のときだけ書く
+    #[serde(skip_serializing_if = "is_identity_curve")]
+    pub tone_curve: Vec<[u8; 2]>,
+    #[serde(skip_serializing_if = "is_neutral_hsl")]
+    pub hsl: [HslAdjust; HSL_BANDS],
+}
+
+fn is_identity_curve(points: &Vec<[u8; 2]>) -> bool {
+    *points == curve::identity_curve()
+}
+
+fn is_neutral_hsl(bands: &[HslAdjust; HSL_BANDS]) -> bool {
+    bands.iter().all(HslAdjust::is_neutral)
 }
 
 impl Preset {
@@ -101,6 +115,8 @@ impl Preset {
             shape: s.shape,
             corner_radius: s.corner_radius,
             text: s.text.clone(),
+            tone_curve: s.tone_curve.clone(),
+            hsl: s.hsl,
         }
     }
 
@@ -130,6 +146,8 @@ impl Preset {
             shape: self.shape,
             corner_radius: self.corner_radius,
             text: self.text.clone(),
+            tone_curve: self.tone_curve.clone(),
+            hsl: self.hsl,
             ..settings.clone()
         }
     }
@@ -331,6 +349,36 @@ fn text_from_value(item: &Value) -> Option<TextSettings> {
     Some(TextSettings { text, font, size, color, opacity, position })
 }
 
+/// トーンカーブの点（[x, y] の並び。正しくなければ壊れた項目）。
+fn curve_from_value(raw: &Value) -> Option<Vec<[u8; 2]>> {
+    let points: Vec<[u8; 2]> = raw
+        .as_array()?
+        .iter()
+        .map(|p| {
+            let pair = p.as_array().filter(|a| a.len() == 2)?;
+            Some([u8::try_from(pair[0].as_u64()?).ok()?, u8::try_from(pair[1].as_u64()?).ok()?])
+        })
+        .collect::<Option<_>>()?;
+    curve::is_valid_curve(&points).then_some(points)
+}
+
+/// 色ごとの調整（8 色分の {hue, saturation, lightness}。範囲の外は収める）。
+fn hsl_from_value(raw: &Value) -> Option<[HslAdjust; HSL_BANDS]> {
+    let items = raw.as_array().filter(|a| a.len() == HSL_BANDS)?;
+    let mut bands = [HslAdjust::default(); HSL_BANDS];
+    for (band, item) in bands.iter_mut().zip(items) {
+        let field = |name: &str, max: i64| -> Option<i32> {
+            Some(item.get(name).map_or(Some(0), Value::as_i64)?.clamp(-max, max) as i32)
+        };
+        *band = HslAdjust {
+            hue: field("hue", i64::from(curve::HSL_HUE_MAX))?,
+            saturation: field("saturation", 100)?,
+            lightness: field("lightness", 100)?,
+        };
+    }
+    Some(bands)
+}
+
 fn preset_from_value(item: &Value) -> Option<Preset> {
     let item = item.as_object()?;
     let name = normalize_name(item.get("name")?.as_str()?);
@@ -348,6 +396,8 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
             "shape" => p.shape = enum_value(raw)?,
             "diorama_direction" => p.diorama_direction = enum_value(raw)?,
             "text" => p.text = text_from_value(raw)?,
+            "tone_curve" => p.tone_curve = curve_from_value(raw)?,
+            "hsl" => p.hsl = hsl_from_value(raw)?,
             "exposure" => p.exposure = python_float(raw)?,
             "brightness" => p.brightness = int_value(number()?)?,
             "contrast" => p.contrast = int_value(number()?)?,
@@ -479,5 +529,28 @@ mod tests {
         assert_eq!((wide.highlights, wide.shadows), (100, -100));
         let applied = set.apply(&EditSettings::default());
         assert_eq!((applied.highlights, applied.shadows), (-30, 45));
+    }
+
+    #[test]
+    fn tone_curve_and_hsl_are_written_only_when_set() {
+        let plain = Preset::from_settings("A", &EditSettings::default());
+        let text = presets_json(std::slice::from_ref(&plain));
+        assert!(!text.contains("tone_curve") && !text.contains("hsl"), "{text}");
+        let mut hsl = [HslAdjust::default(); HSL_BANDS];
+        hsl[2] = HslAdjust { hue: 10, saturation: -20, lightness: 30 };
+        let set = Preset { tone_curve: vec![[0, 10], [128, 150], [255, 240]], hsl, ..plain.clone() };
+        let text = presets_json(std::slice::from_ref(&set));
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
+        // 正しくない曲線は壊れた項目、範囲の外の色の調整は収める
+        assert_eq!(
+            preset_from_value(&serde_json::json!({"name": "B", "tone_curve": [[0, 0], [0, 5], [255, 255]]})),
+            None
+        );
+        let wide = serde_json::json!({"name": "C", "hsl": [{"hue": 99}, {}, {}, {}, {}, {}, {}, {"lightness": -500}]});
+        let wide = preset_from_value(&wide).unwrap();
+        assert_eq!((wide.hsl[0].hue, wide.hsl[7].lightness), (30, -100));
+        let applied = set.apply(&EditSettings::default());
+        assert_eq!((applied.tone_curve, applied.hsl), (set.tone_curve, set.hsl));
     }
 }

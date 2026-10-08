@@ -6,25 +6,45 @@
 export type SaveOptions = { quality: number; keepExif: boolean; keepGps: boolean; maxKb: number | null };
 
 /** 画面で持つ設定（上限を外しても、入れた MB は覚えておく）。 */
-type Stored = Omit<SaveOptions, "maxKb"> & { limit: boolean; limitMb: number };
+export type Stored = Omit<SaveOptions, "maxKb"> & { limit: boolean; limitMb: number };
 
 const DEFAULT_OPTIONS: Stored = { quality: 90, keepExif: true, keepGps: false, limit: false, limitMb: 1 };
 const LIMIT_MIN_MB = 0.05;
 const LIMIT_MAX_MB = 100;
 const STORAGE_KEY = "saveOptions";
 
+/** 画面の欄（「出力」タブの保存の設定と、「投稿加工」タブの位置情報を消す）。 */
+export type SaveOptionsFields = {
+  quality: HTMLInputElement;
+  qualityValue: HTMLOutputElement;
+  keepExif: HTMLInputElement;
+  keepGps: HTMLInputElement;
+  removeGps: HTMLInputElement;
+  limit: HTMLInputElement;
+  limitMb: HTMLInputElement;
+};
+
 export class SaveOptionsPanel {
   private options: Stored;
+  private readonly quality: HTMLInputElement;
+  private readonly qualityValue: HTMLOutputElement;
+  private readonly keepExif: HTMLInputElement;
+  private readonly keepGps: HTMLInputElement;
+  private readonly removeGps: HTMLInputElement;
+  private readonly limit: HTMLInputElement;
+  private readonly limitMb: HTMLInputElement;
 
-  constructor(
-    private readonly quality: HTMLInputElement,
-    private readonly qualityValue: HTMLOutputElement,
-    private readonly keepExif: HTMLInputElement,
-    private readonly keepGps: HTMLInputElement,
-    private readonly removeGps: HTMLInputElement,
-    private readonly limit: HTMLInputElement,
-    private readonly limitMb: HTMLInputElement,
-  ) {
+  constructor(fields: SaveOptionsFields) {
+    ({
+      quality: this.quality,
+      qualityValue: this.qualityValue,
+      keepExif: this.keepExif,
+      keepGps: this.keepGps,
+      removeGps: this.removeGps,
+      limit: this.limit,
+      limitMb: this.limitMb,
+    } = fields);
+    const { quality, keepExif, keepGps, removeGps, limit, limitMb } = fields;
     this.options = load();
     quality.addEventListener("input", () => this.update({ quality: Number(quality.value) }));
     quality.addEventListener("dblclick", () => this.update({ quality: DEFAULT_OPTIONS.quality }));
@@ -42,8 +62,7 @@ export class SaveOptionsPanel {
 
   /** 今の保存の設定。 */
   value(): SaveOptions {
-    const { limit, limitMb, ...rest } = this.options;
-    return { ...rest, maxKb: limit ? Math.max(1, Math.round(limitMb * 1024)) : null };
+    return toSaveOptions(this.options);
   }
 
   private update(change: Partial<Stored>) {
@@ -71,24 +90,33 @@ export class SaveOptionsPanel {
   }
 }
 
+/** 画面で持つ設定を、Rust に渡す保存の設定にする（上限は KB、外していれば null）。 */
+export function toSaveOptions(stored: Stored): SaveOptions {
+  const { limit, limitMb, ...rest } = stored;
+  return { ...rest, maxKb: limit ? Math.max(1, Math.round(limitMb * 1024)) : null };
+}
+
+/** 覚えておいた設定（JSON を読んだもの）を、正しい値だけ使い、ほかは既定値にする。 */
+export function parseStored(saved: unknown): Stored {
+  if (!saved || typeof saved !== "object") return { ...DEFAULT_OPTIONS };
+  const s = saved as Record<string, unknown>;
+  const quality = Number(s.quality);
+  const limitMb = Number(s.limitMb);
+  const bool = (value: unknown, fallback: boolean) => (typeof value === "boolean" ? value : fallback);
+  return {
+    quality: Number.isInteger(quality) && quality >= 1 && quality <= 100 ? quality : DEFAULT_OPTIONS.quality,
+    keepExif: bool(s.keepExif, DEFAULT_OPTIONS.keepExif),
+    keepGps: bool(s.keepGps, DEFAULT_OPTIONS.keepGps),
+    limit: bool(s.limit, DEFAULT_OPTIONS.limit),
+    limitMb: limitMb >= LIMIT_MIN_MB && limitMb <= LIMIT_MAX_MB ? limitMb : DEFAULT_OPTIONS.limitMb,
+  };
+}
+
 function load(): Stored {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
-    if (saved && typeof saved === "object") {
-      const quality = Number(saved.quality);
-      return {
-        quality: Number.isInteger(quality) && quality >= 1 && quality <= 100 ? quality : DEFAULT_OPTIONS.quality,
-        keepExif: typeof saved.keepExif === "boolean" ? saved.keepExif : DEFAULT_OPTIONS.keepExif,
-        keepGps: typeof saved.keepGps === "boolean" ? saved.keepGps : DEFAULT_OPTIONS.keepGps,
-        limit: typeof saved.limit === "boolean" ? saved.limit : DEFAULT_OPTIONS.limit,
-        limitMb:
-          Number(saved.limitMb) >= LIMIT_MIN_MB && Number(saved.limitMb) <= LIMIT_MAX_MB
-            ? Number(saved.limitMb)
-            : DEFAULT_OPTIONS.limitMb,
-      };
-    }
+    return parseStored(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"));
   } catch {
     // 壊れていれば既定値
+    return { ...DEFAULT_OPTIONS };
   }
-  return { ...DEFAULT_OPTIONS };
 }

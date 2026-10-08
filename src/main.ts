@@ -10,7 +10,8 @@ import { BatchDialog } from "./batchDialog";
 import { CollageDialog } from "./collageDialog";
 import { bench, benchSave, verdict } from "./bench";
 import { ColorPanel } from "./colorPanel";
-import { CropController, degreesText } from "./crop";
+import { setupAssist } from "./assist";
+import { CropController } from "./crop";
 import { redo, settingsChanged, setupHistory, undo, userChanged } from "./editing";
 import {
   makeCollage,
@@ -25,13 +26,14 @@ import {
   startBatch,
 } from "./files";
 import { MENU, setMenuChecked } from "./menus";
-import { evText, kelvinText, Panel, signedText } from "./panel";
+import { Panel } from "./panel";
+import { PhotoControls } from "./photoControls";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
-import { catchUnexpectedErrors, notify, reportUnexpected, showError } from "./status";
+import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
 import { TasteGallery } from "./tasteGallery";
 import { TextDialog } from "./textDialog";
-import type { AspectRatio, CropRect, FilterType, FrameKind, OpenInfo, ShapeType, TextFont, TextPosition } from "./types";
+import type { AspectRatio, FilterType, FrameKind, OpenInfo, ShapeType, TextFont, TextPosition } from "./types";
 import { fitToWindow, onPreviewDoubleClick, placeBadge, setupCompare, showActualSize, updateGuide } from "./view";
 
 catchUnexpectedErrors();
@@ -84,34 +86,9 @@ async function createParts() {
     },
     () => output.rotate(),
   );
-  parts.crop.findTilt = () =>
-    invoke<number | null>("auto_straighten", { settings: state.settings }).catch((error) => {
-      void showError("傾きを求められません", error);
-      return undefined;
-    });
-  parts.crop.onAutoStraighten = (degrees) =>
-    notify(degrees === null ? "傾きが分かりませんでした（水平線や長い直線が見つかりません）" : `傾きを ${degreesText(degrees)} 直しました`);
-  parts.crop.prepareBackground = () => {
-    notify("被写体を探しています…");
-    return invoke<boolean>("prepare_background").catch((error) => {
-      void showError("背景を消せません", error);
-      return null;
-    });
-  };
-  parts.crop.onNoSubject = () => notify("被写体が見つからないので、背景はそのままにしました");
+  parts.photoControls = new PhotoControls(settings, () => state.loaded !== null, userChanged);
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
-  const targets = { faces: { command: "detect_faces", name: "顔" }, text: { command: "detect_text", name: "文字" } };
-  parts.privacy.find = (target) =>
-    invoke<CropRect[]>(targets[target].command, { settings: state.settings }).catch((error) => {
-      void showError(`${targets[target].name}を認識できません`, error);
-      return null;
-    });
-  const coverNames = { blur: "ぼかし", mosaic: "モザイク", stamp: "スタンプ" } as const;
-  parts.privacy.onFound = (target, count, kind) => {
-    const name = targets[target].name;
-    notify(count > 0 ? `${name}を ${count} か所見つけて、${coverNames[kind]}で隠しました` : `${name}が見つかりませんでした`);
-  };
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
   parts.textDialog.logoExtensions = state.extensions;
@@ -122,6 +99,7 @@ async function createParts() {
   parts.batchDialog = new BatchDialog(state.extensions);
   parts.collageDialog = new CollageDialog(state.extensions);
   setupHistory();
+  setupAssist();
 }
 
 /** 回転・反転した後の原寸の大きさ（画像がなければ null）。 */
@@ -136,23 +114,6 @@ function updatePrivacyActive() {
   parts.privacy.setActive(tabs.selected() === "privacy" && !preview.trimmed);
 }
 
-/** 自動補正: 今の写真から露出・コントラスト・色温度を求めてスライダーに入れる（1 回の操作として元に戻せる）。 */
-async function autoAdjust() {
-  if (!state.loaded) return;
-  parts.autoButton.disabled = true;
-  try {
-    const values = await invoke<{ exposure: number; contrast: number; temperature: number }>("auto_adjust", {
-      settings: state.settings,
-    });
-    parts.panel.setAuto(values);
-    notify(`自動補正: 露出 ${evText(values.exposure)}・コントラスト ${signedText(values.contrast)}・色温度 ${kelvinText(values.temperature)}`);
-  } catch (error) {
-    await showError("自動補正できません", error);
-  } finally {
-    parts.autoButton.disabled = state.loaded === null;
-  }
-}
-
 /** ボタン・プレビューの操作をつなぐ。 */
 function connectControls() {
   dom.resetButton.addEventListener("click", () => void resetImage());
@@ -164,7 +125,6 @@ function connectControls() {
   parts.textButton.addEventListener("click", () => {
     if (state.loaded) parts.textDialog.open();
   });
-  parts.autoButton.addEventListener("click", () => void autoAdjust());
   parts.tasteButton.addEventListener("click", () => {
     if (!state.loaded) return;
     parts.tasteGallery.open(parts.tasteButton).catch((error) => {

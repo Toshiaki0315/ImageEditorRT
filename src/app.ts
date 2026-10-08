@@ -2,6 +2,7 @@
 // ここでは機能のファイルを読み込まない（部品のコールバックだけ、呼ばれたときに機能を呼ぶ）。
 
 import type { BatchDialog } from "./batchDialog";
+import type { CollageDialog } from "./collageDialog";
 import type { ColorPanel } from "./colorPanel";
 import type { CropController } from "./crop";
 import { ExifView } from "./exif";
@@ -77,6 +78,7 @@ export const parts = {} as {
   recorder: HistoryRecorder<Snapshot>;
   privacy: PrivacyPanel;
   batchDialog: BatchDialog;
+  collageDialog: CollageDialog;
 };
 
 /** 部品の知らせを受ける先（機能のファイルが setup で入れる。ここから機能のファイルを読み込まないため）。 */

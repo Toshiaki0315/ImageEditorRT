@@ -9,6 +9,7 @@ pub mod auto;
 pub mod background;
 pub mod batch;
 pub mod blur;
+pub mod collage;
 pub mod crop;
 pub mod curve;
 #[cfg(target_os = "macos")]

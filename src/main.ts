@@ -7,11 +7,13 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { $, dom, histogramView, hooks, output, parts, preview, state, tabs, zoomView } from "./app";
 import { BatchDialog } from "./batchDialog";
+import { CollageDialog } from "./collageDialog";
 import { bench, benchSave, verdict } from "./bench";
 import { ColorPanel } from "./colorPanel";
 import { CropController, degreesText } from "./crop";
 import { redo, settingsChanged, setupHistory, undo, userChanged } from "./editing";
 import {
+  makeCollage,
   openDialog,
   openPaths,
   paste,
@@ -45,6 +47,7 @@ const menuActions: Record<string, () => void> = {
   [MENU.open]: () => void openDialog(),
   [MENU.save]: () => void saveDialog(),
   [MENU.batch]: () => void startBatch(),
+  [MENU.collage]: () => void makeCollage(),
   [MENU.paste]: () => void paste(),
   [MENU.undo]: undo,
   [MENU.redo]: redo,
@@ -116,6 +119,7 @@ async function createParts() {
   parts.tasteButton = $<HTMLButtonElement>("taste-button");
   parts.autoButton = $<HTMLButtonElement>("auto-adjust");
   parts.batchDialog = new BatchDialog(state.extensions);
+  parts.collageDialog = new CollageDialog(state.extensions);
   setupHistory();
 }
 

@@ -131,6 +131,23 @@ export async function paste() {
   if (action.kind === "nothing") notify(NOTHING_TO_PASTE_MESSAGE);
 }
 
+/** 「並べて 1 枚に」: 写真を選んで並べた画像を作り、元のファイルのない画像として開く（未保存の変更があれば確かめる）。 */
+export async function makeCollage() {
+  if (state.saving || state.opening) return;
+  const request = await parts.collageDialog.run();
+  if (!request) return;
+  state.opening = true;
+  try {
+    if (!(await confirmDiscard())) return;
+    notify("写真を並べています…");
+    showLoaded(await invoke<OpenInfo>("make_collage", request), []);
+  } catch (error) {
+    await showError("写真を並べられません", error);
+  } finally {
+    state.opening = false;
+  }
+}
+
 /** クリップボードの画像を、元のファイルのない画像として開く（未保存の変更があれば確かめる）。 */
 async function openClipboardImage() {
   state.opening = true;

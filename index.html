@@ -203,6 +203,41 @@
         </div>
       </form>
     </dialog>
+    <!-- 並べて 1 枚に（ファイル > 並べて 1 枚に…） -->
+    <dialog id="collage-dialog" class="batch-dialog">
+      <form method="dialog">
+        <h2>並べて 1 枚に</h2>
+        <label for="collage-files">並べる写真（上から順に、左上から並べます）</label>
+        <select id="collage-files" class="batch-files" multiple size="4"></select>
+        <div class="buttons">
+          <button type="button" id="collage-add">写真を追加…</button>
+          <button type="button" id="collage-up">上へ</button>
+          <button type="button" id="collage-down">下へ</button>
+          <span class="spacer"></span>
+          <button type="button" id="collage-remove">取り除く</button>
+        </div>
+        <div class="batch-form">
+          <span>並べ方</span>
+          <select id="collage-layout"></select>
+          <span>縦横比</span>
+          <select id="collage-aspect"></select>
+          <span>長辺</span>
+          <span class="batch-resize"><input type="number" id="collage-long-side" min="200" max="8000" step="1" /> px</span>
+          <span>すき間</span>
+          <span class="batch-resize"><input type="range" id="collage-gap" min="0" max="5" step="0.5" /><output id="collage-gap-value"></output></span>
+          <span>背景</span>
+          <select id="collage-background">
+            <option value="white">白</option>
+            <option value="black">黒</option>
+          </select>
+        </div>
+        <p class="note" id="collage-note"></p>
+        <div class="buttons dialog-buttons">
+          <button type="submit" value="make" id="collage-make">作る</button>
+          <button type="submit" value="cancel" formnovalidate>キャンセル</button>
+        </div>
+      </form>
+    </dialog>
     <!-- まとめて処理の進み具合 -->
     <dialog id="batch-progress" class="batch-dialog">
       <h2>まとめて処理</h2>

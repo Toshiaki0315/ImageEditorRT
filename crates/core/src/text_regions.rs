@@ -6,14 +6,11 @@
 //! 見つけなかったため）。ほぼ同じ範囲は 1 つにまとめる。
 
 use image::RgbaImage;
-use objc2::rc::Retained;
-use objc2::AllocAnyThread;
-use objc2_core_graphics::CGImage;
-use objc2_foundation::{NSArray, NSDictionary, NSString};
-use objc2_vision::{VNImageRequestHandler, VNRecognizeTextRequest, VNRequest, VNRequestTextRecognitionLevel};
+use objc2_foundation::{NSArray, NSString};
+use objc2_vision::{VNRecognizeTextRequest, VNRequestTextRecognitionLevel};
 
-use crate::faces::{cg_image, scan_tiles, to_image_rect};
 use crate::transform::{clamp_crop, CropRect};
+use crate::vision::{perform, scan_tiles, to_image_rect};
 
 /// 文字の範囲を広げる幅（文字の高さに対する割合。上下左右に）。文字の端まで確実に隠すため。
 const PADDING: f64 = 0.3;
@@ -70,43 +67,22 @@ fn merge(mut rects: Vec<CropRect>) -> Vec<CropRect> {
     rects
 }
 
-/// 1 枚の画像（全体または分けた部分）の文字の範囲を認識する。GPU を使えなければ CPU だけでやり直す。
+/// 1 枚の画像（全体または分けた部分）の文字の範囲を認識する。
 fn detect_image(image: &RgbaImage) -> Result<Vec<CropRect>, String> {
-    let cg = cg_image(image).ok_or("画像を文字の認識に渡せません")?;
+    let done = perform(image, "文字", || {
+        let request = VNRecognizeTextRequest::new();
+        // 精度重視（速い認識は日本語に対応しておらず、日本語を指定すると Vision ごと止まる）
+        request.setRecognitionLevel(VNRequestTextRecognitionLevel::Accurate);
+        request.setRecognitionLanguages(&NSArray::from_retained_slice(&[
+            NSString::from_str("ja-JP"),
+            NSString::from_str("en-US"),
+        ]));
+        // 辞書で読み替えない（ナンバープレートなどの意味のない並びも読む）
+        request.setUsesLanguageCorrection(false);
+        request
+    })?;
+    let Some(texts) = done.request.results() else { return Ok(Vec::new()) };
     let size = image.dimensions();
-    detect(&cg, size, false).or_else(|_| detect(&cg, size, true))
-}
-
-/// 文字の範囲を認識する。cpu_only なら CPU だけで認識する。
-fn detect(cg: &CGImage, size: (u32, u32), cpu_only: bool) -> Result<Vec<CropRect>, String> {
-    // SAFETY: CGImage は認識が終わるまで生きている。オプションは空
-    let handler = unsafe {
-        VNImageRequestHandler::initWithCGImage_options(
-            VNImageRequestHandler::alloc(),
-            cg,
-            &NSDictionary::new(),
-        )
-    };
-    let request = VNRecognizeTextRequest::new();
-    // 精度重視（速い認識は日本語に対応しておらず、日本語を指定すると Vision ごと止まる）
-    request.setRecognitionLevel(VNRequestTextRecognitionLevel::Accurate);
-    request.setRecognitionLanguages(&NSArray::from_retained_slice(&[
-        NSString::from_str("ja-JP"),
-        NSString::from_str("en-US"),
-    ]));
-    // 辞書で読み替えない（ナンバープレートなどの意味のない並びも読む）
-    request.setUsesLanguageCorrection(false);
-    if cpu_only {
-        // SAFETY: 認識の前に設定を変えるだけ
-        #[allow(deprecated)]
-        unsafe {
-            request.setUsesCPUOnly(true)
-        };
-    }
-    let requests: Retained<NSArray<VNRequest>> =
-        NSArray::from_retained_slice(&[Retained::into_super(Retained::into_super(request.clone()))]);
-    handler.performRequests_error(&requests).map_err(|e| format!("文字を認識できません（{e}）"))?;
-    let Some(texts) = request.results() else { return Ok(Vec::new()) };
     let mut found = Vec::new();
     for i in 0..texts.count() {
         let text = texts.objectAtIndex(i);

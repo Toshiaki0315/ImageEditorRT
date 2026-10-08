@@ -2,54 +2,25 @@
 //! macOS 14 以降）で、人・動物・ものなど目立つ被写体をすべて残すマスクを作る（端末の中だけで処理する）。
 
 use image::{GrayImage, Luma, RgbaImage};
-use objc2::rc::Retained;
 use objc2::runtime::AnyClass;
-use objc2::AllocAnyThread;
-use objc2_core_graphics::CGImage;
 use objc2_core_video::{
     CVPixelBuffer, CVPixelBufferGetBaseAddress, CVPixelBufferGetBytesPerRow, CVPixelBufferGetHeight,
     CVPixelBufferGetWidth, CVPixelBufferLockBaseAddress, CVPixelBufferLockFlags,
     CVPixelBufferUnlockBaseAddress,
 };
-use objc2_foundation::{NSArray, NSDictionary};
-use objc2_vision::{VNGenerateForegroundInstanceMaskRequest, VNImageRequestHandler, VNRequest};
+use objc2_vision::VNGenerateForegroundInstanceMaskRequest;
 
-use crate::faces::cg_image;
+use crate::vision::perform;
 
 /// 画像の被写体のマスク（画像と同じ大きさ。被写体 255・背景 0）。被写体が見つからなければ None。
 pub fn foreground_mask(image: &RgbaImage) -> Result<Option<GrayImage>, String> {
     if AnyClass::get(c"VNGenerateForegroundInstanceMaskRequest").is_none() {
         return Err("背景を消すには macOS 14 以降が必要です".into());
     }
-    let cg = cg_image(image).ok_or("画像を被写体の認識に渡せません")?;
-    // GPU を使えない環境では CPU だけでやり直す（顔の認識と同じ）
-    detect(&cg, false).or_else(|_| detect(&cg, true))
-}
-
-/// 被写体のマスクを作る。cpu_only なら CPU だけで認識する。
-fn detect(cg: &CGImage, cpu_only: bool) -> Result<Option<GrayImage>, String> {
-    // SAFETY: CGImage は認識が終わるまで生きている。オプションは空
-    let handler = unsafe {
-        VNImageRequestHandler::initWithCGImage_options(
-            VNImageRequestHandler::alloc(),
-            cg,
-            &NSDictionary::new(),
-        )
-    };
     // SAFETY: 引数のない初期化（クラスがあることは確かめてある）
-    let request = unsafe { VNGenerateForegroundInstanceMaskRequest::new() };
-    if cpu_only {
-        // SAFETY: 認識の前に設定を変えるだけ
-        #[allow(deprecated)]
-        unsafe {
-            request.setUsesCPUOnly(true)
-        };
-    }
-    let requests: Retained<NSArray<VNRequest>> =
-        NSArray::from_retained_slice(&[Retained::into_super(Retained::into_super(request.clone()))]);
-    handler.performRequests_error(&requests).map_err(|e| format!("被写体を認識できません（{e}）"))?;
+    let done = perform(image, "被写体", || unsafe { VNGenerateForegroundInstanceMaskRequest::new() })?;
     // SAFETY: 認識が終わった後に結果を読む
-    let Some(results) = (unsafe { request.results() }) else { return Ok(None) };
+    let Some(results) = (unsafe { done.request.results() }) else { return Ok(None) };
     let Some(observation) = results.firstObject() else { return Ok(None) };
     // SAFETY: 見つけた被写体すべて（背景を除く）を、元の画像の大きさのマスクにする
     let buffer = unsafe {
@@ -57,7 +28,7 @@ fn detect(cg: &CGImage, cpu_only: bool) -> Result<Option<GrayImage>, String> {
         if instances.count() == 0 {
             return Ok(None);
         }
-        observation.generateScaledMaskForImageForInstances_fromRequestHandler_error(&instances, &handler)
+        observation.generateScaledMaskForImageForInstances_fromRequestHandler_error(&instances, &done.handler)
     }
     .map_err(|e| format!("被写体のマスクを作れません（{e}）"))?;
     read_mask(&buffer).map(Some)

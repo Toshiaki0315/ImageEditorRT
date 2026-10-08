@@ -52,3 +52,5 @@ pub mod text;
 pub mod text_regions;
 pub mod tiff;
 pub mod transform;
+#[cfg(target_os = "macos")]
+mod vision;

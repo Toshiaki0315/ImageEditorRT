@@ -86,7 +86,7 @@ pub async fn save_image(
         let loaded = state.0.lock().map_err(SaveFailure::other)?;
         let original =
             loaded.original.clone().ok_or_else(|| SaveFailure::other("画像が読み込まれていません"))?;
-        (original, loaded.source.clone(), loaded.background(settings.background))
+        (original, loaded.source.clone(), loaded.background(&settings))
     };
     // 元の画像には上書きしない（大文字・小文字の違いも同じファイルとみなす）
     if source.path.as_deref().is_some_and(|p| save::is_same_file(&path, p)) {

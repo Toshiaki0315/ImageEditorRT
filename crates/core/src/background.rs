@@ -1,4 +1,4 @@
-//! 背景を消す（旧版にはない）: 被写体のマスクで、背景を透明か白にする。
+//! 背景を消す・ぼかす（旧版にはない）: 被写体のマスクで、背景を透明・白にするか、ぼかす。
 //!
 //! マスク（被写体 255・背景 0。途中の値は境目のなめらかさ）は macOS の Vision で作る（`foreground`）。
 //! ここでは、どの大きさの画像にもマスクを合わせて（拡大・縮小して）かける。処理は元の画像に対して、ほかの
@@ -21,11 +21,18 @@ pub enum Background {
     Transparent,
     /// 白にする
     White,
+    /// ぼかす（ポートレート風。強さは `background_blur`）
+    Blur,
 }
 
-/// 画像に mask（画像と違う大きさなら合わせる）をかけて、背景を透明か白にした新しい画像を返す。
-/// Keep なら複製を返す。
-pub fn apply_background(image: &RgbaImage, mask: &GrayImage, mode: Background) -> RgbaImage {
+/// 背景のぼかしの既定の強さ（1〜100）。
+pub const BLUR_DEFAULT: u32 = 50;
+/// 強さ 100 のときのぼかしの半径（写真の短辺に対する割合）。
+const BLUR_MAX_RATIO: f64 = 0.04;
+
+/// 画像に mask（画像と違う大きさなら合わせる）をかけて、背景を透明・白・ぼかした新しい画像を返す。
+/// blur はぼかすときの強さ（1〜100）。Keep なら複製を返す。
+pub fn apply_background(image: &RgbaImage, mask: &GrayImage, mode: Background, blur: u32) -> RgbaImage {
     let mut out = image.clone();
     if mode == Background::Keep {
         return out;
@@ -36,6 +43,9 @@ pub fn apply_background(image: &RgbaImage, mask: &GrayImage, mode: Background) -
     } else {
         crate::resize::resize_gray_bilinear(mask.as_raw(), mask.dimensions(), (width, height))
     };
+    if mode == Background::Blur {
+        return blur_background(image, &fitted, blur);
+    }
     out.as_mut().par_chunks_exact_mut(4).zip(fitted.par_iter()).with_min_len(PIXELS_PER_TASK).for_each(
         |(p, &m)| {
             // 被写体である度合い（元の透明度も掛ける）
@@ -50,10 +60,49 @@ pub fn apply_background(image: &RgbaImage, mask: &GrayImage, mode: Background) -
                     }
                     p[3] = 255;
                 }
-                Background::Keep => {}
+                Background::Keep | Background::Blur => {}
             }
         },
     );
+    out
+}
+
+/// 背景だけをぼかす。被写体の色が背景ににじまないよう、背景の部分（1 − マスク）を重みにしてぼかし
+/// （重みで割り戻す）、元の画像とマスクで混ぜる。半径は写真の短辺に比例させる（プレビューと保存で同じ見え方）。
+fn blur_background(image: &RgbaImage, mask: &[u8], blur: u32) -> RgbaImage {
+    let (width, height) = image.dimensions();
+    let radius = f64::from(width.min(height)) * BLUR_MAX_RATIO * f64::from(blur.clamp(1, 100)) / 100.0;
+    // 色に背景の重みを掛け、重みを透明度の場所に入れてぼかす
+    let mut weighted = image.clone();
+    weighted.as_mut().par_chunks_exact_mut(4).zip(mask.par_iter()).with_min_len(PIXELS_PER_TASK).for_each(
+        |(p, &m)| {
+            let weight = 255 - u32::from(m);
+            for c in &mut p[..3] {
+                *c = ((u32::from(*c) * weight + 127) / 255) as u8;
+            }
+            p[3] = weight as u8;
+        },
+    );
+    let blurred = crate::blur::gaussian_blur(&weighted, radius as f32);
+    let mut out = image.clone();
+    out.as_mut()
+        .par_chunks_exact_mut(4)
+        .zip(blurred.as_raw().par_chunks_exact(4))
+        .zip(mask.par_iter())
+        .with_min_len(PIXELS_PER_TASK)
+        .for_each(|((p, b), &m)| {
+            let weight = u32::from(b[3]);
+            if weight == 0 {
+                return; // まわりに背景がない（被写体の中）
+            }
+            let keep = u32::from(m);
+            for c in 0..3 {
+                // ぼかした背景の色（重みで割り戻す）を、被写体の度合いで元の色と混ぜる
+                let background = (u32::from(b[c]) * 255 + weight / 2) / weight;
+                let mixed = u32::from(p[c]) * keep + background.min(255) * (255 - keep);
+                p[c] = ((mixed + 127) / 255) as u8;
+            }
+        });
     out
 }
 
@@ -71,20 +120,20 @@ mod tests {
     fn transparent_and_white_backgrounds() {
         let image = RgbaImage::from_pixel(8, 4, Rgba([10, 100, 200, 255]));
         let mask = half_mask(8, 4);
-        let clear = apply_background(&image, &mask, Background::Transparent);
+        let clear = apply_background(&image, &mask, Background::Transparent, BLUR_DEFAULT);
         assert_eq!(clear.get_pixel(1, 1).0, [10, 100, 200, 255]);
         assert_eq!(clear.get_pixel(6, 1)[3], 0);
-        let white = apply_background(&image, &mask, Background::White);
+        let white = apply_background(&image, &mask, Background::White, BLUR_DEFAULT);
         assert_eq!(white.get_pixel(1, 1).0, [10, 100, 200, 255]);
         assert_eq!(white.get_pixel(6, 1).0, [255, 255, 255, 255]);
-        assert_eq!(apply_background(&image, &mask, Background::Keep), image);
+        assert_eq!(apply_background(&image, &mask, Background::Keep, BLUR_DEFAULT), image);
     }
 
     #[test]
     fn mask_is_fitted_to_the_image_size() {
         // 4 × 2 のマスクを 40 × 20 の画像に合わせる。左の端は被写体、右の端は背景
         let image = RgbaImage::from_pixel(40, 20, Rgba([50, 50, 50, 255]));
-        let clear = apply_background(&image, &half_mask(4, 2), Background::Transparent);
+        let clear = apply_background(&image, &half_mask(4, 2), Background::Transparent, BLUR_DEFAULT);
         assert_eq!(clear.dimensions(), (40, 20));
         assert_eq!(clear.get_pixel(2, 10)[3], 255);
         assert_eq!(clear.get_pixel(37, 10)[3], 0);
@@ -97,9 +146,66 @@ mod tests {
         let image = RgbaImage::from_pixel(1, 1, Rgba([0, 0, 0, 128]));
         let mask = GrayImage::from_pixel(1, 1, Luma([128]));
         // 元の透明度（半分）× マスク（半分）= 4 分の 1
-        assert_eq!(apply_background(&image, &mask, Background::Transparent).get_pixel(0, 0)[3], 64);
+        assert_eq!(
+            apply_background(&image, &mask, Background::Transparent, BLUR_DEFAULT).get_pixel(0, 0)[3],
+            64
+        );
         // 白: 黒を 4 分の 1 だけ残して白に混ぜる
-        let white = apply_background(&image, &mask, Background::White);
+        let white = apply_background(&image, &mask, Background::White, BLUR_DEFAULT);
         assert_eq!(white.get_pixel(0, 0).0, [191, 191, 191, 255]);
+    }
+
+    #[test]
+    fn blur_keeps_the_subject_and_softens_the_background() {
+        // 左半分が被写体（赤）、右半分が背景（白黒の細かい縞）
+        let image = RgbaImage::from_fn(200, 100, |x, _| {
+            if x < 100 {
+                Rgba([220, 30, 30, 255])
+            } else if x % 4 < 2 {
+                Rgba([255, 255, 255, 255])
+            } else {
+                Rgba([0, 0, 0, 255])
+            }
+        });
+        let mask = half_mask(200, 100);
+        let out = apply_background(&image, &mask, Background::Blur, 50);
+        // 被写体はそのまま（縁から離れたところ）
+        assert_eq!(out.get_pixel(20, 50), image.get_pixel(20, 50));
+        // 背景の縞はならされて灰色に近づく
+        let p = out.get_pixel(160, 50);
+        assert!((100..=160).contains(&p[0]), "{p:?}");
+        // 被写体の赤が背景ににじまない（境目のすぐ右も赤くならない）
+        let edge = out.get_pixel(103, 50);
+        assert!(i32::from(edge[0]) - i32::from(edge[1]) < 30, "{edge:?}");
+        // 強いほどよくならされる
+        let spread = |blur: u32| {
+            let out = apply_background(&image, &mask, Background::Blur, blur);
+            (150..190).map(|x| (i32::from(out.get_pixel(x, 50)[0]) - 128).abs()).sum::<i32>()
+        };
+        assert!(spread(90) <= spread(5));
+    }
+
+    #[test]
+    fn blur_looks_the_same_at_any_size() {
+        // 同じ写真の原寸と半分で、背景のならされ方（縞の残り方）がほぼ同じ
+        let make = |scale: u32| {
+            RgbaImage::from_fn(200 * scale, 100 * scale, |x, _| {
+                if x < 100 * scale {
+                    Rgba([220, 30, 30, 255])
+                } else if (x / scale / 8).is_multiple_of(2) {
+                    Rgba([255, 255, 255, 255])
+                } else {
+                    Rgba([0, 0, 0, 255])
+                }
+            })
+        };
+        let contrast = |scale: u32| {
+            let image = make(scale);
+            let out = apply_background(&image, &half_mask(200 * scale, 100 * scale), Background::Blur, 40);
+            let row: Vec<i32> =
+                (150 * scale..190 * scale).map(|x| i32::from(out.get_pixel(x, 50 * scale)[0])).collect();
+            row.iter().max().unwrap() - row.iter().min().unwrap()
+        };
+        assert!((contrast(1) - contrast(2)).abs() <= 25, "{} {}", contrast(1), contrast(2));
     }
 }

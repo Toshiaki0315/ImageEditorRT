@@ -57,9 +57,15 @@
               <option value="keep">そのまま</option>
               <option value="transparent">消して透明にする</option>
               <option value="white">消して白にする</option>
+              <option value="blur">ぼかす</option>
             </select>
           </label>
-          <p class="note">人・動物・ものなど目立つ被写体だけを残します（macOS 14 以降。処理はこの Mac の中だけ）。透明にした部分は、PNG・TIFF などで保存すると透明のまま、JPEG では白になります。</p>
+          <label class="row">
+            背景のぼかし
+            <input id="background-blur" type="range" min="1" max="100" step="1" title="ダブルクリックで 50 に戻す" />
+            <output id="background-blur-value"></output>
+          </label>
+          <p class="note">人・動物・ものなど目立つ被写体だけを残し、背景を消すか、ぼかします（macOS 14 以降。処理はこの Mac の中だけ）。透明にした部分は、PNG・TIFF などで保存すると透明のまま、JPEG では白になります。</p>
           <h2>回転・反転</h2>
           <div class="buttons">
             <button type="button" data-orient="rotate_left">左に回転</button>

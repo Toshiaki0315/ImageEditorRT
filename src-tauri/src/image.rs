@@ -60,7 +60,7 @@ pub async fn render_preview(
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let preview = loaded.preview.clone().ok_or("画像が読み込まれていません")?;
         let settings = shown_settings(&loaded, settings, comparing);
-        let mask = loaded.background(settings.background);
+        let mask = loaded.background(&settings);
         (preview, loaded.factor, settings, mask)
     };
     let ((image, histogram), render_time) = blocking(move || {
@@ -92,7 +92,7 @@ pub async fn filter_thumbnails(
 ) -> Result<Response, String> {
     let (preview, factor, mask) = {
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        let mask = loaded.background(settings.background);
+        let mask = loaded.background(&settings);
         (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor, mask)
     };
     let thumbnails = blocking(move || {
@@ -253,7 +253,7 @@ pub async fn render_actual_size(
         let loaded = state.0.lock().map_err(|e| e.to_string())?;
         let original = loaded.original.clone().ok_or("画像が読み込まれていません")?;
         let settings = shown_settings(&loaded, settings, comparing);
-        let mask = loaded.background(settings.background);
+        let mask = loaded.background(&settings);
         (original, settings, mask)
     };
     let image = blocking(move || {

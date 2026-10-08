@@ -9,7 +9,7 @@ use imageeditorrt_core::background::{self, Background};
 use imageeditorrt_core::decode;
 use imageeditorrt_core::exif_info::ExifInfo;
 use imageeditorrt_core::formats::{self, Format};
-use imageeditorrt_core::pipeline::{self, PREVIEW_MAX_SIDE};
+use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
 use serde::Serialize;
 use tauri::WebviewWindow;
 
@@ -30,22 +30,23 @@ pub(crate) struct Loaded {
 }
 
 impl Loaded {
-    /// settings の背景の扱いでかけるマスク（そのまま・マスクがなければ None）。
-    pub(crate) fn background(&self, settings_background: Background) -> Option<(Arc<GrayImage>, Background)> {
-        if settings_background == Background::Keep {
+    /// settings の背景の扱いでかける処理（そのまま・マスクがなければ None）。
+    pub(crate) fn background(&self, settings: &EditSettings) -> Option<BackgroundJob> {
+        if settings.background == Background::Keep {
             return None;
         }
-        self.mask.clone().flatten().map(|mask| (mask, settings_background))
+        self.mask.clone().flatten().map(|mask| (mask, settings.background, settings.background_blur))
     }
 }
 
-/// image（原本またはプレビュー用の画像）に、背景を消すマスクをかける（なければそのまま）。重いので別のスレッドで呼ぶ。
-pub(crate) fn with_background(
-    image: Arc<RgbaImage>,
-    mask: Option<(Arc<GrayImage>, Background)>,
-) -> Arc<RgbaImage> {
-    match mask {
-        Some((mask, mode)) => Arc::new(background::apply_background(&image, &mask, mode)),
+/// 背景にかける処理（マスク・扱い・ぼかしの強さ）。
+pub(crate) type BackgroundJob = (Arc<GrayImage>, Background, u32);
+
+/// image（原本またはプレビュー用の画像）に、背景を消す・ぼかす処理をかける（なければそのまま）。
+/// 重いので別のスレッドで呼ぶ。
+pub(crate) fn with_background(image: Arc<RgbaImage>, job: Option<BackgroundJob>) -> Arc<RgbaImage> {
+    match job {
+        Some((mask, mode, blur)) => Arc::new(background::apply_background(&image, &mask, mode, blur)),
         None => image,
     }
 }

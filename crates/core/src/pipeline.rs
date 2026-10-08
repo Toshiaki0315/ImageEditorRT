@@ -89,6 +89,8 @@ pub struct EditSettings {
     /// 背景を消す（旧版にはない）。被写体のマスクが要るので、ここの処理ではかけず、アプリ本体が元の画像に
     /// 前もってかける（`background::apply_background`）
     pub background: Background,
+    /// 背景のぼかしの強さ 1〜100（背景を「ぼかす」とき）
+    pub background_blur: u32,
 }
 
 impl Default for EditSettings {
@@ -125,6 +127,7 @@ impl Default for EditSettings {
             corner_radius: shapes::CORNER_RADIUS_DEFAULT,
             regions: Vec::new(),
             background: Background::Keep,
+            background_blur: crate::background::BLUR_DEFAULT,
         }
     }
 }

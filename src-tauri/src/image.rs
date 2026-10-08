@@ -13,9 +13,7 @@ use tauri::{State, WebviewWindow};
 
 #[cfg(target_os = "macos")]
 use crate::clipboard;
-use crate::state::{
-    blocking, elapsed_ms, file_name, prepare, store, with_prepare, AppState, Loaded, OpenInfo, Source,
-};
+use crate::state::{blocking, elapsed_ms, file_name, prepare, store, AppState, Loaded, OpenInfo, Source};
 use crate::APP_NAME;
 
 /// 画像のファイルを読み込む。読めなければ、ダイアログに出す説明を返す（旧版 FR-IO-10）。
@@ -55,18 +53,13 @@ pub async fn render_preview(
     comparing: bool,
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
-    // 鍵は画像を取り出すあいだだけ持ち、処理は別のスレッドで行う（その間もほかの問い合わせに答えられる）
-    let (preview, factor, settings, mask) = {
-        let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        let preview = loaded.preview.clone().ok_or("画像が読み込まれていません")?;
-        let settings = shown_settings(&loaded, settings, comparing);
-        let mask = loaded.prepare_job(&settings);
-        (preview, loaded.factor, settings, mask)
-    };
+    let opened = state.opened()?;
+    let settings = opened.shown(settings, comparing);
     let ((image, histogram), render_time) = blocking(move || {
         let start = Instant::now();
-        let preview = with_prepare(preview, mask);
-        Ok((pipeline::render_preview_with_histogram(&preview, &settings, factor, trimmed), start.elapsed()))
+        let preview = opened.prepared(&opened.preview, &settings);
+        let rendered = pipeline::render_preview_with_histogram(&preview, &settings, opened.factor, trimmed);
+        Ok((rendered, start.elapsed()))
     })
     .await?;
     let (width, height) = image.dimensions();
@@ -90,14 +83,10 @@ pub async fn filter_thumbnails(
     settings: EditSettings,
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
-    let (preview, factor, mask) = {
-        let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        let mask = loaded.prepare_job(&settings);
-        (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor, mask)
-    };
+    let opened = state.opened()?;
     let thumbnails = blocking(move || {
-        let preview = with_prepare(preview, mask);
-        Ok(pipeline::filter_thumbnails(&preview, &settings, factor, pipeline::THUMBNAIL_MAX_SIDE))
+        let preview = opened.prepared(&opened.preview, &settings);
+        Ok(pipeline::filter_thumbnails(&preview, &settings, opened.factor, pipeline::THUMBNAIL_MAX_SIDE))
     })
     .await?;
     let total: usize = thumbnails.iter().map(|t| 8 + t.as_raw().len()).sum();
@@ -140,16 +129,11 @@ async fn find_regions(
     detect: fn(&image::RgbaImage) -> Result<Vec<CropRect>, String>,
     finish: fn(CropRect, (u32, u32)) -> Option<CropRect>,
 ) -> Result<Vec<CropRect>, String> {
-    let (preview, factor, original) = {
-        let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        let original =
-            loaded.original.as_ref().map(|o| o.dimensions()).ok_or("画像が読み込まれていません")?;
-        (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor, original)
-    };
+    let opened = state.opened()?;
     blocking(move || {
-        let image = pipeline::straightened(&preview, &settings);
-        let size = settings.orientation.size(original);
-        let to_original = |v: i64| (v as f64 / factor).round() as i64;
+        let image = pipeline::straightened(&opened.preview, &settings);
+        let size = settings.orientation.size(opened.original.dimensions());
+        let to_original = |v: i64| (v as f64 / opened.factor).round() as i64;
         Ok(detect(&image)?
             .into_iter()
             .filter_map(|r| {
@@ -173,12 +157,11 @@ pub async fn auto_straighten(
     settings: EditSettings,
     state: State<'_, AppState>,
 ) -> Result<Option<f64>, String> {
-    let preview = {
-        let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        loaded.preview.clone().ok_or("画像が読み込まれていません")?
-    };
-    blocking(move || imageeditorrt_core::horizon::straighten_angle(&settings.orientation.transpose(&preview)))
-        .await
+    let opened = state.opened()?;
+    blocking(move || {
+        imageeditorrt_core::horizon::straighten_angle(&settings.orientation.transpose(&opened.preview))
+    })
+    .await
 }
 
 /// 自動補正: 今の写真（切り抜く範囲。色の調整をかける前）から、露出・コントラスト・色温度のちょうどよい値を求める。
@@ -187,12 +170,10 @@ pub async fn auto_adjust(
     settings: EditSettings,
     state: State<'_, AppState>,
 ) -> Result<imageeditorrt_core::auto::AutoAdjust, String> {
-    let (preview, factor) = {
-        let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        (loaded.preview.clone().ok_or("画像が読み込まれていません")?, loaded.factor)
-    };
+    let opened = state.opened()?;
     blocking(move || {
-        Ok(imageeditorrt_core::auto::auto_adjust(&pipeline::photo_for_analysis(&preview, &settings, factor)))
+        let photo = pipeline::photo_for_analysis(&opened.preview, &settings, opened.factor);
+        Ok(imageeditorrt_core::auto::auto_adjust(&photo))
     })
     .await
 }
@@ -201,44 +182,28 @@ pub async fn auto_adjust(
 /// 被写体があれば true。
 #[tauri::command]
 pub async fn prepare_background(state: State<'_, AppState>) -> Result<bool, String> {
-    let preview = {
-        let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        if let Some(mask) = &loaded.mask {
-            return Ok(mask.is_some());
-        }
-        loaded.preview.clone().ok_or("画像が読み込まれていません")?
-    };
-    let source = preview.clone();
-    let mask = blocking(move || imageeditorrt_core::foreground::foreground_mask(&source)).await?;
-    let found = mask.is_some();
-    let mut loaded = state.0.lock().map_err(|e| e.to_string())?;
-    // 作っている間に別の画像を開いていれば、覚えない
-    if loaded.preview.as_ref().is_some_and(|p| std::sync::Arc::ptr_eq(p, &preview)) {
-        loaded.mask = Some(mask.map(std::sync::Arc::new));
-    }
-    Ok(found)
+    state
+        .remember(
+            |loaded| loaded.mask.as_ref().map(Option::is_some),
+            imageeditorrt_core::foreground::foreground_mask,
+            Option::is_some,
+            |loaded, mask| loaded.mask = Some(mask.map(std::sync::Arc::new)),
+        )
+        .await
 }
 
 /// 肌をなめらかにする準備: 顔をまだ探していなければ、プレビュー用の画像から探して覚える（画像ごとに 1 回）。
 /// 見つけた顔の数を返す。
 #[tauri::command]
 pub async fn prepare_faces(state: State<'_, AppState>) -> Result<usize, String> {
-    let preview = {
-        let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        if let Some(faces) = &loaded.faces {
-            return Ok(faces.len());
-        }
-        loaded.preview.clone().ok_or("画像が読み込まれていません")?
-    };
-    let source = preview.clone();
-    let faces = blocking(move || imageeditorrt_core::faces::detect_faces(&source)).await?;
-    let count = faces.len();
-    let mut loaded = state.0.lock().map_err(|e| e.to_string())?;
-    // 探している間に別の画像を開いていれば、覚えない
-    if loaded.preview.as_ref().is_some_and(|p| std::sync::Arc::ptr_eq(p, &preview)) {
-        loaded.faces = Some(std::sync::Arc::new(faces));
-    }
-    Ok(count)
+    state
+        .remember(
+            |loaded| loaded.faces.as_ref().map(|faces| faces.len()),
+            imageeditorrt_core::faces::detect_faces,
+            Vec::len,
+            |loaded, faces| loaded.faces = Some(std::sync::Arc::new(faces)),
+        )
+        .await
 }
 
 /// リセット（旧版 FR-UI-42）: 読み込んだ画像を捨てて、未読込の状態に戻す。
@@ -247,19 +212,6 @@ pub fn close_image(window: WebviewWindow, state: State<'_, AppState>) -> Result<
     let _ = window.set_title(APP_NAME);
     *state.0.lock().map_err(|e| e.to_string())? = Loaded::default();
     Ok(())
-}
-
-/// 表示に使う設定。comparing（加工前の表示）なら、向きと切り抜く範囲だけを残す。
-pub(crate) fn shown_settings(loaded: &Loaded, settings: EditSettings, comparing: bool) -> EditSettings {
-    shown_for(loaded.original.as_ref().map(|o| o.dimensions()), settings, comparing)
-}
-
-/// original_size（原寸。画像がなければ None）の画像に、表示で使う設定。
-fn shown_for(original_size: Option<(u32, u32)>, settings: EditSettings, comparing: bool) -> EditSettings {
-    match (original_size, comparing) {
-        (Some(size), true) => pipeline::before_settings(size, &settings),
-        _ => settings,
-    }
 }
 
 /// 100% 表示: 原寸で処理した保存結果（comparing なら加工前）を返す（処理は別のスレッド）。
@@ -271,15 +223,11 @@ pub async fn render_actual_size(
     comparing: bool,
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
-    let (original, settings, mask) = {
-        let loaded = state.0.lock().map_err(|e| e.to_string())?;
-        let original = loaded.original.clone().ok_or("画像が読み込まれていません")?;
-        let settings = shown_settings(&loaded, settings, comparing);
-        let mask = loaded.prepare_job(&settings);
-        (original, settings, mask)
-    };
+    let opened = state.opened()?;
+    let settings = opened.shown(settings, comparing);
     let image = blocking(move || {
-        pipeline::apply_edits(&with_prepare(original, mask), &settings).map_err(|e| e.to_string())
+        let original = opened.prepared(&opened.original, &settings);
+        pipeline::apply_edits(&original, &settings).map_err(|e| e.to_string())
     })
     .await?;
     let (width, height) = image.dimensions();
@@ -379,34 +327,4 @@ pub fn diorama_guide(
     let preview = loaded.preview.as_ref().ok_or("画像が読み込まれていません")?;
     let settings = if trimmed { EditSettings { crop: None, ..settings } } else { settings };
     Ok(pipeline::diorama_guide(preview.dimensions(), &settings, loaded.factor))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use imageeditorrt_core::filters::FilterType;
-    use imageeditorrt_core::frames::FrameType;
-    use imageeditorrt_core::transform::{CropRect, Orientation};
-
-    #[test]
-    fn before_settings_only_while_comparing() {
-        let settings = EditSettings {
-            filter: FilterType::Sepia,
-            frame: FrameType::Polaroid,
-            orientation: Orientation::new(90, false),
-            crop: Some(CropRect::new(10, 10, 200, 100)),
-            ..EditSettings::default()
-        };
-        // 比べていなければそのまま
-        assert_eq!(shown_for(Some((400, 300)), settings.clone(), false), settings);
-        // 比べている間は加工前（向きと、フレームの比に合わせた範囲だけ）
-        let before = shown_for(Some((400, 300)), settings.clone(), true);
-        assert_eq!(before, pipeline::before_settings((400, 300), &settings));
-        assert_eq!(
-            (before.filter, before.frame, before.orientation),
-            (FilterType::None, FrameType::None, settings.orientation)
-        );
-        // 画像がなければそのまま
-        assert_eq!(shown_for(None, settings.clone(), true), settings);
-    }
 }

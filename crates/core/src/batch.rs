@@ -178,15 +178,15 @@ pub fn process_image(source: &Path, out_dir: &Path, options: &BatchOptions) -> R
     let mut settings = batch_settings(options, decoded.image.dimensions()).map_err(|e| e.to_string())?;
     settings.regions = privacy_regions(&decoded.image, &options.privacy)?;
     let mut image = decoded.image;
-    // 肌をなめらかに: 顔を見つけて、ほかの加工より前にかける（画面と同じ）
+    // 肌をなめらかに: 縮めた画像で顔を見つけ、ほかの加工より前にかける（画面と同じ前処理）
     if settings.skin_smooth > 0 {
-        let (small, factor) = crate::pipeline::make_preview(&image, crate::pipeline::PREVIEW_MAX_SIDE);
-        let scale = |v: i64| (v as f64 / factor).round() as i64;
-        let faces: Vec<CropRect> = crate::faces::detect_faces(&small)?
-            .into_iter()
-            .map(|r| CropRect::new(scale(r.x), scale(r.y), scale(r.width), scale(r.height)))
-            .collect();
-        crate::skin::smooth_skin(&mut image, &faces, settings.skin_smooth);
+        let (small, _) = crate::pipeline::make_preview(&image, crate::pipeline::PREVIEW_MAX_SIDE);
+        let faces = crate::faces::detect_faces(&small)?;
+        let sources =
+            crate::prepare::Sources { faces: Some(&faces), mask: None, preview_width: small.width() };
+        if let Some(prepared) = crate::prepare::prepare(&image, &settings, &sources) {
+            image = prepared;
+        }
     }
     let edited = crate::pipeline::apply_edits(&image, &settings).map_err(|e| e.to_string())?;
     let path = output_path(source, out_dir);

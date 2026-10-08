@@ -94,6 +94,10 @@ check "色ごとの調整（色相のスライダー）" "3" "$(ax slider "$PID"
 ax click "$PID" "色ごとの調整をリセット" >/dev/null; sleep 0.3
 check "色ごとの調整をリセット" "0" "$(ax slider "$PID" "色相" 0)"
 
+check "肌をなめらかに（スライダー）" "3" "$(ax slider "$PID" "肌をなめらかに" 3)"
+wait_for 15 sh -c "osascript '$LIB' texts $PID | grep -q '顔が見つからない'" || true
+check "肌をなめらかに（顔のない画像の知らせ）" "顔が見つからない" "$(ax texts "$PID" | grep '顔が見つからない' || true)"
+
 ax click "$PID" "自動補正" >/dev/null
 wait_for 15 sh -c "osascript '$LIB' texts $PID | grep -q '自動補正:'" || true
 check "自動補正（ステータスバー）" "自動補正: 露出" "$(ax texts "$PID" | grep '自動補正:' || true)"

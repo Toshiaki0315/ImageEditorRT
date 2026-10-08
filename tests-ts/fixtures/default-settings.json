@@ -102,5 +102,6 @@
     "position": "bottom_right",
     "size": 15.0,
     "opacity": 80
-  }
+  },
+  "skinSmooth": 0
 }

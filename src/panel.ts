@@ -43,6 +43,8 @@ const DETAIL: Slider[] = [
   { key: "sharpen", label: "シャープ", min: 0, max: 100, initial: 0 },
   { key: "blur", label: "ぼかし", min: 0, max: 100, initial: 0 },
   { key: "denoise", label: "ノイズ除去", min: 0, max: 100, initial: 0 },
+  // 見つけた顔のまわりだけ（旧版にはない。顔は画像ごとに 1 回探す）
+  { key: "skinSmooth", label: "肌をなめらかに", min: 0, max: 100, initial: 0 },
 ];
 
 /** 割合を「50%」のように表示する。 */

@@ -101,6 +101,8 @@ pub struct EditSettings {
     pub hsl: [HslAdjust; HSL_BANDS],
     /// ロゴの透かし（文字と同じく写真の上・フレームの余白に描く。旧版にはない）
     pub logo: LogoSettings,
+    /// 肌をなめらかに 0〜100（顔の枠が要るので、背景と同じくアプリ本体が元の画像に前もってかける。旧版にはない）
+    pub skin_smooth: u32,
 }
 
 impl Default for EditSettings {
@@ -141,6 +143,7 @@ impl Default for EditSettings {
             tone_curve: curve::identity_curve(),
             hsl: [HslAdjust::default(); HSL_BANDS],
             logo: LogoSettings::default(),
+            skin_smooth: 0,
         }
     }
 }

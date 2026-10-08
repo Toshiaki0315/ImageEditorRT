@@ -49,6 +49,8 @@ export const state = {
   opening: false,
   /** 保存中・まとめて処理中（保存・開く・リセット・終了などを止める） */
   saving: false,
+  /** 開いている画像の顔を探したか（肌をなめらかに。画像を開くたびに false に戻す） */
+  facesPrepared: false,
   /** 「加工をコピー」でコピーした写真の設定（加工の項目だけを使う。アプリを終了するまで覚えておく） */
   copiedLook: null as EditSettings | null,
   /** 最後に保存したときの設定（未保存の変更の判定に使う） */

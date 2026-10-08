@@ -64,6 +64,7 @@ pub fn run() {
             image::auto_straighten,
             image::auto_adjust,
             image::prepare_background,
+            image::prepare_faces,
             image::collage_choices,
             image::make_collage,
             image::render_actual_size,

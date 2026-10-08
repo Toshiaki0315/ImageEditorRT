@@ -107,6 +107,10 @@
           </label>
           <label class="check"><input id="keep-exif" type="checkbox" /> 撮影情報 (EXIF) を残す</label>
           <label class="check"><input id="keep-gps" type="checkbox" /> 位置情報 (GPS) も残す</label>
+          <label class="check limit-size"
+            ><input id="limit-size" type="checkbox" /> ファイルの大きさを
+            <input id="limit-mb" type="number" min="0.05" max="100" step="0.1" /> MB 以下にする（JPEG）</label
+          >
         </div>
         <div id="page-diorama" class="page" role="tabpanel" hidden></div>
         <div id="page-privacy" class="page" role="tabpanel" hidden>

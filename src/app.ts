@@ -101,6 +101,8 @@ export const saveOptions = new SaveOptionsPanel(
   $<HTMLInputElement>("keep-exif"),
   $<HTMLInputElement>("keep-gps"),
   $<HTMLInputElement>("remove-gps"),
+  $<HTMLInputElement>("limit-size"),
+  $<HTMLInputElement>("limit-mb"),
 );
 
 function extensionOf(path: string): string {

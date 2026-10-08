@@ -18,6 +18,21 @@ export function sizeSnapshot(state: SizeState): SizeState {
   return state.edited ? { ...state } : { ...state, width: 1, height: 1 };
 }
 
+/** よく使う大きさ（長辺の px）。「出力」タブとまとめて処理で選べる。 */
+export const SIZE_PRESETS: [string, number][] = [
+  ["Instagram（1080px）", 1080],
+  ["メール（1280px）", 1280],
+  ["X（1600px）", 1600],
+  ["フル HD（1920px）", 1920],
+  ["4K（3840px）", 3840],
+];
+
+/** 長辺を px にした欄の状態（比は保つ。横長なら幅、縦長なら高さを決める）。 */
+export function longSideState(state: SizeState, px: number): SizeState {
+  const side: Side = state.width >= state.height ? "width" : "height";
+  return { ...state, [side]: px, edited: true, last: side, keepAspect: true };
+}
+
 const initialState = (): SizeState => ({ width: 1, height: 1, edited: false, last: "width", keepAspect: true });
 
 export class OutputSize {
@@ -26,6 +41,7 @@ export class OutputSize {
   private readonly width = $<HTMLInputElement>("out-width");
   private readonly height = $<HTMLInputElement>("out-height");
   private readonly keepAspect = $<HTMLInputElement>("keep-aspect");
+  private readonly presets = $<HTMLSelectElement>("size-preset");
 
   /** @param onChange 欄を変えたとき（出力の大きさの表示などを更新する） */
   private readonly settings: EditSettings;
@@ -37,6 +53,12 @@ export class OutputSize {
     // 旧版の数値の欄と同じく、入力のたびに反映する
     this.width.addEventListener("input", () => this.edited("width", this.width));
     this.height.addEventListener("input", () => this.edited("height", this.height));
+    for (const [label, px] of SIZE_PRESETS) this.presets.add(new Option(label, String(px)));
+    this.presets.addEventListener("change", () => {
+      const px = Number(this.presets.value);
+      this.presets.value = "";
+      if (px > 0) this.setLongSide(px);
+    });
     this.keepAspect.addEventListener("change", () => {
       this.state.keepAspect = this.keepAspect.checked;
       this.onChange();
@@ -49,7 +71,7 @@ export class OutputSize {
     this.loaded = loaded;
     this.state = initialState();
     this.keepAspect.checked = true;
-    this.width.disabled = this.height.disabled = this.keepAspect.disabled = !loaded;
+    this.width.disabled = this.height.disabled = this.keepAspect.disabled = this.presets.disabled = !loaded;
     if (!loaded) this.width.value = this.height.value = "";
   }
 
@@ -84,6 +106,14 @@ export class OutputSize {
   /** 90° 回転したとき: 手で変えた幅・高さを入れ替える。 */
   async rotate() {
     this.state = await invoke<SizeState>("rotate_size", { state: this.state });
+  }
+
+  /** 長辺を px にする（よく使う大きさ）。比は保つ。 */
+  setLongSide(px: number) {
+    if (!this.loaded) return;
+    this.state = longSideState(this.state, px);
+    this.keepAspect.checked = true;
+    this.onChange();
   }
 
   private edited(side: Side, input: HTMLInputElement) {

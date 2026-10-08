@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { histogramPeak } from "../src/histogram.ts";
 import { isCompareKey } from "../src/keys.ts";
-import { sizeSnapshot } from "../src/output.ts";
+import { longSideState, SIZE_PRESETS, sizeSnapshot } from "../src/output.ts";
 import { readImages, readPreview, readRawImage } from "../src/protocol.ts";
 import { centeredOffset, clampOffset } from "../src/zoom.ts";
 
@@ -83,4 +83,12 @@ test("出力の欄の履歴の状態: 手で変えていなければ幅・高さ
   assert.deepEqual(sizeSnapshot({ ...untouched, width: 4000, height: 3000 }), sizeSnapshot(untouched));
   const edited = { ...untouched, edited: true, width: 800, height: 533 };
   assert.deepEqual(sizeSnapshot(edited), edited);
+});
+
+test("よく使う大きさ: 横長なら幅、縦長なら高さを長辺にし、比を保つ", () => {
+  const landscape = { width: 4000, height: 3000, edited: false, last: "height" as const, keepAspect: false };
+  assert.deepEqual(longSideState(landscape, 1080), { width: 1080, height: 3000, edited: true, last: "width", keepAspect: true });
+  const portrait = { ...landscape, width: 2000, height: 3000 };
+  assert.deepEqual(longSideState(portrait, 1600), { width: 2000, height: 1600, edited: true, last: "height", keepAspect: true });
+  assert.ok(SIZE_PRESETS.every(([, px]) => Number.isInteger(px) && px > 0));
 });

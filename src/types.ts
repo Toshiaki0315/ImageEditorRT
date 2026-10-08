@@ -209,7 +209,12 @@ export type TextSettings = {
   color: [number, number, number];
   opacity: number;
   position: TextPosition;
+  /** 飾り（なしのときは Rust が書かないので、ないこともある） */
+  effect?: TextEffect;
 };
+
+/** 文字の飾り（Rust の text::TextEffect）。 */
+export type TextEffect = "none" | "outline" | "shadow";
 
 /** 文字・透かしの既定値。 */
 export function defaultText(): TextSettings {

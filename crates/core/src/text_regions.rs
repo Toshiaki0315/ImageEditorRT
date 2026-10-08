@@ -139,6 +139,7 @@ mod tests {
             color: [20, 20, 20],
             opacity: 100,
             position: TextPosition::BottomRight,
+            ..TextSettings::default()
         };
         draw_text(&mut image, &text, Some((440, 440, 760, 540)), Some(600.0));
         let found = detect_text(&image).unwrap();
@@ -181,6 +182,7 @@ mod tests {
             color: [20, 20, 20],
             opacity: 100,
             position: TextPosition::Center,
+            ..TextSettings::default()
         };
         let area = (i64::from(plate.0), i64::from(plate.1), i64::from(plate.2), i64::from(plate.3));
         draw_text(&mut image, &text, Some(area), Some(60.0));

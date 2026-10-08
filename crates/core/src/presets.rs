@@ -16,7 +16,7 @@ use crate::frames::FrameType;
 use crate::logo::LogoSettings;
 use crate::pipeline::{EditSettings, FILTER_STRENGTH_FULL, FILTER_STRENGTH_MAX};
 use crate::shapes::ShapeType;
-use crate::text::{TextFont, TextPosition, TextSettings};
+use crate::text::{TextEffect, TextFont, TextPosition, TextSettings};
 
 /// ファイルの形式の版。
 pub const PRESETS_VERSION: u32 = 1;
@@ -398,7 +398,9 @@ fn text_from_value(item: &Value) -> Option<TextSettings> {
         Some(v) => enum_value(v)?,
         None => default.position,
     };
-    Some(TextSettings { text, font, size, color, opacity, position })
+    // 飾りは旧版にない。知らない値なら飾りなし
+    let effect: TextEffect = item.get("effect").and_then(enum_value).unwrap_or_default();
+    Some(TextSettings { text, font, size, color, opacity, position, effect })
 }
 
 /// トーンカーブの点（[x, y] の並び。正しくなければ壊れた項目）。

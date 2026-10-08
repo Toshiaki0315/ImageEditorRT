@@ -320,5 +320,57 @@
         </div>
       </form>
     </dialog>
+    <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
+      <form method="dialog">
+        <h2 id="help-title">ImageEditorRT の使い方</h2>
+        <div class="help-body">
+          <h3>画像を開く・保存する</h3>
+          <ul>
+            <li>ウィンドウにドロップ・⌘O・⌘V（クリップボードの画像・Finder でコピーしたファイル）・「ファイル &gt; 最近使った項目」で開く。RAW も開ける</li>
+            <li>⌘S で保存（元の画像には上書きしない）。保存していない変更があるまま閉じると確かめる</li>
+            <li>「ファイル &gt; まとめて処理…」で複数の画像に同じ加工。「並べて 1 枚に…」で 2〜4 枚を並べる</li>
+          </ul>
+          <h3>タブ</h3>
+          <dl>
+            <dt>加工</dt>
+            <dd>テイストと強さ・露出〜経年劣化・ハイライト／シャドウ・トーンカーブ・色ごとの調整・肌をなめらかに・ディテール。「自動補正」でおまかせ、「一覧…」でテイストを見比べる。スライダーはダブルクリックで既定値</dd>
+            <dt>切り抜き</dt>
+            <dd>比を選んでプレビューをドラッグ。回転・反転・水平の補正（傾きの自動補正も）・背景を消す／ぼかす・フレーム・形（角丸・円）</dd>
+            <dt>出力</dt>
+            <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG の品質・EXIF・位置情報・ファイルの大きさの上限</dd>
+            <dt>ジオラマ</dt>
+            <dd>ミニチュア風。ピントの帯のガイドがプレビューに出る</dd>
+            <dt>投稿加工</dt>
+            <dd>位置情報を消す・ぼかし／モザイク／スタンプで隠す（プレビューをドラッグ）。顔・文字を見つけてまとめて隠せる</dd>
+            <dt>EXIF</dt>
+            <dd>撮影情報（MakerNote も）。位置情報はマップで開ける</dd>
+          </dl>
+          <h3>そのほか</h3>
+          <ul>
+            <li>⌘T・「文字…」で文字・透かし（{日付}・{日時} で撮影日時、縁取り・影、ロゴの画像）</li>
+            <li>「プリセット ▾」で加工の組み合わせを保存・呼び出し・ファイルに書き出し／読み込み</li>
+          </ul>
+          <h3>キーボードショートカット</h3>
+          <table class="help-keys">
+            <tbody>
+              <tr><td>⌘O</td><td>開く</td></tr>
+              <tr><td>⌘S</td><td>保存</td></tr>
+              <tr><td>⌘V</td><td>画像をペーストして開く</td></tr>
+              <tr><td>⌘Z ／ ⇧⌘Z</td><td>元に戻す／やり直す</td></tr>
+              <tr><td>⌥⌘C ／ ⌥⌘V</td><td>加工をコピー／ペースト</td></tr>
+              <tr><td>⌘T</td><td>文字・透かし</td></tr>
+              <tr><td>\（押している間）</td><td>加工前を見る</td></tr>
+              <tr><td>⌘1 ／ ⌘0</td><td>100% で表示／画面に合わせる</td></tr>
+              <tr><td>⇧⌘H</td><td>ヒストグラムの表示・非表示</td></tr>
+              <tr><td>⌘?</td><td>この使い方</td></tr>
+              <tr><td>⌘W ／ ⌘Q</td><td>閉じる／終了</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="buttons dialog-buttons">
+          <button type="submit" value="close" id="help-close">閉じる</button>
+        </div>
+      </form>
+    </dialog>
   </body>
 </html>

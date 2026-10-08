@@ -58,6 +58,10 @@ const menuActions: Record<string, () => void> = {
   [MENU.pasteLook]: () => void pasteLook(),
   [MENU.actualSize]: () => showActualSize(),
   [MENU.fit]: fitToWindow,
+  [MENU.help]: () => {
+    const help = $<HTMLDialogElement>("help-dialog");
+    if (!help.open) help.showModal();
+  },
   [MENU.histogram]: () => {
     histogramView.setShown(!histogramView.shown);
     setMenuChecked(MENU.histogram, histogramView.shown);

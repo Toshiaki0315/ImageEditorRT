@@ -82,6 +82,11 @@ ax menu "$PID" "ファイル" "まとめて処理…" >/dev/null
 wait_for 10 sh -c "osascript '$LIB' texts $PID | grep -q '投稿加工'" || true
 check "まとめて処理（投稿加工の欄）" "投稿加工" "$(ax texts "$PID" | grep '投稿加工' | head -1 || true)"
 ax click "$PID" "キャンセル" >/dev/null; sleep 0.5
+# 使い方（モーダルのダイアログは、タブを切り替えた後だと中身が AX に出ないので先に確かめる）
+ax menu "$PID" "ヘルプ" "ImageEditorRT の使い方" >/dev/null; sleep 0.5
+check "使い方（キーボードショートカットの一覧）" "キーボードショートカット" "$(ax texts "$PID" | grep 'キーボードショートカット' || true)"
+ax click "$PID" "閉じる" >/dev/null; sleep 0.5
+check "使い方を閉じる" "閉じた" "$(ax texts "$PID" | grep -q 'キーボードショートカット' || echo 閉じた)"
 
 check "スライダーを動かす" "3" "$(ax slider "$PID" "明るさ" 3)"
 sleep 1 # 変更が落ち着いてから履歴に積まれる

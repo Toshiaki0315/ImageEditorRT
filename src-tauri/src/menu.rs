@@ -37,6 +37,8 @@ pub const ACTUAL_SIZE: &str = "actual_size";
 pub const FIT: &str = "fit";
 /// 「表示 > ヒストグラム」（チェックの付く項目。状態は画面が環境設定に残し、set_menu_checked で合わせる）
 pub const HISTOGRAM: &str = "histogram";
+/// 「ヘルプ > ImageEditorRT の使い方」（機能とキーボードショートカットの一覧を画面に出す）
+pub const HELP: &str = "help";
 
 /// メニューバーを作る。
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -128,7 +130,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .minimize_with_text("しまう")
         .maximize_with_text("拡大／縮小")
         .build()?;
-    Menu::with_items(app, &[&app_menu, &file, &edit, &view, &window])
+    // ⌘?（? は Shift と / のキー。Tauri のメニューは物理キーで指定する）
+    let usage = MenuItemBuilder::with_id(HELP, format!("{} の使い方", super::APP_NAME))
+        .accelerator("CmdOrCtrl+Shift+/")
+        .build(app)?;
+    let help = SubmenuBuilder::new(app, "ヘルプ").item(&usage).build()?;
+    // macOS のヘルプメニューにする（メニューの項目を探す欄が付く）
+    #[cfg(target_os = "macos")]
+    help.set_as_help_menu_for_nsapp()?;
+    Menu::with_items(app, &[&app_menu, &file, &edit, &view, &window, &help])
 }
 
 /// メニューの項目が選ばれたとき、画面に知らせる（最近使った項目はここで処理する）。

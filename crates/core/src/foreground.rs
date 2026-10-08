@@ -86,12 +86,25 @@ fn read_mask(buffer: &CVPixelBuffer) -> Result<GrayImage, String> {
 mod tests {
     use super::*;
 
+    /// 被写体の認識を試す。GPU・Neural Engine のない環境（CI の仮想マシン）では CPU だけでも認識できない
+    /// （「Could not create inference context」）ので、そのときは None を返してテストを飛ばす。
+    fn try_mask(image: &RgbaImage) -> Option<Option<GrayImage>> {
+        match foreground_mask(image) {
+            Err(e) if e.contains("inference context") => {
+                eprintln!("この環境では被写体を認識できないので飛ばす: {e}");
+                None
+            }
+            result => Some(result.unwrap()),
+        }
+    }
+
     #[test]
     fn finds_the_person_in_a_portrait() {
         // NASA のポートレート（tests/fixtures/face.jpg、256 × 320）。顔のあたりは被写体、左上の暗い背景は背景
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/face.jpg");
         let image = image::open(path).unwrap().to_rgba8();
-        let mask = foreground_mask(&image).unwrap().expect("被写体が見つかる");
+        let Some(mask) = try_mask(&image) else { return };
+        let mask = mask.expect("被写体が見つかる");
         assert_eq!(mask.dimensions(), image.dimensions());
         assert!(mask.get_pixel(160, 85)[0] > 200, "顔 {}", mask.get_pixel(160, 85)[0]);
         assert!(mask.get_pixel(10, 10)[0] < 50, "背景 {}", mask.get_pixel(10, 10)[0]);
@@ -100,6 +113,7 @@ mod tests {
     #[test]
     fn plain_image_has_no_subject() {
         let image = RgbaImage::from_pixel(64, 48, image::Rgba([120, 160, 200, 255]));
-        assert!(foreground_mask(&image).unwrap().is_none());
+        let Some(mask) = try_mask(&image) else { return };
+        assert!(mask.is_none());
     }
 }

@@ -38,6 +38,7 @@ pub mod makernote;
 pub mod output;
 pub mod pillow;
 pub mod pipeline;
+pub mod prepare;
 pub mod presets;
 pub mod privacy;
 mod pyfmt;

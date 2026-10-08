@@ -82,20 +82,16 @@ pub async fn save_image(
         );
         return Err(SaveFailure { kind: "extension", message: message.to_string() });
     }
-    let (original, source, mask) = {
-        let loaded = state.0.lock().map_err(SaveFailure::other)?;
-        let original =
-            loaded.original.clone().ok_or_else(|| SaveFailure::other("画像が読み込まれていません"))?;
-        (original, loaded.source.clone(), loaded.prepare_job(&settings))
-    };
+    let opened = state.opened().map_err(SaveFailure::other)?;
+    let source = opened.source.clone();
     // 元の画像には上書きしない（大文字・小文字の違いも同じファイルとみなす）
     if source.path.as_deref().is_some_and(|p| save::is_same_file(&path, p)) {
         return Err(SaveFailure { kind: "sameFile", message: SAME_FILE_MESSAGE.into() });
     }
     let saved = tauri::async_runtime::spawn_blocking(move || {
         save_pool().install(|| {
-            // 背景を消すマスクはプレビューの大きさなので、原寸に広げてかける
-            let original = crate::state::with_prepare(original, mask);
+            // 肌・背景の材料はプレビューの大きさなので、原寸に合わせてかける
+            let original = opened.prepared(&opened.original, &settings);
             let edited = pipeline::apply_edits(&original, &settings).map_err(SaveFailure::other)?;
             let is_tiff = source.format == Some(Format::Tiff);
             save::save_edited(&edited, &path, options, source.exif.as_deref(), is_tiff)

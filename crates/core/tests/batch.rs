@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use image::{Rgba, RgbaImage};
 use imageeditorrt_core::batch::{
-    batch_settings, collect_images, output_path, run_batch, summary, BatchOptions,
+    batch_settings, collect_images, output_path, run_batch, summary, BatchOptions, BatchPrivacy,
 };
 use imageeditorrt_core::frames::FrameType;
 use imageeditorrt_core::pipeline::EditSettings;
@@ -26,7 +26,7 @@ fn touch(path: &Path) {
 }
 
 fn options(look: Preset, long_side: Option<u32>) -> BatchOptions {
-    BatchOptions { look, long_side, save: SaveOptions::default() }
+    BatchOptions { look, long_side, save: SaveOptions::default(), privacy: BatchPrivacy::default() }
 }
 
 fn plain() -> Preset {
@@ -173,5 +173,55 @@ fn processes_files_and_keeps_going_after_a_broken_one() {
     let again = process_image(&input.join("wide.png"), &out, &opts).unwrap();
     assert_eq!(again, out.join("wide_edited.png"));
     assert_eq!(image::open(input.join("wide.png")).unwrap().width(), 40);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn remove_gps_overrides_the_save_options() {
+    let mut keep = options(plain(), None);
+    keep.save.keep_gps = true;
+    assert!(keep.save_options().keep_gps);
+    let removed =
+        BatchOptions { privacy: BatchPrivacy { remove_gps: true, ..BatchPrivacy::default() }, ..keep };
+    assert!(!removed.save_options().keep_gps);
+    assert_eq!(removed.save_options().quality, removed.save.quality);
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn faces_are_covered_in_batch() {
+    use imageeditorrt_core::privacy::RegionKind;
+    let dir = temp_dir("privacy");
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/face.jpg");
+    let plain_out =
+        imageeditorrt_core::batch::process_image(&source, &dir.join("plain"), &options(plain(), None))
+            .unwrap();
+    let privacy =
+        BatchPrivacy { faces: true, kind: RegionKind::Mosaic, strength: 100, ..BatchPrivacy::default() };
+    let covered = BatchOptions { privacy, ..options(plain(), None) };
+    let regions = match imageeditorrt_core::batch::privacy_regions(
+        &image::open(&source).unwrap().to_rgba8(),
+        &covered.privacy,
+    ) {
+        Err(e) if e.contains("inference context") => {
+            eprintln!("この環境では顔を認識できないので飛ばす: {e}");
+            return;
+        }
+        result => result.unwrap(),
+    };
+    assert_eq!(regions.len(), 1);
+    let out = imageeditorrt_core::batch::process_image(&source, &dir.join("covered"), &covered).unwrap();
+    let (a, b) = (image::open(plain_out).unwrap().to_rgba8(), image::open(out).unwrap().to_rgba8());
+    // 顔のあたり（256 × 320 の (160, 85)）は変わり、左下の角は変わらない（JPEG の誤差はゆるす）
+    let diff = |x: u32, y: u32| {
+        (0..3)
+            .map(|c| i32::from(a.get_pixel(x, y)[c]).abs_diff(i32::from(b.get_pixel(x, y)[c])))
+            .max()
+            .unwrap()
+    };
+    let face_changed =
+        (140..180).flat_map(|x| (70..100).map(move |y| (x, y))).filter(|&(x, y)| diff(x, y) > 20).count();
+    assert!(face_changed > 100, "{face_changed}");
+    assert!(diff(5, 315) <= 6);
     std::fs::remove_dir_all(&dir).unwrap();
 }

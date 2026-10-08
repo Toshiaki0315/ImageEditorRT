@@ -699,6 +699,12 @@ button[aria-pressed="true"] {
   align-items: center;
 }
 
+.batch-privacy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
 .batch-resize,
 .batch-out {
   display: flex;

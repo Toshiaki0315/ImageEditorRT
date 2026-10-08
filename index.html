@@ -187,6 +187,21 @@
             <label><input type="checkbox" id="batch-resize" />長辺を</label>
             <input type="number" id="batch-long-side" min="1" max="20000" step="1" /> px にする
           </span>
+          <span>投稿加工</span>
+          <span class="batch-privacy">
+            <label><input type="checkbox" id="batch-remove-gps" />位置情報を消す</label>
+            <label><input type="checkbox" id="batch-faces" />顔を隠す</label>
+            <label><input type="checkbox" id="batch-text" />文字を隠す</label>
+          </span>
+          <span>隠し方</span>
+          <span class="batch-resize">
+            <select id="batch-cover">
+              <option value="blur">ぼかし</option>
+              <option value="mosaic">モザイク</option>
+              <option value="stamp">スタンプ（😊）</option>
+            </select>
+            強さ <input type="range" id="batch-strength" min="1" max="100" step="1" value="50" /><output id="batch-strength-value">50</output>
+          </span>
           <span>保存先</span>
           <span class="batch-out">
             <span id="batch-out-dir" class="batch-out-dir">（まだ選んでいません）</span>
@@ -194,7 +209,7 @@
           </span>
         </div>
         <p class="note">
-          トリミング範囲と回転・反転はかけません（フレーム・円のときは各画像の中央をその比で切り抜きます）。元と同じ名前・形式で保存し、同じ名前があれば
+          トリミング範囲と回転・反転はかけません（フレーム・円のときは各画像の中央をその比で切り抜きます）。顔・文字は 1 枚ごとに見つけて隠します（処理はこの Mac の中だけ）。元と同じ名前・形式で保存し、同じ名前があれば
           _edited を付けて上書きしません。JPEG 品質・EXIF は「保存の設定」に従います。
         </p>
         <div class="buttons dialog-buttons">

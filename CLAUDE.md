@@ -48,6 +48,11 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
   src/
     formats.rs            # 読み込める形式・拡張子・透過の有無
     decode.rs             # ImageIO での読み込み（向きを直した sRGB の RGBA にする。macOS のみ）
+    vision.rs             # macOS の Vision の呼び出し（CPU でのやり直し・枠の変換・分けた部分ごとの認識。macOS のみ）
+    faces.rs              # 顔の認識（Vision）と、隠す範囲の広げ方
+    text_regions.rs       # 文字の認識（Vision。読めた文字の範囲だけ）
+    horizon.rs            # 傾きの自動補正（Vision の水平線、なければ長い直線から推定）
+    foreground.rs         # 被写体のマスク（Vision。macOS 14 以降）
     resize.rs             # 縮小（プレビューは fast_image_resize、保存は Pillow と画素まで同じリサイズ）
     transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
     output.rs             # 「出力」タブのサイズ変更（欄に出す値と、編集設定に渡す幅・高さ）
@@ -56,18 +61,26 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     batch.rs              # まとめて処理（保存先の名前・画像の集め方・1 枚ずつの処理と中止）
     presets.rs            # プリセット（名前付きの加工の組み合わせ）の保存・読み込み（旧版と同じ JSON）
     pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
+    prepare.rs            # 元の画像に前もってかける処理（肌をなめらかに → 背景。顔の枠・マスクは画面側が 1 回作って渡す）
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
+    curve.rs              # トーンカーブ（単調な 3 次補間）と色ごとの調整（8 色の色相・彩度・明るさ）
+    auto.rs               # 自動補正（色の分布から露出・コントラスト・色温度を求める）
     blur.rs               # ガウスぼかし・アンシャープマスク（Pillow と画素まで同じ）
     pillow.rs             # 旧版が使っていた Pillow の処理（ImageEnhance・blend・screen など）を同じ丸め方で
     filters.rs            # テイスト（フィルター 23 種）
     effects.rs            # ディテール（シャープ・ぼかし・ノイズ除去）
+    skin.rs               # 肌をなめらかに（顔のまわりの楕円だけ、輪郭を残してなめらかに）
     diorama.rs            # ジオラマ風（ミニチュア風・ティルトシフト）
     frames.rs             # フレーム（ポラロイド・チェキ）
     histogram.rs          # ヒストグラム（R・G・B・輝度の分布）の計算
     shapes.rs             # 形（角丸・円）の切り抜き
+    privacy.rs            # 投稿加工の範囲（ぼかし・モザイク・絵文字のスタンプ）
+    background.rs         # 背景を消す（透明・白）・ぼかす（被写体のマスクで）
+    collage.rs            # 並べて 1 枚に（並べ方・枠に合わせた切り抜き）
     sample.rs             # 計測用の画像
     pyrandom.rs           # Python の random.Random と同じ乱数（経年劣化の粒子を旧版とそろえる）
     text.rs               # 文字・透かし（フォント・9 か所とフレームの余白・大きさ・色・不透明度。ab_glyph で描く）
+    logo.rs               # ロゴの透かし（画像ファイルを文字と同じ位置の決め方で重ねる）
     encode.rs             # JPEG への書き出し（プレビューの計測用）
     save.rs               # 保存（形式・名前の決め方・元の画像への上書きの防止・EXIF を残す）
     exif_info.rs          # EXIF・GPS・MakerNote を表示用に読む
@@ -78,9 +91,12 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
   examples/bench.rs       # ベンチマーク
   tests/                  # ファイルを使うテスト（fixtures/ はテスト用の画像・EXIF）
 src-tauri/                # Tauri のアプリ本体（コマンドで core を呼び、画面と受け渡すだけ）
+  src/main.rs             # 入り口（lib.rs の run を呼ぶだけ）
   src/lib.rs              # 起動（コマンドの登録・終了の求めの扱い）だけ
-  src/state.rs            # 開いている画像の状態と、読み込んだ画像を状態に置くまでの共通の処理
-  src/image.rs            # 開く・閉じる・プレビュー・100% 表示・クリップボードの画像・ジオラマのガイド
+  src/state.rs            # 開いている画像の状態（opened() で写しを取る・マスクと顔の枠を 1 回だけ作って覚える）と、
+                          #   読み込んだ画像を状態に置くまでの共通の処理
+  src/image.rs            # 開く・閉じる・プレビュー・100% 表示・クリップボードの画像・ジオラマのガイド・テイストの一覧の見本・
+                          #   顔／文字／傾き／被写体の認識・自動補正・並べて 1 枚に
   src/saving.rs           # 保存（保存用のスレッドの組）と保存ダイアログの初期のパス
   src/settings.rs         # 設定パネルの選択肢と、範囲・出力の大きさの計算（計算は core）
   src/system.rs           # メニューの状態・マップで開く・終了の確認
@@ -94,8 +110,10 @@ src-tauri/                # Tauri のアプリ本体（コマンドで core を�
   tauri.conf.json
 src/                      # 画面（TypeScript）
   main.ts                 # 入り口: 部品を作り、メニュー・イベントを機能につなぐ（計測モードも）
+  bench.ts                # 計測モード（受け渡しを含めた速さ）
   app.ts                  # 共有の状態（開いている画像・保存中など）・画面の要素・部品
   editing.ts              # 設定の変更の知らせ・元に戻す／やり直す・未保存の変更の確認
+  assist.ts               # 自動の処理（傾き・背景の被写体・顔／文字を隠す・肌のための顔・自動補正）の問い合わせと知らせ
   view.ts                 # 加工前との比較・100% 表示・左上の表示・ジオラマのガイド
   files.ts                # 開く・ドロップ・保存・貼り付け・まとめて処理・リセット・終了
   presetsUi.ts            # 「プリセット ▾」のメニュー・保存・当てはめ・削除
@@ -105,16 +123,21 @@ src/                      # 画面（TypeScript）
   keys.ts                 # キーの判定（\ キー・¥ キー）
   preview.ts              # プレビューの描画（エリアに収める・描き直しをまとめる）
   zoom.ts                 # 100% 表示（1px = 1 画素、ドラッグ・スクロールで動かす）
-  batchDialog.ts          # まとめて処理のダイアログと進み具合
+  batchDialog.ts          # まとめて処理のダイアログ（投稿加工の選択肢を含む）と進み具合
   paste.ts                # ⌘V で何をするか（ファイル・画像・入力欄の文字）を決める
   histogram.ts            # プレビューに重ねるヒストグラム
   history.ts              # アンドゥ／リドゥの履歴（画面の部品に依存しない。tests-ts/ で npm test）
   panel.ts / tabs.ts      # 設定パネルのスライダー・タブ
   exif.ts                 # 「EXIF」タブ（折りたたみの一覧・選んだ行のコピー・マップで開く）
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）
+  photoControls.ts        # 「切り抜き」タブの水平の補正（自動を含む）と背景（消す・ぼかす）
+  privacy.ts / regions.ts # 「投稿加工」タブ（範囲のドラッグ・顔／文字を見つけて隠す）と範囲の計算
+  colorPanel.ts / curve.ts # トーンカーブのグラフと色ごとの調整（曲線の計算は Rust と同じ）
+  tasteGallery.ts         # テイストの一覧（見本を並べて選ぶ）
+  collageDialog.ts        # 並べて 1 枚に のダイアログ
   textDialog.ts           # 「文字・透かし」のダイアログ（⌘T・「文字…」）
   output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）
-  saveOptions.ts          # 「出力」タブの保存の設定（JPEG 品質・EXIF・GPS。localStorage に残す）
+  saveOptions.ts          # 保存の設定（JPEG 品質・EXIF・GPS・ファイルの大きさの上限。localStorage に残す）
   types.ts                # Rust とやりとりする型
   styles.css
 index.html
@@ -126,7 +149,7 @@ docs/decisions.md         # 作り直しの中で決めたこと（色の空間�
 
 1. **画像処理と EXIF は `crates/core` に書く。** core は Tauri に依存しない。`src-tauri` は core を呼んで画面と受け渡すだけにし、TypeScript では画素を加工しない。
 2. **元画像は不変。** 読み込んだ原本は保持し、プレビュー・保存のたびに原本から処理し直す。フィルターの重ね掛けをしない。
-3. **処理の順番は旧版と同じにし、`pipeline.rs` の 1 か所で決める**（EXIF の回転補正 → 回転・反転 → トリミング → リサイズ → ジオラマ → フィルター → 形 → 文字 → フレーム。旧版の `docs/requirements.md` §5.1）。トリミングの座標は、常に**回転・反転した後の原寸画像の座標**で持つ。
+3. **処理の順番は旧版と同じにし、`pipeline.rs` の 1 か所で決める**（EXIF の回転補正 → 回転・反転 → トリミング → リサイズ → ジオラマ → フィルター → 形 → 文字 → フレーム。旧版の `docs/requirements.md` §5.1）。この版で足した処理もその流れの中に置く（水平の補正と投稿加工のぼかし・モザイクは回転・反転の直後、トーンカーブ・色ごとの調整は色の調整の中、スタンプは経年劣化の後、ロゴは文字と同じ）。顔の枠・マスクが要る肌・背景だけは、`prepare.rs` で回転・反転より前に元の画像にかける。トリミングの座標は、常に**回転・反転した後の原寸画像の座標**で持つ。
 4. **プレビューは縮小版で処理する。** 長辺 1600px に縮めた画像に設定をかけて表示し、保存のときだけ原寸で処理する。
 5. **プレビューの受け渡しは生のバイト列で行う。** `tauri::ipc::Response` で返し、JSON や base64 にしない（`docs/prototype.md`）。設定を変えてから描き終わるまで 200ms 以内を保つ。
 6. **重い処理で画面を止めない。** 重い処理を行うコマンドは `async fn` にし、原寸の処理・保存はメインスレッドで行わない。

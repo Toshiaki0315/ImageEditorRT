@@ -84,6 +84,8 @@ pub async fn save_image(
     }
     let opened = state.opened().map_err(SaveFailure::other)?;
     let source = opened.source.clone();
+    // 文字の {日付}・{日時} を撮影日時に置き換える
+    let settings = opened.shown(settings, false);
     // 元の画像には上書きしない（大文字・小文字の違いも同じファイルとみなす）
     if source.path.as_deref().is_some_and(|p| save::is_same_file(&path, p)) {
         return Err(SaveFailure { kind: "sameFile", message: SAME_FILE_MESSAGE.into() });

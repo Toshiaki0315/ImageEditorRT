@@ -177,6 +177,9 @@ pub fn process_image(source: &Path, out_dir: &Path, options: &BatchOptions) -> R
     let decoded = loaded.decoded;
     let mut settings = batch_settings(options, decoded.image.dimensions()).map_err(|e| e.to_string())?;
     settings.regions = privacy_regions(&decoded.image, &options.privacy)?;
+    // 文字の {日付}・{日時} は写真ごとの撮影日時にする
+    let date = loaded.raw_exif.as_deref().and_then(crate::exif_info::capture_date);
+    settings.text.text = crate::text::expand_placeholders(&settings.text.text, date.as_ref());
     let mut image = decoded.image;
     // 肌をなめらかに: 縮めた画像で顔を見つけ、ほかの加工より前にかける（画面と同じ前処理）
     if settings.skin_smooth > 0 {

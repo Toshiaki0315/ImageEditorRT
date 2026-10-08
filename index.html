@@ -152,12 +152,16 @@
     <dialog id="text-dialog" class="text-dialog">
       <h2>文字・透かし</h2>
       <label class="row">文字 <textarea id="text-input" rows="3" placeholder="入れる文字（例: © 2026 Toshiaki）。改行もできます"></textarea></label>
+      <div class="buttons insert-buttons">
+        <button type="button" id="insert-date" title="撮影日時（EXIF）の日付を入れます（例: 2026.10.09）">撮影日を入れる</button>
+        <button type="button" id="insert-date-time" title="撮影日時（EXIF）の日付と時刻を入れます（例: 2026.10.09 14:23）">撮影日時を入れる</button>
+      </div>
       <label class="row">フォント <select id="text-font"></select></label>
       <label class="row">大きさ <input id="text-size" type="number" min="1" max="30" step="0.5" /><span>%</span></label>
       <label class="row">色 <input id="text-color" type="color" /></label>
       <label class="row">不透明度 <input id="text-opacity" type="range" min="0" max="100" step="1" /><output id="text-opacity-value"></output></label>
       <label class="row">位置 <select id="text-position"></select></label>
-      <p class="note">大きさは写真の短辺に対する % です。「フレームの余白」はポラロイド・チェキの広い余白に入れます（フレームがなければ写真の下中央）。フレームの余白の文字は「トリミング実行」の表示で確認できます。</p>
+      <p class="note">大きさは写真の短辺に対する % です。{日付}・{日時} は撮影日時（EXIF）に置き換わります（まとめて処理では写真ごと）。「フレームの余白」はポラロイド・チェキの広い余白に入れます（フレームがなければ写真の下中央）。フレームの余白の文字は「トリミング実行」の表示で確認できます。</p>
       <h2>ロゴ</h2>
       <div class="row logo-row">
         ロゴ

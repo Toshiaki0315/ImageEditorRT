@@ -166,6 +166,25 @@ impl TextSettings {
     }
 }
 
+/// 撮影日時の差し込み（文字の中に書くと、写真の撮影日時に置き換える）。
+pub const DATE_PLACEHOLDER: &str = "{日付}";
+pub const DATE_TIME_PLACEHOLDER: &str = "{日時}";
+
+/// 文字の {日付}（2026.10.09）・{日時}（2026.10.09 14:23）を撮影日時に置き換える。撮影日時がなければ空にする。
+pub fn expand_placeholders(text: &str, date: Option<&crate::exif_info::CaptureDate>) -> String {
+    if !text.contains('{') {
+        return text.to_string();
+    }
+    let (day, minute) = match date {
+        Some(d) => (
+            format!("{}.{:02}.{:02}", d.year, d.month, d.day),
+            format!("{}.{:02}.{:02} {:02}:{:02}", d.year, d.month, d.day, d.hour, d.minute),
+        ),
+        None => (String::new(), String::new()),
+    };
+    text.replace(DATE_TIME_PLACEHOLDER, &minute).replace(DATE_PLACEHOLDER, &day)
+}
+
 /// フォントを読む。同じフォントは 2 回目から読み直さない。読めなければヒラギノ角ゴシック W3、
 /// それも読めなければ None（旧版は Pillow の組み込みのフォントで代わりに描いていた）。
 pub fn load_font(font: TextFont) -> Option<&'static FontVec> {
@@ -429,5 +448,14 @@ mod tests {
     fn json_names_match_old_presets() {
         assert_eq!(serde_json::to_string(&TextFont::GothicBold).unwrap(), "\"GOTHIC_BOLD\"");
         assert_eq!(serde_json::to_string(&TextPosition::FrameMargin).unwrap(), "\"frame_margin\"");
+    }
+
+    #[test]
+    fn placeholders_become_the_capture_date() {
+        let date = crate::exif_info::CaptureDate { year: 2026, month: 10, day: 9, hour: 7, minute: 5 };
+        assert_eq!(expand_placeholders("撮影 {日付}", Some(&date)), "撮影 2026.10.09");
+        assert_eq!(expand_placeholders("{日時}\n© me", Some(&date)), "2026.10.09 07:05\n© me");
+        assert_eq!(expand_placeholders("{日付}", None), "");
+        assert_eq!(expand_placeholders("{ほか}", Some(&date)), "{ほか}");
     }
 }

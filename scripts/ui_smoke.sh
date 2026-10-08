@@ -130,6 +130,9 @@ ax menu "$PID" "編集" "加工をペースト" >/dev/null; sleep 0.5
 ax menu "$PID" "編集" "文字・透かし…" >/dev/null
 wait_for 10 sh -c "osascript '$LIB' texts $PID | grep -q '（なし）'" || true
 check "文字・透かし（ロゴの欄）" "（なし）" "$(ax texts "$PID" | grep '（なし）' | head -1 || true)"
+ax click "$PID" "撮影日を入れる" >/dev/null; sleep 0.5
+check "撮影日を入れる（画像に撮影日時がないので文字は空のまま、元に戻せる）" "true" "$(ax menu-enabled "$PID" "編集" "元に戻す")"
+ax click "$PID" "文字を消す" >/dev/null; sleep 0.3
 ax click "$PID" "閉じる" >/dev/null; sleep 0.3
 
 ax menu "$PID" "表示" "100% で表示" >/dev/null

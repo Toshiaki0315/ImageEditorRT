@@ -79,6 +79,50 @@ pub fn read_exif_info(file: &[u8]) -> ExifInfo {
     }
 }
 
+/// 撮影日時（年・月・日・時・分）。文字の {日付}・{日時} に使う。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CaptureDate {
+    pub year: u16,
+    pub month: u8,
+    pub day: u8,
+    pub hour: u8,
+    pub minute: u8,
+}
+
+/// EXIF（TIFF の部分。raw_exif が返すもの）から撮影日時を読む。DateTimeOriginal、なければ DateTime。
+/// どちらもない・読めなければ None。
+pub fn capture_date(raw: &[u8]) -> Option<CaptureDate> {
+    let exif = exif::Reader::new().read_raw(raw.to_vec()).ok()?;
+    [exif::Tag::DateTimeOriginal, exif::Tag::DateTime].into_iter().find_map(|tag| {
+        let field = exif.get_field(tag, exif::In::PRIMARY)?;
+        let exif::Value::Ascii(ref values) = field.value else { return None };
+        parse_date(values.first()?)
+    })
+}
+
+/// "YYYY:MM:DD HH:MM:SS" を読む（区切りが違っても数字の並びで読む）。
+fn parse_date(bytes: &[u8]) -> Option<CaptureDate> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let numbers: Vec<u32> = text
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    let [year, month, day, hour, minute, ..] = numbers[..] else { return None };
+    let valid = (1..=9999).contains(&year)
+        && (1..=12).contains(&month)
+        && (1..=31).contains(&day)
+        && hour < 24
+        && minute < 60;
+    valid.then_some(CaptureDate {
+        year: year as u16,
+        month: month as u8,
+        day: day as u8,
+        hour: hour as u8,
+        minute: minute as u8,
+    })
+}
+
 /// ファイルの中身から、EXIF の TIFF の部分（"II*\0" / "MM\0*" で始まる）を取り出す。
 pub fn raw_exif(file: &[u8]) -> Option<Vec<u8>> {
     exif::Reader::new().read_from_container(&mut Cursor::new(file)).ok().map(|e| e.buf().to_vec())
@@ -478,5 +522,21 @@ mod tests {
     fn not_an_image() {
         let info = read_exif_info(b"garbage");
         assert!(info.empty && info.entries.is_empty());
+    }
+
+    #[test]
+    fn capture_date_from_exif() {
+        let file =
+            std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/pentax.jpg"))
+                .unwrap();
+        let date = capture_date(&raw_exif(&file).unwrap()).unwrap();
+        assert!(date.year >= 2000 && (1..=12).contains(&date.month), "{date:?}");
+        assert_eq!(
+            parse_date(b"2026:10:09 14:23:05"),
+            Some(CaptureDate { year: 2026, month: 10, day: 9, hour: 14, minute: 23 })
+        );
+        assert_eq!(parse_date(b"    :  :     :  :  "), None);
+        assert_eq!(parse_date(b"2026:13:09 14:23:05"), None);
+        assert_eq!(capture_date(b"not exif"), None);
     }
 }

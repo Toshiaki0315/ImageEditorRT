@@ -84,6 +84,7 @@ pub async fn filter_thumbnails(
     state: State<'_, AppState>,
 ) -> Result<Response, String> {
     let opened = state.opened()?;
+    let settings = opened.shown(settings, false);
     let thumbnails = blocking(move || {
         let preview = opened.prepared(&opened.preview, &settings);
         Ok(pipeline::filter_thumbnails(&preview, &settings, opened.factor, pipeline::THUMBNAIL_MAX_SIDE))

@@ -6,9 +6,10 @@ use std::time::Instant;
 
 use image::{GrayImage, RgbaImage};
 use imageeditorrt_core::decode;
-use imageeditorrt_core::exif_info::ExifInfo;
+use imageeditorrt_core::exif_info::{capture_date, CaptureDate, ExifInfo};
 use imageeditorrt_core::formats::{self, Format};
 use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
+use imageeditorrt_core::text;
 use imageeditorrt_core::transform::CropRect;
 use serde::Serialize;
 use tauri::WebviewWindow;
@@ -42,16 +43,20 @@ pub(crate) struct Opened {
     pub(crate) source: Source,
     mask: Option<Arc<GrayImage>>,
     faces: Option<Arc<Vec<CropRect>>>,
+    /// 撮影日時（EXIF。文字の {日付}・{日時} に使う）
+    capture_date: Option<CaptureDate>,
 }
 
 impl Opened {
-    /// 表示に使う設定。comparing（加工前の表示）なら、向きと切り抜く範囲だけを残す。
+    /// 表示・保存に使う設定。文字の {日付}・{日時} を撮影日時に置き換える。comparing（加工前の表示）なら、
+    /// 向きと切り抜く範囲だけを残す。
     pub(crate) fn shown(&self, settings: EditSettings, comparing: bool) -> EditSettings {
         if comparing {
-            pipeline::before_settings(self.original.dimensions(), &settings)
-        } else {
-            settings
+            return pipeline::before_settings(self.original.dimensions(), &settings);
         }
+        let mut settings = settings;
+        settings.text.text = text::expand_placeholders(&settings.text.text, self.capture_date.as_ref());
+        settings
     }
 
     /// image（原本かプレビュー用の画像）に、settings の前もってかける処理（肌をなめらかに・背景）をかけたもの。
@@ -79,6 +84,7 @@ impl AppState {
             source: loaded.source.clone(),
             mask: loaded.mask.clone().flatten(),
             faces: loaded.faces.clone(),
+            capture_date: loaded.source.exif.as_deref().and_then(capture_date),
         })
     }
 
@@ -226,6 +232,7 @@ mod tests {
             source: Source::default(),
             mask: mask.map(Arc::new),
             faces: None,
+            capture_date: Some(CaptureDate { year: 2026, month: 10, day: 9, hour: 14, minute: 23 }),
         }
     }
 
@@ -248,6 +255,20 @@ mod tests {
             (before.filter, before.frame, before.orientation),
             (FilterType::None, FrameType::None, settings.orientation)
         );
+    }
+
+    #[test]
+    fn capture_date_fills_the_text() {
+        let opened = opened(None);
+        let settings = EditSettings {
+            text: imageeditorrt_core::text::TextSettings {
+                text: "撮影 {日時}".into(), ..Default::default()
+            },
+            ..EditSettings::default()
+        };
+        assert_eq!(opened.shown(settings.clone(), false).text.text, "撮影 2026.10.09 14:23");
+        // 加工前の表示では文字を描かない
+        assert!(opened.shown(settings, true).text.text.is_empty());
     }
 
     #[test]

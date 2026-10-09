@@ -12,6 +12,7 @@ import { OutputSize, type SizeState } from "./output";
 import type { Panel } from "./panel";
 import type { PhotoControls } from "./photoControls";
 import { Preview } from "./preview";
+import type { LocalPanel } from "./localPanel";
 import type { PrivacyPanel } from "./privacy";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
@@ -85,6 +86,7 @@ export const parts = {} as {
   autoButton: HTMLButtonElement;
   recorder: HistoryRecorder<Snapshot>;
   privacy: PrivacyPanel;
+  localPanel: LocalPanel;
   batchDialog: BatchDialog;
   collageDialog: CollageDialog;
 };

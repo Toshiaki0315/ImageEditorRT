@@ -27,6 +27,7 @@ export function settingsChanged() {
   hooks.prepareFaces(settingsChanged);
   // 出力の幅・高さは範囲・フレームなどで変わるので、先に合わせてからプレビューを描く
   parts.privacy?.show();
+  parts.localPanel?.show();
   parts.photoControls?.show();
   parts.colorPanel?.show();
   void output.refresh().then(() => {
@@ -65,7 +66,11 @@ export function setupHistory() {
     snapshot,
     restore,
     isAdjusting: () =>
-      sliderDragging || parts.crop.isDragging() || parts.privacy.isDragging() || parts.colorPanel.isDragging(),
+      sliderDragging ||
+      parts.crop.isDragging() ||
+      parts.privacy.isDragging() ||
+      parts.localPanel.isDragging() ||
+      parts.colorPanel.isDragging(),
     onUpdate: updateMenus,
   });
   document.addEventListener("pointerdown", (event) => {

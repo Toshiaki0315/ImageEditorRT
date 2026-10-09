@@ -130,6 +130,10 @@ export class Panel {
     const extra = document.createElement("div");
     extra.id = "color-extra";
     adjustPage.append(extra);
+    // 部分補正（localPanel.ts が中身を作る）
+    const local = document.createElement("div");
+    local.id = "local-extra";
+    adjustPage.append(local);
     this.heading(adjustPage, "ディテール");
     this.build(adjustPage, DETAIL);
     // 赤目の補正（旧版にはない。肌をなめらかにと同じく、見つけた顔の目のあたりだけ）

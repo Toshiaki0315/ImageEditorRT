@@ -202,7 +202,8 @@ export type TextPosition =
   | "bottom_left"
   | "bottom"
   | "bottom_right"
-  | "frame_margin";
+  | "frame_margin"
+  | "tiled";
 
 /** 文字・透かしの設定（Rust の text::TextSettings）。size は写真の短辺に対する %、opacity は %。 */
 export type TextSettings = {

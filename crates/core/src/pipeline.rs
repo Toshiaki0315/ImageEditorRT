@@ -28,6 +28,7 @@ use crate::shapes;
 pub use crate::shapes::ShapeType;
 use crate::text;
 pub use crate::text::{TextFont, TextPosition, TextSettings};
+use crate::tile;
 use crate::transform::{self, round_half_even, CropRect, Orientation, SizeError};
 
 /// テイストの強さの既定（100% = テイストのまま）。
@@ -249,10 +250,14 @@ fn apply_shape_and_frame(mut image: RgbaImage, settings: &EditSettings) -> RgbaI
     }
     let on_margin = settings.text.position == TextPosition::FrameMargin && has_frame;
     let logo_on_margin = settings.logo.position == TextPosition::FrameMargin && has_frame;
-    if !on_margin {
+    if settings.text.position == TextPosition::Tiled {
+        tile::draw_tiled_text(&mut image, &settings.text);
+    } else if !on_margin {
         text::draw_text(&mut image, &photo_text(settings), None, None);
     }
-    if !logo_on_margin {
+    if settings.logo.position == TextPosition::Tiled {
+        tile::draw_tiled_logo(&mut image, &settings.logo);
+    } else if !logo_on_margin {
         logo::draw_logo(&mut image, &photo_logo(settings), None, None);
     }
     let photo_size = image.dimensions();

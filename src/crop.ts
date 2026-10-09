@@ -4,6 +4,7 @@
 // 座標はどれも、回転・反転した後の原寸画像の座標（px）。
 
 import { invoke } from "@tauri-apps/api/core";
+import { GUIDE_KINDS, type GuideKind, guideLines, parseGuide } from "./guides";
 import type { AspectRatio, CropRect, EditSettings, FrameKind, OrientOp, Orientation, Region, ShapeType } from "./types";
 
 type DragMode = "new" | "move" | "resize";
@@ -24,6 +25,8 @@ const CORNER_RADIUS_DEFAULT = 10;
 const EDIT_RANGE_TEXT = "範囲を編集";
 /** 縦向きを選べる比（自由と 1:1 には向きがない） */
 const HAS_ORIENTATION: AspectRatio[] = ["ratio5x4", "ratio4x3", "ratio3x2", "ratio16x9"];
+/** 選んだガイドを残す環境設定の名前 */
+const GUIDE_STORAGE_KEY = "crop.guide";
 
 /** 比の名前を縦の形にする（「16:9」→「9:16」）。 */
 export const portraitName = (name: string) => name.split(":").reverse().join(":");
@@ -43,6 +46,9 @@ export class CropController {
   private readonly clear = $<HTMLButtonElement>("clear-crop");
   private readonly frame = $<HTMLSelectElement>("frame");
   private readonly shape = $<HTMLSelectElement>("shape");
+  private readonly guide = $<HTMLSelectElement>("crop-guide");
+  /** ガイドを描くか（「切り抜き」タブを開いている間だけ） */
+  private guideActive = false;
   private readonly corner = $<HTMLInputElement>("corner-radius");
   private readonly cornerValue = $<HTMLOutputElement>("corner-radius-value");
   /** 向きのある比の、横向きの名前（「縦向き」で名前を縦の形にするため） */
@@ -79,6 +85,12 @@ export class CropController {
     const follow = new Option(FOLLOW_TEXT, FOLLOW);
     follow.disabled = true;
     this.aspect.add(follow);
+    for (const [value, label] of GUIDE_KINDS) this.guide.add(new Option(label, value));
+    this.guide.value = loadGuide();
+    this.guide.addEventListener("change", () => {
+      saveGuide(this.guide.value);
+      this.draw();
+    });
     for (const [value, label] of frames) this.frame.add(new Option(label, value));
     for (const [value, label] of shapes) this.shape.add(new Option(label, value));
     this.aspect.addEventListener("change", () => {
@@ -158,6 +170,13 @@ export class CropController {
     return this.trim.getAttribute("aria-pressed") === "true";
   }
 
+  /** ガイドを描くかを切り替える（「切り抜き」タブを開いたとき・閉じたとき）。 */
+  setGuideActive(active: boolean) {
+    if (active === this.guideActive) return;
+    this.guideActive = active;
+    this.draw();
+  }
+
   /** プレビューの表示の大きさが変わったとき・描き直したとき、範囲・形の線を描き直す。 */
   draw() {
     const active = this.size !== null && !this.isTrimmed() && !this.canvas.hidden;
@@ -168,8 +187,9 @@ export class CropController {
     this.overlay.replaceChildren();
     const crop = this.settings.crop;
     const outline = this.shapeOutline();
-    if (!crop && !outline) return;
     const r = crop ? this.toScreen(crop) : null;
+    this.drawGuide(r ?? { x: 0, y: 0, width, height });
+    if (!crop && !outline) return;
     // 範囲の外と形の外側を暗くする（形があれば形、なければ範囲の内側だけを明るく残す。旧版 FR-UI-58）
     const hole = outline ?? (r ? `M${r.x} ${r.y}h${r.width}v${r.height}h${-r.width}Z` : "");
     const mask = document.createElementNS(SVG, "path");
@@ -200,6 +220,20 @@ export class CropController {
       handle.setAttribute("width", String(HANDLE_SIZE));
       handle.setAttribute("height", String(HANDLE_SIZE));
       this.overlay.append(handle);
+    }
+  }
+
+  /** 範囲 area（画面の座標）にガイドの線を描く（影の上に白い線。ほかの線より下）。 */
+  private drawGuide(area: CropRect) {
+    const kind = this.guide.value as GuideKind;
+    if (!this.guideActive || kind === "none") return;
+    for (const className of ["guide-shadow", "guide-line"]) {
+      for (const [x1, y1, x2, y2] of guideLines(kind, area)) {
+        const line = document.createElementNS(SVG, "line");
+        line.setAttribute("class", className);
+        for (const [key, value] of Object.entries({ x1, y1, x2, y2 })) line.setAttribute(key, String(value));
+        this.overlay.append(line);
+      }
     }
   }
 
@@ -486,4 +520,21 @@ function corners(r: CropRect): [number, number][] {
     [r.x + r.width, r.y + r.height],
     [r.x, r.y + r.height],
   ];
+}
+
+/** 環境設定に残したガイド（読めなければなし）。 */
+function loadGuide(): GuideKind {
+  try {
+    return parseGuide(localStorage.getItem(GUIDE_STORAGE_KEY));
+  } catch {
+    return "none";
+  }
+}
+
+function saveGuide(value: string) {
+  try {
+    localStorage.setItem(GUIDE_STORAGE_KEY, value);
+  } catch {
+    // 残せなくても表示は切り替える
+  }
 }

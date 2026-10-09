@@ -91,6 +91,7 @@
           <h2>トリミング</h2>
           <label class="row">比 <select id="aspect"></select></label>
           <label class="check"><input id="portrait" type="checkbox" /> 縦向き</label>
+          <label class="row" title="構図を決めるための線を範囲（範囲がなければ画像全体）に重ねます。保存する画像には描きません">ガイド <select id="crop-guide"></select></label>
           <label class="row">X <input id="crop-x" type="number" min="0" step="1" /><span>px</span></label>
           <label class="row">Y <input id="crop-y" type="number" min="0" step="1" /><span>px</span></label>
           <label class="row">幅 <input id="crop-width" type="number" min="0" step="1" /><span>px</span></label>
@@ -342,7 +343,7 @@
             <dt>加工</dt>
             <dd>テイストと強さ・露出〜経年劣化・ハイライト／シャドウ・トーンカーブ・色ごとの調整・肌をなめらかに・ディテール。「自動補正」でおまかせ、「一覧…」でテイストを見比べる。スライダーはダブルクリックで既定値</dd>
             <dt>切り抜き</dt>
-            <dd>比を選んでプレビューをドラッグ。回転・反転・水平の補正（傾きの自動補正も）・背景を消す／ぼかす・フレーム・形（角丸・円）</dd>
+            <dd>比を選んでプレビューをドラッグ（三分割・黄金比・対角線のガイドも出せる）。回転・反転・水平の補正（傾きの自動補正も）・背景を消す／ぼかす・フレーム・形（角丸・円）</dd>
             <dt>出力</dt>
             <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG の品質・EXIF・位置情報・ファイルの大きさの上限</dd>
             <dt>ジオラマ</dt>

@@ -95,7 +95,7 @@ async function createParts() {
     userChanged,
     (trimmed) => {
       preview.trimmed = trimmed;
-      updatePrivacyActive();
+      updateOverlays();
       settingsChanged();
     },
     () => output.rotate(),
@@ -123,9 +123,10 @@ function orientedSize(): [number, number] | null {
   return settings.orientation.rotation % 180 === 0 ? [loaded.width, loaded.height] : [loaded.height, loaded.width];
 }
 
-/** 投稿加工の範囲は「投稿加工」タブを開いていて、切り抜いた表示でないときだけ描く・選べる。 */
-function updatePrivacyActive() {
+/** 投稿加工の範囲は「投稿加工」タブを開いていて、切り抜いた表示でないときだけ描く・選べる。切り抜きのガイドは「切り抜き」タブの間だけ描く。 */
+function updateOverlays() {
   parts.privacy.setActive(tabs.selected() === "privacy" && !preview.trimmed);
+  parts.crop.setGuideActive(tabs.selected() === "crop");
 }
 
 /** ボタン・プレビューの操作をつなぐ。 */
@@ -157,10 +158,10 @@ function connectControls() {
   setupSplit();
   tabs.setEnabled("exif", false);
   tabs.onSelect = () => {
-    updatePrivacyActive();
+    updateOverlays();
     void updateGuide();
   };
-  updatePrivacyActive();
+  updateOverlays();
   setupDrop();
 }
 

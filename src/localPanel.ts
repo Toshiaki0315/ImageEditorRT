@@ -152,19 +152,18 @@ export class LocalPanel {
   }
 
   /**
-   * Esc キー: 押している「円を足す」「帯を足す」をやめる。押していなければ、選んでいる範囲の選択を外す
-   * （範囲は消さない。ドラッグの途中ならドラッグもやめる）。どちらもなければ false。
+   * Esc キー: 押している「円を足す」「帯を足す」をやめる。押していなければ、選んでいる（青い線の）範囲を取り消す
+   * （「範囲を削除」と同じ。元に戻せる。ほかの範囲はそのまま）。ドラッグの途中ならドラッグもやめる。どちらもなければ false。
    */
   cancel(): boolean {
     this.drag = null;
     if (this.tool !== null) {
       this.tool = null;
-    } else if (this.selected !== null) {
-      this.selected = null;
-    } else {
-      return false;
+      this.show();
+      return true;
     }
-    this.show();
+    if (this.selected === null) return false;
+    this.remove();
     return true;
   }
 

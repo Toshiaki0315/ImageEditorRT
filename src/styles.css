@@ -138,6 +138,17 @@ button:disabled {
   stroke-width: 1;
 }
 
+/* 切り抜きのガイド（細い白い線に、薄い影） */
+.overlay .guide-shadow {
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 2;
+}
+
+.overlay .guide-line {
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1;
+}
+
 .overlay .handle {
   fill: #ffffff;
   stroke: rgba(0, 0, 0, 0.63);

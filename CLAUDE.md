@@ -53,6 +53,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     text_regions.rs       # 文字の認識（Vision。読めた文字の範囲だけ）
     horizon.rs            # 傾きの自動補正（Vision の水平線、なければ長い直線から推定）
     foreground.rs         # 被写体のマスク（Vision。macOS 14 以降）
+    saliency.rs           # 目立つ部分の枠（Vision の注目度。おまかせ切り抜き）
     resize.rs             # 縮小（プレビューは fast_image_resize、保存は Pillow と画素まで同じリサイズ）
     transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
     output.rs             # 「出力」タブのサイズ変更（欄に出す値と、編集設定に渡す幅・高さ）

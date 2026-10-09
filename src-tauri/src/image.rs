@@ -126,6 +126,31 @@ pub async fn detect_text(
     find_regions(settings, state, text_regions::detect_text, transform::clamp_crop).await
 }
 
+/// おまかせ切り抜き: プレビュー用の画像を今の向きにして目立つ部分を探し、選んでいる比でその部分が中央寄りに入る
+/// 範囲を、回転・反転した後の原寸の座標で返す。目立つ部分が見つからなければ None。
+#[tauri::command]
+pub async fn auto_crop(
+    settings: EditSettings,
+    aspect: imageeditorrt_core::crop::AspectChoice,
+    state: State<'_, AppState>,
+) -> Result<Option<CropRect>, String> {
+    let opened = state.opened()?;
+    blocking(move || {
+        let image = pipeline::straightened(&opened.preview, &settings);
+        let Some(found) = imageeditorrt_core::saliency::salient_rect(&image)? else { return Ok(None) };
+        let size = settings.orientation.size(opened.original.dimensions());
+        let to_original = |v: i64| (v as f64 / opened.factor).round() as i64;
+        let subject = CropRect::new(
+            to_original(found.x),
+            to_original(found.y),
+            to_original(found.width),
+            to_original(found.height),
+        );
+        Ok(imageeditorrt_core::crop::subject_crop(size, subject, aspect))
+    })
+    .await
+}
+
 /// プレビュー用の画像を今の向き（回転・反転・水平の補正）にして detect で範囲を探し、原寸の座標に直してから
 /// finish（原寸の画像の大きさで、隠す範囲に仕上げる）にかけて返す（処理は別のスレッド）。
 async fn find_regions(

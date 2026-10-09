@@ -175,6 +175,48 @@ pub fn fit_to_aspect(rect: Option<CropRect>, aspect: AspectChoice, size: (u32, u
     })
 }
 
+/// おまかせ切り抜きで、比が自由なときに被写体のまわりに足す余白（被写体の大きさに対する比率、片側）。
+const SUBJECT_PADDING: f64 = 0.2;
+/// おまかせ切り抜きで、比が自由なときの範囲の大きさの下限（画像の幅・高さに対する比率）。
+const SUBJECT_MIN_FRACTION: f64 = 0.4;
+
+/// おまかせ切り抜き（旧版にはない）: size の画像の中で、subject（目立つ部分の枠）が中央寄りに入る範囲。
+///
+/// 比の指定があれば、その比でいちばん大きい範囲を、被写体の中心に合わせて置く。自由なら、被写体のまわりに
+/// 余白（被写体の大きさの 20%）を足して画像と同じ比に広げた範囲（画像の 40% より小さくはしない）。
+/// どちらも画像からははみ出さない（はみ出すぶんは内側へずらす）。
+pub fn subject_crop(size: (u32, u32), subject: CropRect, aspect: AspectChoice) -> Option<CropRect> {
+    let (width, height) = (f64::from(size.0), f64::from(size.1));
+    if width < 1.0 || height < 1.0 {
+        return None;
+    }
+    let (w, h) = match aspect.aspect(size) {
+        Some((aw, ah)) => {
+            let ratio = aw / ah;
+            if width / height > ratio {
+                (height * ratio, height)
+            } else {
+                (width, width / ratio)
+            }
+        }
+        None => {
+            let pad = |v: i64| v as f64 * (1.0 + SUBJECT_PADDING * 2.0);
+            let (pw, ph) = (pad(subject.width), pad(subject.height));
+            let ratio = width / height;
+            // 画像と同じ比に広げ、小さすぎない・画像より大きくない大きさにする
+            let (w, h) = if pw / ph < ratio { (ph * ratio, ph) } else { (pw, pw / ratio) };
+            let scale = (width * SUBJECT_MIN_FRACTION / w).max(1.0).min(width / w);
+            (w * scale, h * scale)
+        }
+    };
+    let (cx, cy) =
+        (subject.x as f64 + subject.width as f64 / 2.0, subject.y as f64 + subject.height as f64 / 2.0);
+    let x = (cx - w / 2.0).clamp(0.0, width - w);
+    let y = (cy - h / 2.0).clamp(0.0, height - h);
+    let rect = CropRect::new(x.round() as i64, y.round() as i64, w.round() as i64, h.round() as i64);
+    clamp_crop(rect, size)
+}
+
 /// 回転・反転の結果。
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -216,6 +258,7 @@ pub fn orient(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::privacy::RegionKind;
 
     const fn choice(ratio: AspectRatio) -> AspectChoice {
@@ -340,5 +383,25 @@ mod tests {
         );
         let flipped = orient(Orientation::default(), OrientOp::FlipHorizontal, None, &[], (200, 100));
         assert_eq!((flipped.size, flipped.crop), ((200, 100), None));
+    }
+
+    #[test]
+    fn subject_crop_keeps_the_subject_near_the_center() {
+        let size = (4000, 3000);
+        // 右寄りの被写体を 1:1 で: いちばん大きい正方形（3000）を、被写体の中心に寄せる（右端で止まる）
+        let subject = CropRect::new(2800, 1000, 600, 800);
+        assert_eq!(subject_crop(size, subject, SQUARE), Some(CropRect::new(1000, 0, 3000, 3000)));
+        // 中央の被写体を 9:16（縦向きの 16:9）で: 高さいっぱい、被写体の中心に合わせる
+        let center = CropRect::new(1800, 1200, 400, 600);
+        assert_eq!(
+            subject_crop(size, center, AspectChoice { portrait: true, ..choice(AspectRatio::Ratio16x9) }),
+            Some(CropRect::new(1156, 0, 1688, 3000))
+        );
+        // 自由: 余白を足して画像と同じ 4:3 に（被写体 400×600 → 560×840 → 1120×840。40% の 1600 に広げる）
+        let free = subject_crop(size, center, FREE).unwrap();
+        assert_eq!(free, CropRect::new(1200, 900, 1600, 1200));
+        // 大きな被写体なら、余白を足しても画像より大きくしない
+        let big = CropRect::new(0, 0, 3900, 2900);
+        assert_eq!(subject_crop(size, big, FREE), Some(CropRect::whole(size)));
     }
 }

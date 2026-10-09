@@ -47,6 +47,8 @@ mod pyfmt;
 pub mod pyrandom;
 pub mod redeye;
 pub mod resize;
+#[cfg(target_os = "macos")]
+pub mod saliency;
 pub mod sample;
 pub mod save;
 pub mod shapes;

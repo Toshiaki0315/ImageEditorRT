@@ -1,4 +1,4 @@
-// 自動の処理（旧版にはない）: 傾きの自動補正・背景の被写体・顔／文字を見つけて隠す・肌のための顔・自動補正。
+// 自動の処理（旧版にはない）: 傾きの自動補正・おまかせ切り抜き・背景の被写体・顔／文字を見つけて隠す・肌のための顔・自動補正。
 // どれも Rust（macOS の Vision・色の分布）に問い合わせ、エラーはダイアログ、結果はステータスバーで知らせる。
 // 部品（photoControls・privacy・panel）には問い合わせ方だけを渡し、ここで画面の文をまとめて持つ。
 
@@ -31,6 +31,16 @@ export function setupAssist() {
     });
   };
   photo.onNoSubject = () => notify("被写体が見つからないので、背景はそのままにしました");
+
+  parts.crop.findSubjectCrop = (aspect) => {
+    notify("目立つ被写体を探しています…");
+    return invoke<CropRect | null>("auto_crop", { settings: state.settings, aspect }).catch((error) => {
+      void showError("おまかせで切り抜けません", error);
+      return undefined;
+    });
+  };
+  parts.crop.onAutoCrop = (found) =>
+    notify(found ? "目立つ被写体に合わせて範囲を選びました（ドラッグで直せます）" : "目立つ被写体が見つからないので、範囲はそのままにしました");
 
   parts.privacy.find = (target) =>
     invoke<CropRect[]>(TARGETS[target].command, { settings: state.settings }).catch((error) => {

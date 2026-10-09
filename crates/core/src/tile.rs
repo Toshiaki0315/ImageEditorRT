@@ -195,6 +195,44 @@ mod tests {
     }
 
     #[test]
+    fn logo_is_repeated_over_the_whole_photo() {
+        // 赤い四角のロゴ（まわりは透明）を書き出して、白い写真に敷き詰める
+        let dir = std::env::temp_dir().join(format!("imageeditorrt-tile-logo-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("logo.png");
+        RgbaImage::from_fn(40, 20, |x, _| {
+            if (10..30).contains(&x) {
+                Rgba([255, 0, 0, 255])
+            } else {
+                Rgba([0, 0, 0, 0])
+            }
+        })
+        .save(&path)
+        .unwrap();
+        let mut image = RgbaImage::from_pixel(600, 400, Rgba([255, 255, 255, 255]));
+        let logo = LogoSettings {
+            path: path.to_string_lossy().into_owned(),
+            position: TextPosition::Tiled,
+            size: 10.0,
+            opacity: 100,
+        };
+        draw_tiled_logo(&mut image, &logo);
+        let red = |x: u32, y: u32| {
+            (x..x + 120).flat_map(|x| (y..y + 120).map(move |y| (x, y))).any(|(x, y)| {
+                let p = image.get_pixel(x, y);
+                p[0] > 200 && p[1] < 80
+            })
+        };
+        for (x, y) in [(0, 0), (480, 0), (0, 280), (480, 280), (240, 140)] {
+            assert!(red(x, y), "({x}, {y}) の近くにロゴがない");
+        }
+        // ロゴの透明な部分は写真をそのまま残す（全体を塗りつぶさない）
+        let white = image.pixels().filter(|p| p.0 == [255, 255, 255, 255]).count();
+        assert!(white > 600 * 400 / 2, "{white}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn rotation_keeps_the_whole_stamp() {
         let stamp = RgbaImage::from_pixel(40, 10, Rgba([255, 0, 0, 255]));
         let rotated = rotate(&stamp, TILE_ANGLE.to_radians());

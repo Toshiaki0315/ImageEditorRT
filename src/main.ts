@@ -175,7 +175,7 @@ function connectControls() {
 }
 
 /**
- * Esc キーで範囲の指定を解除する: 投稿加工の範囲の選択・部分補正の道具や範囲の選択があれば（そのタブで）先にそれをやめ、
+ * Esc キーで範囲の指定を解除する: 投稿加工の選んでいる範囲は取り消し、部分補正の道具や範囲の選択はやめる（そのタブで先に）。それも
  * なければトリミング範囲をクリアする（範囲はどのタブでもプレビューに出ていて、ドラッグで選べるので、どのタブでも）。
  * 文字の入力中・ダイアログを開いているとき・100% 表示の間は、何もしない。
  */
@@ -185,7 +185,7 @@ function setupEscape() {
     if (isEditingText() || document.querySelector("dialog[open]")) return;
     const tab = tabs.selected();
     const handled =
-      (tab === "privacy" && parts.privacy.deselect()) ||
+      (tab === "privacy" && parts.privacy.cancelSelected()) ||
       (tab === "adjust" && parts.localPanel.cancel()) ||
       parts.crop.cancelRange();
     if (handled) event.preventDefault();

@@ -142,12 +142,14 @@ export class PrivacyPanel {
     this.draw();
   }
 
-  /** Esc キー: 選んでいる範囲の選択を外す（範囲は消さない。ドラッグの途中ならドラッグもやめる）。選んでいなければ false。 */
-  deselect(): boolean {
+  /**
+   * Esc キー: 選んでいる（青い線の）範囲を取り消す（「範囲を削除」と同じ。元に戻せる。ほかの範囲はそのまま）。
+   * ドラッグの途中ならドラッグもやめる。選んでいなければ false。
+   */
+  cancelSelected(): boolean {
     this.drag = null;
     if (this.selected === null) return false;
-    this.selected = null;
-    this.show();
+    this.remove();
     return true;
   }
 

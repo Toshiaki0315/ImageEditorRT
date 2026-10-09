@@ -84,6 +84,13 @@ pub struct Preset {
     /// 肌をなめらかに（旧版にはない）。0 以外のときだけファイルに書く
     #[serde(skip_serializing_if = "is_zero_u32")]
     pub skin_smooth: u32,
+    /// 赤目の補正（旧版にはない）。するときだけファイルに書く
+    #[serde(skip_serializing_if = "is_false")]
+    pub red_eye: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 fn is_zero_u32(value: &u32) -> bool {
@@ -130,6 +137,7 @@ impl Preset {
             hsl: s.hsl,
             logo: s.logo.clone(),
             skin_smooth: s.skin_smooth,
+            red_eye: s.red_eye,
         }
     }
 
@@ -163,6 +171,7 @@ impl Preset {
             hsl: self.hsl,
             logo: self.logo.clone(),
             skin_smooth: self.skin_smooth,
+            red_eye: self.red_eye,
             ..settings.clone()
         }
     }
@@ -454,6 +463,7 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
             "hsl" => p.hsl = hsl_from_value(raw)?,
             "logo" => p.logo = enum_value(raw)?,
             "skin_smooth" => p.skin_smooth = int_value::<u32>(number()?)?.min(100),
+            "red_eye" => p.red_eye = raw.as_bool()?,
             "exposure" => p.exposure = python_float(raw)?,
             "brightness" => p.brightness = int_value(number()?)?,
             "contrast" => p.contrast = int_value(number()?)?,
@@ -585,6 +595,18 @@ mod tests {
         assert_eq!((wide.highlights, wide.shadows), (100, -100));
         let applied = set.apply(&EditSettings::default());
         assert_eq!((applied.highlights, applied.shadows), (-30, 45));
+    }
+
+    #[test]
+    fn red_eye_is_written_only_when_set() {
+        let plain = Preset::from_settings("A", &EditSettings::default());
+        assert!(!presets_json(std::slice::from_ref(&plain)).contains("red_eye"));
+        let set = Preset { red_eye: true, ..plain };
+        let text = presets_json(std::slice::from_ref(&set));
+        assert!(text.contains("\"red_eye\": true"), "{text}");
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
+        assert!(set.apply(&EditSettings::default()).red_eye);
     }
 
     #[test]

@@ -80,6 +80,8 @@ export type EditSettings = {
   logo: LogoSettings;
   /** 肌をなめらかに 0〜100（見つけた顔のまわりだけ） */
   skinSmooth: number;
+  /** 赤目の補正（見つけた顔の目のあたりだけ） */
+  redEye: boolean;
 };
 
 /** ロゴの透かし（Rust の logo::LogoSettings）。size は写真の短辺に対する %、opacity は %。 */
@@ -148,6 +150,7 @@ export function defaultSettings(): EditSettings {
     hsl: neutralHsl(),
     logo: { path: "", position: "bottom_right", size: 15, opacity: 80 },
     skinSmooth: 0,
+    redEye: false,
   };
 }
 

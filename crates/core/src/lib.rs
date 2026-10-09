@@ -43,6 +43,7 @@ pub mod presets;
 pub mod privacy;
 mod pyfmt;
 pub mod pyrandom;
+pub mod redeye;
 pub mod resize;
 pub mod sample;
 pub mod save;

@@ -250,8 +250,8 @@ pub fn process_image_at(
     let date = loaded.raw_exif.as_deref().and_then(crate::exif_info::capture_date);
     settings.text.text = crate::text::expand_placeholders(&settings.text.text, date.as_ref());
     let mut image = decoded.image;
-    // 肌をなめらかに: 縮めた画像で顔を見つけ、ほかの加工より前にかける（画面と同じ前処理）
-    if settings.skin_smooth > 0 {
+    // 肌をなめらかに・赤目の補正: 縮めた画像で顔を見つけ、ほかの加工より前にかける（画面と同じ前処理）
+    if crate::prepare::uses_faces(&settings) {
         let (small, _) = crate::pipeline::make_preview(&image, crate::pipeline::PREVIEW_MAX_SIDE);
         let faces = crate::faces::detect_faces(&small)?;
         let sources =

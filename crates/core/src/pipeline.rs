@@ -103,6 +103,8 @@ pub struct EditSettings {
     pub logo: LogoSettings,
     /// 肌をなめらかに 0〜100（顔の枠が要るので、背景と同じくアプリ本体が元の画像に前もってかける。旧版にはない）
     pub skin_smooth: u32,
+    /// 赤目の補正（肌をなめらかにと同じく、顔の枠を使って元の画像に前もってかける。旧版にはない）
+    pub red_eye: bool,
 }
 
 impl Default for EditSettings {
@@ -144,6 +146,7 @@ impl Default for EditSettings {
             hsl: [HslAdjust::default(); HSL_BANDS],
             logo: LogoSettings::default(),
             skin_smooth: 0,
+            red_eye: false,
         }
     }
 }

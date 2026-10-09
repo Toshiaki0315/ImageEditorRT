@@ -21,7 +21,7 @@ import { type ClipboardContents, pasteAction, pasteStamp } from "./paste";
 import { presetNames } from "./presetsUi";
 import { notify, showError, updateStatus } from "./status";
 import { defaultSettings, type OpenInfo } from "./types";
-import { fitToWindow, setComparing, updateGuide } from "./view";
+import { fitToWindow, setComparing, stopSplit, updateGuide } from "./view";
 
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
 const LOAD_ERROR_TITLE = "画像を読み込めません";
@@ -267,6 +267,7 @@ export async function resetImage() {
   state.savedSettings = null;
   state.notes = [];
   preview.clear();
+  stopSplit();
   Object.assign(state.settings, defaultSettings());
   parts.panel.show();
   preview.trimmed = false;

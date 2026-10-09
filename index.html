@@ -13,6 +13,13 @@
         <div id="placeholder" class="placeholder">ここに画像をドロップしてください</div>
         <div class="frame">
           <canvas id="canvas" class="preview" hidden></canvas>
+          <!-- 左右に分けて比べる（表示 > 左右に分けて比べる）。境目の左に加工前を重ね、境目をドラッグで動かす -->
+          <div id="split" class="split" hidden>
+            <canvas id="split-canvas" class="split-canvas"></canvas>
+            <div id="split-line" class="split-line" role="separator" aria-label="加工前と加工後の境目"></div>
+            <span class="split-label split-label-before">加工前</span>
+            <span class="split-label split-label-after">加工後</span>
+          </div>
           <!-- トリミング範囲の選択（範囲の外を暗くし、ドラッグで選ぶ） -->
           <svg id="overlay" class="overlay" hidden></svg>
           <!-- 投稿加工の範囲（「投稿加工」タブを開いている間だけ。ドラッグで足す・動かす） -->
@@ -360,6 +367,7 @@
               <tr><td>⌥⌘C ／ ⌥⌘V</td><td>加工をコピー／ペースト</td></tr>
               <tr><td>⌘T</td><td>文字・透かし</td></tr>
               <tr><td>\（押している間）</td><td>加工前を見る</td></tr>
+              <tr><td>⌘B</td><td>左右に分けて加工前と比べる（境目はドラッグで動かす）</td></tr>
               <tr><td>⌘1 ／ ⌘0</td><td>100% で表示／画面に合わせる</td></tr>
               <tr><td>⇧⌘H</td><td>ヒストグラムの表示・非表示</td></tr>
               <tr><td>⌘?</td><td>この使い方</td></tr>

@@ -20,6 +20,7 @@ export const MENU = {
   actualSize: "actual_size",
   fit: "fit",
   histogram: "histogram",
+  split: "split",
   help: "help",
   presetSave: "preset-save",
   presetExport: "preset-export",
@@ -38,7 +39,7 @@ function setMenuEnabled(id: string, enabled: boolean) {
   void invoke("set_menu_enabled", { id, enabled });
 }
 
-/** メニューの「元に戻す」「やり直す」「加工をコピー／ペースト」「100% で表示」「画面に合わせる」を、今の状態に合わせる。 */
+/** メニューの「元に戻す」「やり直す」「加工をコピー／ペースト」「100% で表示」「画面に合わせる」「左右に分けて比べる」を、今の状態に合わせる。 */
 export function updateMenus() {
   const editable = state.loaded !== null && !state.saving;
   setMenuEnabled(MENU.undo, editable && (parts.recorder?.canUndo() ?? false));
@@ -47,6 +48,7 @@ export function updateMenus() {
   setMenuEnabled(MENU.pasteLook, editable && state.copiedLook !== null);
   setMenuEnabled(MENU.actualSize, state.loaded !== null && !isZoomed());
   setMenuEnabled(MENU.fit, isZoomed());
+  setMenuEnabled(MENU.split, state.loaded !== null && !isZoomed());
 }
 
 /** チェックの付く項目の状態を変える。 */

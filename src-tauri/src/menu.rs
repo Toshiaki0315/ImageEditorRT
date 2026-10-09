@@ -37,6 +37,8 @@ pub const ACTUAL_SIZE: &str = "actual_size";
 pub const FIT: &str = "fit";
 /// 「表示 > ヒストグラム」（チェックの付く項目。状態は画面が環境設定に残し、set_menu_checked で合わせる）
 pub const HISTOGRAM: &str = "histogram";
+/// 「表示 > 左右に分けて比べる」（チェックの付く項目。境目の左に加工前、右に加工後）
+pub const SPLIT: &str = "split";
 /// 「ヘルプ > ImageEditorRT の使い方」（機能とキーボードショートカットの一覧を画面に出す）
 pub const HELP: &str = "help";
 
@@ -118,10 +120,16 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .accelerator("CmdOrCtrl+0")
         .enabled(false)
         .build(app)?;
+    let split = CheckMenuItemBuilder::with_id(SPLIT, "左右に分けて比べる")
+        .accelerator("CmdOrCtrl+B")
+        .checked(false)
+        .enabled(false)
+        .build(app)?;
     let view = SubmenuBuilder::new(app, "表示")
         .item(&actual_size)
         .item(&fit)
         .separator()
+        .item(&split)
         .item(&histogram)
         .separator()
         .fullscreen_with_text("フルスクリーンにする")

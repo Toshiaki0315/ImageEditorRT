@@ -782,6 +782,46 @@ mod tests {
     }
 
     #[test]
+    fn local_contrast_temperature_and_saturation_work_inside_only() {
+        // 左半分は赤みのある灰色、右半分は暗い青。円は画像の真ん中（どちらにもかかる）
+        let original = RgbaImage::from_fn(200, 100, |x, _| {
+            if x < 100 {
+                image::Rgba([170, 120, 110, 255])
+            } else {
+                image::Rgba([40, 60, 120, 255])
+            }
+        });
+        let circle = |a: LocalAdjust| EditSettings {
+            local_adjustments: vec![LocalAdjust {
+                shape: local::LocalShape::Ellipse { rect: CropRect::new(50, 0, 100, 100) },
+                feather: 0,
+                ..a
+            }],
+            ..EditSettings::default()
+        };
+        let out = |a: LocalAdjust| apply_edits(&original, &circle(a)).unwrap();
+        let (inside_left, inside_right, outside) = ((90, 50), (110, 50), (5, 50));
+        let px = |image: &RgbaImage, (x, y): (u32, u32)| image.get_pixel(x, y).0;
+        // 色温度（全体と同じ向き）: 下げると円の中だけ暖かく（赤が増え青が減る）、上げると青く
+        let warm = out(LocalAdjust { temperature: 3000, ..LocalAdjust::default() });
+        let (before, after) = (px(&original, inside_left), px(&warm, inside_left));
+        assert!(after[0] > before[0] && after[2] < before[2], "{before:?} → {after:?}");
+        assert_eq!(px(&warm, outside), px(&original, outside));
+        let cool = px(&out(LocalAdjust { temperature: 9000, ..LocalAdjust::default() }), inside_left);
+        assert!(cool[0] < before[0] && cool[2] > before[2], "{before:?} → {cool:?}");
+        // 彩度 -100 なら円の中は灰色に
+        let gray = out(LocalAdjust { saturation: -100, ..LocalAdjust::default() });
+        let p = px(&gray, inside_right);
+        assert!(p[0].abs_diff(p[2]) <= 2, "{p:?}");
+        assert_eq!(px(&gray, outside), px(&original, outside));
+        // コントラストを上げると、明るい左と暗い右の差が円の中で広がる
+        let contrast = out(LocalAdjust { contrast: 60, ..LocalAdjust::default() });
+        let spread =
+            |image: &RgbaImage| i32::from(px(image, inside_left)[1]) - i32::from(px(image, inside_right)[1]);
+        assert!(spread(&contrast) > spread(&original), "{} → {}", spread(&original), spread(&contrast));
+    }
+
+    #[test]
     fn local_adjustments_land_on_the_same_place_in_preview_and_save() {
         let original = RgbaImage::from_pixel(400, 200, image::Rgba([100, 100, 100, 255]));
         // 右半分を切り抜き、その中の円（原寸 240〜360 × 40〜160）だけ明るくする

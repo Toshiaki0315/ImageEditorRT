@@ -598,6 +598,34 @@ mod tests {
     }
 
     #[test]
+    fn text_effect_and_tiled_position_round_trip() {
+        let text = TextSettings {
+            text: "© me".into(),
+            effect: TextEffect::Outline,
+            position: TextPosition::Tiled,
+            ..TextSettings::default()
+        };
+        let set = Preset { text, ..Preset::from_settings("A", &EditSettings::default()) };
+        let json = presets_json(std::slice::from_ref(&set));
+        assert!(
+            json.contains("\"effect\": \"outline\"") && json.contains("\"position\": \"tiled\""),
+            "{json}"
+        );
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
+        // 飾りなしは書かない。知らない飾りは「なし」として読む（ほかの項目はそのまま）
+        let plain = Preset::from_settings("B", &EditSettings::default());
+        assert!(!presets_json(std::slice::from_ref(&plain)).contains("effect"));
+        let unknown =
+            serde_json::json!({"name": "C", "text": {"text": "x", "effect": "glow", "position": "tiled"}});
+        let read = preset_from_value(&unknown).unwrap();
+        assert_eq!(
+            (read.text.effect, read.text.position, read.text.text.as_str()),
+            (TextEffect::None, TextPosition::Tiled, "x")
+        );
+    }
+
+    #[test]
     fn red_eye_is_written_only_when_set() {
         let plain = Preset::from_settings("A", &EditSettings::default());
         assert!(!presets_json(std::slice::from_ref(&plain)).contains("red_eye"));

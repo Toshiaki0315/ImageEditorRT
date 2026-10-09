@@ -137,9 +137,8 @@ pub async fn auto_crop(
     let opened = state.opened()?;
     blocking(move || {
         let image = pipeline::straightened(&opened.preview, &settings);
-        let Some(found) = imageeditorrt_core::saliency::salient_rect(&image)? else { return Ok(None) };
         let size = settings.orientation.size(opened.original.dimensions());
-        Ok(imageeditorrt_core::crop::subject_crop(size, found.to_original(opened.factor), aspect))
+        imageeditorrt_core::saliency::auto_crop(&image, opened.factor, size, aspect)
     })
     .await
 }

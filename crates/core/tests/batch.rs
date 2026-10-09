@@ -304,3 +304,27 @@ fn output_format_changes_the_suffix() {
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+#[cfg(target_os = "macos")]
+fn batch_can_save_as_heic() {
+    use imageeditorrt_core::decode::decode_file;
+    use imageeditorrt_core::exif_info::read_exif_info;
+    use imageeditorrt_core::formats::Format;
+    let dir = temp_dir("heic");
+    // EXIF のある JPEG を、形式を HEIC にして保存する
+    let source = dir.join("in/canon.jpg");
+    std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+    std::fs::copy(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/canon.jpg"), &source).unwrap();
+    let heic = BatchOptions { format: OutputFormat::Heic, ..options(plain(), None) };
+    let out = imageeditorrt_core::batch::process_image(&source, &dir.join("out"), &heic).unwrap();
+    assert_eq!(out, dir.join("out/canon.heic"));
+    let bytes = std::fs::read(&out).unwrap();
+    let decoded = decode_file(&bytes).unwrap();
+    assert_eq!(decoded.format, Format::Heif);
+    assert_eq!(decoded.image.dimensions(), image::open(&source).unwrap().to_rgba8().dimensions());
+    // EXIF（機種）は残る
+    let info = read_exif_info(&bytes);
+    assert!(info.entries.iter().any(|e| e.tag == "Make" && e.value == "Canon"), "{:?}", info.entries);
+    std::fs::remove_dir_all(&dir).unwrap();
+}

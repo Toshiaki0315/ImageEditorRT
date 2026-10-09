@@ -20,6 +20,7 @@ export const MENU = {
   actualSize: "actual_size",
   fit: "fit",
   histogram: "histogram",
+  help: "help",
   presetSave: "preset-save",
   presetExport: "preset-export",
   presetImport: "preset-import",

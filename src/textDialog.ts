@@ -1,7 +1,7 @@
 // 「文字・透かし」のダイアログ（旧版 FR-UI-47）。開いたまま調整でき、変更はすぐ設定とプレビューに反映する。
 
 import { open } from "@tauri-apps/plugin-dialog";
-import type { EditSettings, LogoSettings, TextFont, TextPosition } from "./types";
+import type { EditSettings, LogoSettings, TextEffect, TextFont, TextPosition } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -18,6 +18,7 @@ export class TextDialog {
   private readonly opacity = $<HTMLInputElement>("text-opacity");
   private readonly opacityValue = $<HTMLOutputElement>("text-opacity-value");
   private readonly position = $<HTMLSelectElement>("text-position");
+  private readonly effect = $<HTMLSelectElement>("text-effect");
   private readonly logoName = $<HTMLElement>("logo-name");
   private readonly logoClear = $<HTMLButtonElement>("logo-clear");
   private readonly logoSize = $<HTMLInputElement>("logo-size");
@@ -53,6 +54,7 @@ export class TextDialog {
     this.color.addEventListener("input", () => this.update({ color: fromHex(this.color.value) }));
     this.opacity.addEventListener("input", () => this.update({ opacity: Number(this.opacity.value) }));
     this.position.addEventListener("change", () => this.update({ position: this.position.value as TextPosition }));
+    this.effect.addEventListener("change", () => this.update({ effect: this.effect.value as TextEffect }));
     $<HTMLButtonElement>("text-clear").addEventListener("click", () => this.update({ text: "" }));
     $<HTMLButtonElement>("insert-date").addEventListener("click", () => this.insert("{日付}"));
     $<HTMLButtonElement>("insert-date-time").addEventListener("click", () => this.insert("{日時}"));
@@ -81,6 +83,7 @@ export class TextDialog {
     this.opacity.value = String(t.opacity);
     this.opacityValue.textContent = `${t.opacity}%`;
     this.position.value = t.position;
+    this.effect.value = t.effect ?? "none";
     const logo = this.settings.logo;
     this.logoName.textContent = logo.path ? (logo.path.split("/").pop() ?? logo.path) : "（なし）";
     this.logoName.title = logo.path;

@@ -29,6 +29,7 @@ import {
 import { MENU, setMenuChecked } from "./menus";
 import { Panel } from "./panel";
 import { PhotoControls } from "./photoControls";
+import { LocalPanel } from "./localPanel";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
 import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
@@ -105,6 +106,7 @@ async function createParts() {
   parts.photoControls = new PhotoControls(settings, () => state.loaded !== null, userChanged);
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
+  parts.localPanel = new LocalPanel($("local-extra"), settings, dom.canvas, orientedSize, userChanged);
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
   parts.textDialog.logoExtensions = state.extensions;
@@ -129,6 +131,7 @@ function orientedSize(): [number, number] | null {
 function updateOverlays() {
   parts.privacy.setActive(tabs.selected() === "privacy" && !preview.trimmed);
   parts.crop.setGuideActive(tabs.selected() === "crop");
+  parts.localPanel.setActive(tabs.selected() === "adjust" && !preview.trimmed);
 }
 
 /** ボタン・プレビューの操作をつなぐ。 */
@@ -152,6 +155,7 @@ function connectControls() {
   preview.onResize = () => {
     parts.crop.draw();
     parts.privacy.draw();
+    parts.localPanel.draw();
     void updateGuide();
     placeBadge();
   };

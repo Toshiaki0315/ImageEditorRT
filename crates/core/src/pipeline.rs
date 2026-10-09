@@ -21,6 +21,7 @@ pub use crate::filters::FilterType;
 pub use crate::frames::FrameType;
 use crate::frames::{self, FRAME_COLOR};
 use crate::histogram::{compute_histogram, Histogram};
+use crate::local::{self, LocalAdjust};
 use crate::logo;
 pub use crate::logo::LogoSettings;
 use crate::privacy::{self, Region};
@@ -91,6 +92,8 @@ pub struct EditSettings {
     pub corner_radius: u32,
     /// 投稿加工で隠す範囲（ぼかし・モザイクは回転・反転の直後に、スタンプは経年劣化の後にかける。旧版にはない）
     pub regions: Vec<Region>,
+    /// 部分補正（円・帯の範囲の中だけの調整。色の調整の直後にかける。写真ごとの範囲なのでプリセットには入れない。旧版にはない）
+    pub local_adjustments: Vec<LocalAdjust>,
     /// 背景を消す（旧版にはない）。被写体のマスクが要るので、ここの処理ではかけず、アプリ本体が元の画像に
     /// 前もってかける（`background::apply_background`）
     pub background: Background,
@@ -148,6 +151,7 @@ impl Default for EditSettings {
             logo: LogoSettings::default(),
             skin_smooth: 0,
             red_eye: false,
+            local_adjustments: Vec::new(),
         }
     }
 }
@@ -229,7 +233,8 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
     let stamp_place = (scale, (photo.x as f64 * scale.0, photo.y as f64 * scale.1));
 
     let reference = f64::from(image.width().min(image.height()));
-    let image = apply_detail(apply_basic_adjustments(image, settings), settings, reference, None);
+    let adjusted = apply_local_adjustments(apply_basic_adjustments(image, settings), settings, stamp_place);
+    let image = apply_detail(adjusted, settings, reference, None);
     let image = apply_diorama_and_filter(image, settings, None);
     let mut image = image;
     adjust::vignette(&mut image, settings.vignette);
@@ -322,7 +327,12 @@ pub fn render_preview_with_histogram(
     let reference = rect.map_or(f64::from(image.width().min(image.height())), |r| r.short_side() as f64);
     // シャープの半径の下限は保存時の写真に対するものなので、保存する写真の短辺も渡す
     let output = saved_photo_short_side(image.dimensions(), settings, factor);
-    let adjusted = apply_detail(apply_basic_adjustments(image, settings), settings, reference, output);
+    let adjusted = apply_local_adjustments(
+        apply_basic_adjustments(image, settings),
+        settings,
+        ((factor, factor), (0.0, 0.0)),
+    );
+    let adjusted = apply_detail(adjusted, settings, reference, output);
     // ジオラマの帯は写真（実際に切り抜く範囲）に対する位置に置き、全体表示では外側にも続ける
     let mut rendered = apply_diorama_and_filter(adjusted, settings, rect);
     // スタンプの位置のずれ（切り抜いた表示なら、切り抜いた範囲の左上の分）
@@ -570,6 +580,27 @@ fn scale(value: i64, factor: f64) -> i64 {
 
 /// フィルターの前にかける基本補正（露出 → 明るさ → コントラスト → 色温度 → トーンカーブ → ハイライト／シャドウ →
 /// 彩度 → 色ごとの調整）。露出〜トーンカーブは 1 つの変換表にまとめて 1 回でかける。
+/// 部分補正をかける。place は原寸の座標からこの画像の座標への換算（倍率, ずれ）。
+fn apply_local_adjustments(
+    image: RgbaImage,
+    settings: &EditSettings,
+    (scale, offset): ((f64, f64), (f64, f64)),
+) -> RgbaImage {
+    if settings.local_adjustments.is_empty() {
+        return image;
+    }
+    local::apply_local(image, &settings.local_adjustments, scale, offset, |image, a| {
+        let only = EditSettings {
+            exposure: a.exposure,
+            contrast: a.contrast,
+            temperature: a.temperature,
+            saturation: a.saturation,
+            ..EditSettings::default()
+        };
+        apply_basic_adjustments(image.clone(), &only)
+    })
+}
+
 fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> RgbaImage {
     let mut lut: Lut = adjust::identity_lut();
     if settings.exposure != 0.0 {
@@ -748,6 +779,31 @@ mod tests {
         let guide = diorama_guide((200, 100), &vertical, 1.0);
         assert!(!guide.horizontal);
         assert!((guide.lines[1].0 - 0.4).abs() < 1e-9);
+    }
+
+    #[test]
+    fn local_adjustments_land_on_the_same_place_in_preview_and_save() {
+        let original = RgbaImage::from_pixel(400, 200, image::Rgba([100, 100, 100, 255]));
+        // 右半分を切り抜き、その中の円（原寸 240〜360 × 40〜160）だけ明るくする
+        let settings = EditSettings {
+            crop: Some(CropRect::new(200, 0, 200, 200)),
+            local_adjustments: vec![LocalAdjust {
+                shape: local::LocalShape::Ellipse { rect: CropRect::new(240, 40, 120, 120) },
+                exposure: 1.0,
+                feather: 0,
+                ..LocalAdjust::default()
+            }],
+            ..EditSettings::default()
+        };
+        // 保存: 切り抜いた画像（200×200）の (100, 100) が円の中心
+        let saved = apply_edits(&original, &settings).unwrap();
+        assert!(saved.get_pixel(100, 100)[0] > 120 && saved.get_pixel(5, 5)[0] == 100);
+        // プレビュー（半分の大きさ・全体表示）: (150, 50) が円の中心、切り抜く範囲の外は変えない
+        let small = RgbaImage::from_pixel(200, 100, image::Rgba([100, 100, 100, 255]));
+        let preview = render_preview(&small, &settings, 0.5, false);
+        assert!(preview.get_pixel(150, 50)[0] > 120 && preview.get_pixel(105, 5)[0] == 100);
+        // 加工前の表示には部分補正を入れない
+        assert!(before_settings((400, 200), &settings).local_adjustments.is_empty());
     }
 
     #[test]

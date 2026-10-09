@@ -105,16 +105,17 @@ pub fn stamp_list() -> Vec<&'static str> {
     imageeditorrt_core::privacy::STAMPS.to_vec()
 }
 
-/// 回転・反転（トリミング範囲・投稿加工の範囲も一緒に回す）。
+/// 回転・反転（トリミング範囲・投稿加工の範囲・部分補正の範囲も一緒に回す）。
 #[tauri::command]
 pub fn crop_orient(
     orientation: Orientation,
     op: OrientOp,
     crop: Option<CropRect>,
     regions: Vec<Region>,
+    local_adjustments: Vec<imageeditorrt_core::local::LocalAdjust>,
     size: (u32, u32),
 ) -> Oriented {
-    crop::orient(orientation, op, crop, &regions, size)
+    crop::orient(orientation, op, crop, &regions, &local_adjustments, size)
 }
 
 /// 「出力」タブのサイズ変更: 欄に出す幅・高さと、編集設定に渡す幅・高さ。

@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::frames::{window_aspect, FrameType};
+use crate::local::{LocalAdjust, LocalShape};
 use crate::privacy::Region;
 use crate::shapes::ShapeType;
 use crate::transform::{
@@ -218,7 +219,7 @@ pub fn subject_crop(size: (u32, u32), subject: CropRect, aspect: AspectChoice) -
 }
 
 /// 回転・反転の結果。
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Oriented {
     pub orientation: Orientation,
@@ -226,19 +227,36 @@ pub struct Oriented {
     pub crop: Option<CropRect>,
     /// 一緒に回した、投稿加工の範囲
     pub regions: Vec<Region>,
+    /// 一緒に回した、部分補正の範囲
+    pub local_adjustments: Vec<LocalAdjust>,
     /// 回転・反転した後の原寸画像の大きさ
     pub size: (u32, u32),
 }
 
 /// 表示中の向きに対して回転・反転する（旧版 FR-UI-55）。size は今の向きの原寸画像の大きさ。
-/// トリミング範囲と投稿加工の範囲も、同じ写真の部分を指すよう一緒に回す。
+/// トリミング範囲・投稿加工の範囲・部分補正の範囲も、同じ写真の部分を指すよう一緒に回す。
 pub fn orient(
     orientation: Orientation,
     op: OrientOp,
     crop: Option<CropRect>,
     regions: &[Region],
+    local_adjustments: &[LocalAdjust],
     size: (u32, u32),
 ) -> Oriented {
+    let point = |[x, y]: [i64; 2]| {
+        let p = transform_rect(CropRect::new(x, y, 0, 0), size, op);
+        [p.x, p.y]
+    };
+    let local_adjustments = local_adjustments
+        .iter()
+        .map(|a| LocalAdjust {
+            shape: match a.shape {
+                LocalShape::Ellipse { rect } => LocalShape::Ellipse { rect: transform_rect(rect, size, op) },
+                LocalShape::Band { from, to } => LocalShape::Band { from: point(from), to: point(to) },
+            },
+            ..*a
+        })
+        .collect();
     let rect = crop.and_then(|r| clamp_crop(r, size));
     let regions = regions
         .iter()
@@ -251,6 +269,7 @@ pub fn orient(
         orientation: orientation.apply(op),
         crop: rect.map(|r| transform_rect(r, size, op)),
         regions,
+        local_adjustments,
         size: if op.swaps_sides() { (size.1, size.0) } else { size },
     }
 }
@@ -367,6 +386,16 @@ mod tests {
                 // 画像の外の範囲は捨てる
                 Region { rect: CropRect::new(500, 500, 10, 10), ..Region::default() },
             ],
+            &[
+                LocalAdjust {
+                    shape: LocalShape::Ellipse { rect: CropRect::new(10, 20, 30, 40) },
+                    ..LocalAdjust::default()
+                },
+                LocalAdjust {
+                    shape: LocalShape::Band { from: [0, 0], to: [0, 50] },
+                    ..LocalAdjust::default()
+                },
+            ],
             (200, 100),
         );
         assert_eq!(result.orientation, Orientation::new(90, false));
@@ -381,7 +410,15 @@ mod tests {
                 ..Region::default()
             }]
         );
-        let flipped = orient(Orientation::default(), OrientOp::FlipHorizontal, None, &[], (200, 100));
+        // 部分補正の円は範囲と同じく、帯の端の点も一緒に回す（右に回すと上端の帯は右端から）
+        assert_eq!(
+            result.local_adjustments.iter().map(|a| a.shape).collect::<Vec<_>>(),
+            [
+                LocalShape::Ellipse { rect: CropRect::new(40, 10, 40, 30) },
+                LocalShape::Band { from: [100, 0], to: [50, 0] },
+            ]
+        );
+        let flipped = orient(Orientation::default(), OrientOp::FlipHorizontal, None, &[], &[], (200, 100));
         assert_eq!((flipped.size, flipped.crop), ((200, 100), None));
     }
 

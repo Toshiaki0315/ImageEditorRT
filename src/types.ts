@@ -82,6 +82,21 @@ export type EditSettings = {
   skinSmooth: number;
   /** 赤目の補正（見つけた顔の目のあたりだけ） */
   redEye: boolean;
+  /** 部分補正（円・帯の範囲の中だけの調整。回転・反転した後の原寸の座標） */
+  localAdjustments: LocalAdjust[];
+};
+
+/** 部分補正の範囲の形（Rust の local::LocalShape）。 */
+export type LocalShape = { kind: "ellipse"; rect: CropRect } | { kind: "band"; from: [number, number]; to: [number, number] };
+
+/** 部分補正の 1 つ分（Rust の local::LocalAdjust）。feather は楕円の境目のぼかし幅（%）。 */
+export type LocalAdjust = {
+  shape: LocalShape;
+  exposure: number;
+  contrast: number;
+  temperature: number;
+  saturation: number;
+  feather: number;
 };
 
 /** ロゴの透かし（Rust の logo::LogoSettings）。size は写真の短辺に対する %、opacity は %。 */
@@ -151,6 +166,7 @@ export function defaultSettings(): EditSettings {
     logo: { path: "", position: "bottom_right", size: 15, opacity: 80 },
     skinSmooth: 0,
     redEye: false,
+    localAdjustments: [],
   };
 }
 

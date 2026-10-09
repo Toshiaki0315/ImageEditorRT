@@ -104,5 +104,6 @@
     "opacity": 80
   },
   "skinSmooth": 0,
-  "redEye": false
+  "redEye": false,
+  "localAdjustments": []
 }

@@ -191,6 +191,11 @@ button:disabled {
   stroke-width: 2;
 }
 
+/* 部分補正の帯の終わりの線（ここで効かなくなる） */
+.local-overlay .dashed {
+  stroke-dasharray: 6 4;
+}
+
 .stamp-grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);

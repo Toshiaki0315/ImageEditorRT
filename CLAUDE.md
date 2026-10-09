@@ -64,6 +64,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
     prepare.rs            # 元の画像に前もってかける処理（赤目 → 肌をなめらかに → 背景。顔の枠・マスクは画面側が 1 回作って渡す）
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
+    local.rs              # 部分補正（円・帯の範囲の重みで、範囲の調整をかけた画像を混ぜる）
     curve.rs              # トーンカーブ（単調な 3 次補間）と色ごとの調整（8 色の色相・彩度・明るさ）
     auto.rs               # 自動補正（色の分布から露出・コントラスト・色温度を求める）
     blur.rs               # ガウスぼかし・アンシャープマスク（Pillow と画素まで同じ）
@@ -138,6 +139,7 @@ src/                      # 画面（TypeScript）
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）
   guides.ts               # 切り抜きのガイド線（三分割・黄金比・対角線）の位置の計算
   photoControls.ts        # 「切り抜き」タブの水平の補正（自動を含む）と背景（消す・ぼかす）
+  localPanel.ts / localShapes.ts # 「加工」タブの部分補正（範囲のドラッグ）と範囲の当たり判定・線の位置
   privacy.ts / regions.ts # 「投稿加工」タブ（範囲のドラッグ・顔／文字を見つけて隠す）と範囲の計算
   colorPanel.ts / curve.ts # トーンカーブのグラフと色ごとの調整（曲線の計算は Rust と同じ）
   tasteGallery.ts         # テイストの一覧（見本を並べて選ぶ）

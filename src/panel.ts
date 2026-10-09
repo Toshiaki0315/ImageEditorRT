@@ -73,6 +73,7 @@ export class Panel {
   private readonly rows = new Map<NumberKey, { slider: Slider; input: HTMLInputElement; output: HTMLOutputElement }>();
   private readonly filter = document.createElement("select");
   private readonly direction = document.createElement("select");
+  private readonly redEye = document.createElement("input");
 
   constructor(
     adjustPage: HTMLElement,
@@ -131,6 +132,17 @@ export class Panel {
     adjustPage.append(extra);
     this.heading(adjustPage, "ディテール");
     this.build(adjustPage, DETAIL);
+    // 赤目の補正（旧版にはない。肌をなめらかにと同じく、見つけた顔の目のあたりだけ）
+    const redEyeRow = document.createElement("label");
+    redEyeRow.className = "check";
+    redEyeRow.title = "フラッシュで赤く写った瞳を、暗い色に戻します（顔を見つけて目のあたりだけ。処理はこの Mac の中だけ）";
+    this.redEye.type = "checkbox";
+    this.redEye.addEventListener("change", () => {
+      this.settings.redEye = this.redEye.checked;
+      this.onChange();
+    });
+    redEyeRow.append(this.redEye, " 赤目を補正");
+    adjustPage.append(redEyeRow);
     const reset = document.createElement("button");
     reset.type = "button";
     reset.className = "reset-adjustments";
@@ -221,6 +233,7 @@ export class Panel {
     for (const slider of [...STRENGTH, ...COLOR, ...DETAIL]) this.settings[slider.key] = slider.initial;
     this.settings.toneCurve = identityCurve();
     this.settings.hsl = neutralHsl();
+    this.settings.redEye = false;
     this.show();
     this.onChange();
   }
@@ -229,6 +242,7 @@ export class Panel {
   show() {
     this.filter.value = this.settings.filter;
     this.direction.value = this.settings.dioramaDirection;
+    this.redEye.checked = this.settings.redEye;
     for (const key of this.rows.keys()) this.showRow(key);
     this.updateStrength();
   }

@@ -64,15 +64,15 @@ async function autoAdjust() {
 }
 
 /**
- * 肌をなめらかにするときは、先に顔を探しておく（画像ごとに 1 回）。探し終えたら描き直す（settingsChanged は
+ * 肌をなめらかに・赤目の補正をするときは、先に顔を探しておく（画像ごとに 1 回）。探し終えたら描き直す（settingsChanged は
  * 設定が変わるたびに呼ぶ）。
  */
 function prepareFaces(redraw: () => void) {
-  if (state.settings.skinSmooth === 0 || state.facesPrepared) return;
+  if ((state.settings.skinSmooth === 0 && !state.settings.redEye) || state.facesPrepared) return;
   state.facesPrepared = true;
   void invoke<number>("prepare_faces")
     .then((count) => {
-      if (count === 0) notify("顔が見つからないので、肌をなめらかにする処理はかかりません");
+      if (count === 0) notify("顔が見つからないので、肌をなめらかに・赤目の補正はかかりません");
       redraw();
     })
     .catch((error) => {

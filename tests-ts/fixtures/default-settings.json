@@ -103,5 +103,6 @@
     "size": 15.0,
     "opacity": 80
   },
-  "skinSmooth": 0
+  "skinSmooth": 0,
+  "redEye": false
 }

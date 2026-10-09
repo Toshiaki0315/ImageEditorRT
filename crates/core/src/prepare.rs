@@ -1,4 +1,4 @@
-//! 元の画像に前もってかける処理（肌をなめらかに → 背景を消す・ぼかす。旧版にはない）。
+//! 元の画像に前もってかける処理（赤目の補正 → 肌をなめらかに → 背景を消す・ぼかす。旧版にはない）。
 //!
 //! どちらも Vision で見つけた顔の枠・被写体のマスクが要る。顔の枠・マスクは画像ごとに 1 回、プレビュー用の
 //! 画像（回転・反転する前）から作って覚えておき、ここでかける画像（プレビュー用の画像か原寸）の大きさに合わせる。
@@ -8,8 +8,8 @@ use image::{GrayImage, RgbaImage};
 
 use crate::background::{self, Background};
 use crate::pipeline::EditSettings;
-use crate::skin;
 use crate::transform::CropRect;
+use crate::{redeye, skin};
 
 /// 前もってかける処理の材料（プレビュー用の画像の大きさ・座標）。
 #[derive(Clone, Copy, Debug)]
@@ -24,22 +24,32 @@ pub struct Sources<'a> {
 
 /// settings と材料で、かける処理があるか。
 pub fn needed(settings: &EditSettings, sources: &Sources) -> bool {
-    let skin = settings.skin_smooth > 0 && sources.faces.is_some_and(|f| !f.is_empty());
+    let skin = uses_faces(settings) && sources.faces.is_some_and(|f| !f.is_empty());
     let background = settings.background != Background::Keep && sources.mask.is_some();
     skin || background
 }
 
-/// image（回転・反転する前のプレビュー用の画像か原寸）に、肌をなめらかに → 背景の順でかけた画像を返す。
+/// 顔の枠を使う処理（肌をなめらかに・赤目の補正）があるか。
+pub fn uses_faces(settings: &EditSettings) -> bool {
+    settings.skin_smooth > 0 || settings.red_eye
+}
+
+/// image（回転・反転する前のプレビュー用の画像か原寸）に、赤目 → 肌をなめらかに → 背景の順でかけた画像を返す。
 /// かける処理がなければ None（呼んだ側は元の画像をそのまま使う）。
 pub fn prepare(image: &RgbaImage, settings: &EditSettings, sources: &Sources) -> Option<RgbaImage> {
     if !needed(settings, sources) {
         return None;
     }
     let mut out = image.clone();
-    if let Some(faces) = sources.faces.filter(|_| settings.skin_smooth > 0) {
+    if let Some(faces) = sources.faces.filter(|_| uses_faces(settings)) {
         let scale = f64::from(image.width()) / f64::from(sources.preview_width.max(1));
         let fitted: Vec<CropRect> = faces.iter().map(|r| scale_rect(*r, scale)).collect();
-        skin::smooth_skin(&mut out, &fitted, settings.skin_smooth);
+        if settings.red_eye {
+            redeye::fix_red_eyes(&mut out, &fitted);
+        }
+        if settings.skin_smooth > 0 {
+            skin::smooth_skin(&mut out, &fitted, settings.skin_smooth);
+        }
     }
     if let Some(mask) = sources.mask.filter(|_| settings.background != Background::Keep) {
         out = background::apply_background(&out, mask, settings.background, settings.background_blur);

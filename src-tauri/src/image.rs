@@ -139,14 +139,7 @@ pub async fn auto_crop(
         let image = pipeline::straightened(&opened.preview, &settings);
         let Some(found) = imageeditorrt_core::saliency::salient_rect(&image)? else { return Ok(None) };
         let size = settings.orientation.size(opened.original.dimensions());
-        let to_original = |v: i64| (v as f64 / opened.factor).round() as i64;
-        let subject = CropRect::new(
-            to_original(found.x),
-            to_original(found.y),
-            to_original(found.width),
-            to_original(found.height),
-        );
-        Ok(imageeditorrt_core::crop::subject_crop(size, subject, aspect))
+        Ok(imageeditorrt_core::crop::subject_crop(size, found.to_original(opened.factor), aspect))
     })
     .await
 }
@@ -163,19 +156,7 @@ async fn find_regions(
     blocking(move || {
         let image = pipeline::straightened(&opened.preview, &settings);
         let size = settings.orientation.size(opened.original.dimensions());
-        let to_original = |v: i64| (v as f64 / opened.factor).round() as i64;
-        Ok(detect(&image)?
-            .into_iter()
-            .filter_map(|r| {
-                let r = CropRect::new(
-                    to_original(r.x),
-                    to_original(r.y),
-                    to_original(r.width),
-                    to_original(r.height),
-                );
-                finish(r, size)
-            })
-            .collect())
+        Ok(detect(&image)?.into_iter().filter_map(|r| finish(r.to_original(opened.factor), size)).collect())
     })
     .await
 }

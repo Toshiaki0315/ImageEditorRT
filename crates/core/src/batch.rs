@@ -14,7 +14,7 @@ use crate::pipeline::{effective_crop, EditSettings};
 use crate::presets::Preset;
 use crate::privacy::{Region, RegionKind};
 use crate::save::{self, SaveOptions};
-use crate::transform::{CropRect, SizeError, MAX_SIZE, MIN_SIZE};
+use crate::transform::{SizeError, MAX_SIZE, MIN_SIZE};
 
 /// 一括処理の設定。long_side を指定すると、写真の長辺をその px にリサイズする（フレームはその外側に付く）。
 #[derive(Clone, Debug, PartialEq)]
@@ -152,18 +152,16 @@ pub fn privacy_regions(image: &image::RgbaImage, privacy: &BatchPrivacy) -> Resu
     }
     let size = image.dimensions();
     let (small, factor) = crate::pipeline::make_preview(image, crate::pipeline::PREVIEW_MAX_SIDE);
-    let to_original = |r: CropRect| {
-        let scale = |v: i64| (v as f64 / factor).round() as i64;
-        CropRect::new(scale(r.x), scale(r.y), scale(r.width), scale(r.height))
-    };
     let mut rects = Vec::new();
     if privacy.faces {
         let faces = crate::faces::detect_faces(&small)?;
-        rects.extend(faces.into_iter().filter_map(|r| crate::faces::cover_rect(to_original(r), size)));
+        rects.extend(faces.into_iter().filter_map(|r| crate::faces::cover_rect(r.to_original(factor), size)));
     }
     if privacy.text {
         let texts = crate::text_regions::detect_text(&small)?;
-        rects.extend(texts.into_iter().filter_map(|r| crate::transform::clamp_crop(to_original(r), size)));
+        rects.extend(
+            texts.into_iter().filter_map(|r| crate::transform::clamp_crop(r.to_original(factor), size)),
+        );
     }
     Ok(rects
         .into_iter()

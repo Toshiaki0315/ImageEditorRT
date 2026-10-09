@@ -53,6 +53,21 @@ impl SaveFailure {
     }
 }
 
+/// 保存先を確かめる: path が保存できる拡張子で、書き出す paths のどれも元の画像 source ではないこと。
+fn check_targets(path: &Path, paths: &[PathBuf], source: Option<&Path>) -> Result<(), SaveFailure> {
+    if !save::is_savable(path) {
+        let message = SaveError::UnsupportedExtension(
+            path.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default(),
+        );
+        return Err(SaveFailure { kind: "extension", message: message.to_string() });
+    }
+    // 元の画像には上書きしない（大文字・小文字の違いも同じファイルとみなす）
+    if source.is_some_and(|source| paths.iter().any(|p| save::is_same_file(p, source))) {
+        return Err(SaveFailure { kind: "sameFile", message: SAME_FILE_MESSAGE.into() });
+    }
+    Ok(())
+}
+
 /// 保存（原寸の処理）に使うスレッドの組。プレビューの描き直しが待たされないよう、
 /// プレビュー（rayon の既定の組）とは分け、CPU のコアを 2 つ残す。
 pub(crate) fn save_pool() -> &'static rayon::ThreadPool {
@@ -76,20 +91,11 @@ pub async fn save_image(
     state: State<'_, AppState>,
 ) -> Result<save::Saved, SaveFailure> {
     let path = PathBuf::from(path);
-    if !save::is_savable(&path) {
-        let message = SaveError::UnsupportedExtension(
-            path.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default(),
-        );
-        return Err(SaveFailure { kind: "extension", message: message.to_string() });
-    }
     let opened = state.opened().map_err(SaveFailure::other)?;
     let source = opened.source.clone();
+    check_targets(&path, std::slice::from_ref(&path), source.path.as_deref())?;
     // 文字の {日付}・{日時} を撮影日時に置き換える
     let settings = opened.shown(settings, false);
-    // 元の画像には上書きしない（大文字・小文字の違いも同じファイルとみなす）
-    if source.path.as_deref().is_some_and(|p| save::is_same_file(&path, p)) {
-        return Err(SaveFailure { kind: "sameFile", message: SAME_FILE_MESSAGE.into() });
-    }
     let saved = tauri::async_runtime::spawn_blocking(move || {
         save_pool().install(|| {
             // 肌・背景の材料はプレビューの大きさなので、原寸に合わせてかける
@@ -125,20 +131,11 @@ pub async fn save_sizes(
     state: State<'_, AppState>,
 ) -> Result<Vec<SizedSaved>, SaveFailure> {
     let base = PathBuf::from(path);
-    if !save::is_savable(&base) {
-        let message = SaveError::UnsupportedExtension(
-            base.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default(),
-        );
-        return Err(SaveFailure { kind: "extension", message: message.to_string() });
-    }
     let opened = state.opened().map_err(SaveFailure::other)?;
     let source = opened.source.clone();
-    let settings = opened.shown(settings, false);
     let paths = save::sized_paths(&base, &long_sides);
-    // 元の画像には上書きしない
-    if source.path.as_deref().is_some_and(|p| paths.iter().any(|path| save::is_same_file(path, p))) {
-        return Err(SaveFailure { kind: "sameFile", message: SAME_FILE_MESSAGE.into() });
-    }
+    check_targets(&base, &paths, source.path.as_deref())?;
+    let settings = opened.shown(settings, false);
     tauri::async_runtime::spawn_blocking(move || {
         save_pool().install(|| {
             // 肌・背景などの前もってかける処理は、大きさによらないので 1 回だけ
@@ -164,6 +161,20 @@ pub async fn save_sizes(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn targets_must_be_savable_and_not_the_source() {
+        let source = Path::new("/photos/IMG_0001.JPG");
+        let ok = Path::new("/photos/IMG_0001_edited.jpg");
+        assert!(check_targets(ok, &[ok.to_path_buf()], Some(source)).is_ok());
+        assert!(check_targets(ok, &[ok.to_path_buf()], None).is_ok());
+        // 保存できない拡張子
+        let raw = Path::new("/photos/x.dng");
+        assert_eq!(check_targets(raw, &[raw.to_path_buf()], None).unwrap_err().kind, "extension");
+        // 書き出すもののどれかが元の画像（大文字・小文字の違いも同じ）
+        let paths = [ok.to_path_buf(), PathBuf::from("/photos/img_0001.jpg")];
+        assert_eq!(check_targets(ok, &paths, Some(source)).unwrap_err().kind, "sameFile");
+    }
 
     #[test]
     fn initial_save_paths() {

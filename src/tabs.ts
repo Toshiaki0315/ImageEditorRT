@@ -1,5 +1,7 @@
 // 設定パネルのタブ。最後に開いていたタブを覚えておき、次に起動したときも開く（旧版 FR-UI-61）。
 
+import { readStored, writeStored } from "./storage";
+
 export type TabName = "adjust" | "crop" | "output" | "diorama" | "privacy" | "exif";
 
 const STORAGE_KEY = "lastTab";
@@ -57,21 +59,13 @@ export class Tabs {
   }
 
   private load(): TabName {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && this.buttons.some((b) => b.dataset.tab === saved)) return saved as TabName;
-    } catch {
-      // 保存先が使えなくても動く
-    }
+    const saved = readStored(STORAGE_KEY);
+    if (saved && this.buttons.some((b) => b.dataset.tab === saved)) return saved as TabName;
     return DEFAULT_TAB;
   }
 
   private remember(name: TabName) {
     this.remembered = name;
-    try {
-      localStorage.setItem(STORAGE_KEY, name);
-    } catch {
-      // 保存先が使えなくても動く
-    }
+    writeStored(STORAGE_KEY, name);
   }
 }

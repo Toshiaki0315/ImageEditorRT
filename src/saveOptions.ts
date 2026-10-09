@@ -2,6 +2,9 @@
 // （位置情報を残すかの逆。どちらで変えても両方に反映する）。
 // 保存の好みなので画像を開いても戻さず、アプリを終了しても残す（旧版 FR-UI-56）。
 
+// Node のテスト（tests-ts/）からも読むので、拡張子まで書く
+import { readStored, writeStored } from "./storage.ts";
+
 /** Rust の save::SaveOptions。maxKb はファイルの大きさの上限（KB、JPEG・HEIC のとき。なければ null）。 */
 export type SaveOptions = { quality: number; keepExif: boolean; keepGps: boolean; maxKb: number | null };
 
@@ -67,11 +70,7 @@ export class SaveOptionsPanel {
 
   private update(change: Partial<Stored>) {
     this.options = { ...this.options, ...change };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.options));
-    } catch {
-      // 保存先が使えなくても動く
-    }
+    writeStored(STORAGE_KEY, JSON.stringify(this.options));
     this.show();
   }
 
@@ -114,7 +113,7 @@ export function parseStored(saved: unknown): Stored {
 
 function load(): Stored {
   try {
-    return parseStored(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"));
+    return parseStored(JSON.parse(readStored(STORAGE_KEY) ?? "null"));
   } catch {
     // 壊れていれば既定値
     return { ...DEFAULT_OPTIONS };

@@ -1,6 +1,8 @@
 // プレビューの右下に重ねるヒストグラム（R・G・B を半透明で、輝度を灰色で重ねる。旧版 FR-UI-46）。
 
 import type { Histogram } from "./protocol";
+// Node のテスト（tests-ts/）からも読むので、拡張子まで書く
+import { readStored, writeStored } from "./storage.ts";
 
 const BINS = 256;
 const GRAPH_WIDTH = BINS; // 横は 1 段階 1px
@@ -39,13 +41,8 @@ export class HistogramView {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    let saved: string | null = null;
-    try {
-      saved = localStorage.getItem(STORAGE_KEY);
-    } catch {
-      // 環境設定が読めなければ既定の表示にする
-    }
-    this.shown = saved !== "false";
+    // 環境設定が読めなければ既定の表示（出す）にする
+    this.shown = readStored(STORAGE_KEY) !== "false";
     canvas.style.width = `${GRAPH_WIDTH + PADDING * 2}px`;
     canvas.style.height = `${GRAPH_HEIGHT + PADDING * 2}px`;
   }
@@ -53,11 +50,7 @@ export class HistogramView {
   /** 表示・非表示を切り替えて、環境設定に残す。 */
   setShown(shown: boolean) {
     this.shown = shown;
-    try {
-      localStorage.setItem(STORAGE_KEY, String(shown));
-    } catch {
-      // 残せなくても表示は切り替える
-    }
+    writeStored(STORAGE_KEY, String(shown));
     this.draw();
   }
 

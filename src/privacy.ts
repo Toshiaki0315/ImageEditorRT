@@ -2,12 +2,19 @@
 // 大きさを変える・強さと隠し方を変える。範囲は回転・反転した後の原寸の画像の座標で持つ（トリミング範囲と同じ）。
 // 位置情報の削除のチェックは saveOptions.ts が受け持つ。
 
-import { hitRegion, moveRect, type Point, rectCorners, rectFromPoints } from "./regions";
+import { HANDLE_HIT, handleElement, svgElement } from "./overlay";
+import {
+  hitRegion,
+  moveRect,
+  nearPoint,
+  type Point,
+  rectCorners,
+  rectFromPoints,
+  scaleRect,
+  screenScale,
+} from "./regions";
 import type { CropRect, EditSettings, Region, RegionKind } from "./types";
 
-const SVG = "http://www.w3.org/2000/svg";
-const HANDLE_SIZE = 8;
-const HANDLE_HIT = 10;
 const STRENGTH_DEFAULT = 50;
 /** これより小さい範囲（クリックしただけなど）は足さない（原寸の px） */
 const MIN_SIDE = 4;
@@ -155,21 +162,10 @@ export class PrivacyPanel {
       const r = this.toScreen(region.rect);
       const selected = index === this.selected;
       for (const kind of ["edge-shadow", selected ? "edge selected" : "edge"]) {
-        const rect = document.createElementNS(SVG, "rect");
-        rect.setAttribute("class", kind);
-        for (const [key, value] of Object.entries(r)) rect.setAttribute(key, String(value));
-        this.overlay.append(rect);
+        this.overlay.append(svgElement("rect", kind, r));
       }
       if (!selected) return;
-      for (const [cx, cy] of rectCorners(r)) {
-        const handle = document.createElementNS(SVG, "rect");
-        handle.setAttribute("class", "handle");
-        handle.setAttribute("x", String(cx - HANDLE_SIZE / 2));
-        handle.setAttribute("y", String(cy - HANDLE_SIZE / 2));
-        handle.setAttribute("width", String(HANDLE_SIZE));
-        handle.setAttribute("height", String(HANDLE_SIZE));
-        this.overlay.append(handle);
-      }
+      for (const [cx, cy] of rectCorners(r)) this.overlay.append(handleElement(cx, cy));
     });
   }
 
@@ -259,10 +255,7 @@ export class PrivacyPanel {
   }
 
   private toScreen(rect: CropRect): CropRect {
-    const [width, height] = this.size()!;
-    const sx = this.canvas.clientWidth / width;
-    const sy = this.canvas.clientHeight / height;
-    return { x: rect.x * sx, y: rect.y * sy, width: rect.width * sx, height: rect.height * sy };
+    return scaleRect(rect, screenScale([this.canvas.clientWidth, this.canvas.clientHeight], this.size()!));
   }
 
   /** 選んでいる範囲の四隅のハンドルの上なら、その角の番号。 */
@@ -271,8 +264,8 @@ export class PrivacyPanel {
     if (!region) return null;
     const box = this.overlay.getBoundingClientRect();
     const [px, py] = [event.clientX - box.left, event.clientY - box.top];
-    const index = rectCorners(this.toScreen(region.rect)).findIndex(
-      ([cx, cy]) => Math.abs(px - cx) <= HANDLE_HIT && Math.abs(py - cy) <= HANDLE_HIT,
+    const index = rectCorners(this.toScreen(region.rect)).findIndex((corner) =>
+      nearPoint(corner, [px, py], HANDLE_HIT),
     );
     return index >= 0 ? index : null;
   }

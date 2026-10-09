@@ -20,6 +20,21 @@ export function moveRect(rect: CropRect, dx: number, dy: number, size: Point): C
   return { ...rect, x, y };
 }
 
+/** 原寸 1px が画面の何 px か（横・縦）。shown は表示の大きさ、size は原寸の大きさ。 */
+export function screenScale(shown: Point, size: Point): Point {
+  return [shown[0] / size[0], shown[1] / size[1]];
+}
+
+/** 範囲を横・縦それぞれの倍率で拡大・縮小する（原寸の座標を画面の座標にするなど）。 */
+export function scaleRect(rect: CropRect, [sx, sy]: Point): CropRect {
+  return { x: rect.x * sx, y: rect.y * sy, width: rect.width * sx, height: rect.height * sy };
+}
+
+/** 2 点が横・縦とも hit 以内か（ハンドルをつかんだか）。 */
+export function nearPoint([ax, ay]: Point, [bx, by]: Point, hit: number): boolean {
+  return Math.abs(ax - bx) <= hit && Math.abs(ay - by) <= hit;
+}
+
 /** 左上・右上・右下・左下の順の角。 */
 export function rectCorners(r: CropRect): Point[] {
   return [

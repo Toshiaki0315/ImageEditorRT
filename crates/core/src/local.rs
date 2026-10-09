@@ -3,7 +3,8 @@
 //! 範囲は回転・反転した後の原寸の画像の座標で持つ（トリミング範囲・投稿加工の範囲と同じ）。範囲ごとに、
 //! 画像全体にその範囲の調整をかけた画像を作り、範囲の重み（中で 1、外で 0、境目はなめらか）で混ぜる。
 
-use image::RgbaImage;
+use image::{imageops, RgbaImage};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::adjust::TEMPERATURE_NEUTRAL;
@@ -99,7 +100,9 @@ fn smoothstep(t: f64) -> f64 {
 }
 
 /// image に部分補正をかける。原寸の座標 (x, y) は、この画像では (x * scale - offset) にある。
-/// adjust は、画像全体に 1 つ分の調整をかけた画像を返す（色の調整と同じかけ方）。
+/// adjust は、渡した画像全体に 1 つ分の調整をかけた画像を返す（色の調整と同じかけ方。画素ごとに決まる処理であること）。
+///
+/// 速さのため、範囲が効くところ（円は外接する四角、帯は画像全体）だけを切り出して調整し、行ごとに並列に混ぜる。
 pub fn apply_local(
     mut image: RgbaImage,
     adjusts: &[LocalAdjust],
@@ -107,24 +110,63 @@ pub fn apply_local(
     offset: (f64, f64),
     adjust: impl Fn(&RgbaImage, &LocalAdjust) -> RgbaImage,
 ) -> RgbaImage {
+    let width = image.width() as usize;
     for local in adjusts.iter().filter(|a| !a.is_neutral()) {
-        let adjusted = adjust(&image, local);
-        for (x, y, pixel) in image.enumerate_pixels_mut() {
-            // 画素の中心を原寸の座標に戻す
-            let ox = (f64::from(x) + 0.5 + offset.0) / scale.0;
-            let oy = (f64::from(y) + 0.5 + offset.1) / scale.1;
-            let weight = local.weight(ox, oy);
-            if weight <= 0.0 {
-                continue;
-            }
-            let target = adjusted.get_pixel(x, y);
-            for c in 0..3 {
-                let (a, b) = (f32::from(pixel[c]), f32::from(target[c]));
-                pixel[c] = (a + (b - a) * weight).round().clamp(0.0, 255.0) as u8;
-            }
-        }
+        let Some((left, top, right, bottom)) = local.pixel_bounds(image.dimensions(), scale, offset) else {
+            continue;
+        };
+        let part = imageops::crop_imm(&image, left, top, right - left, bottom - top).to_image();
+        let adjusted = adjust(&part, local);
+        image
+            .as_mut()
+            .par_chunks_exact_mut(width * 4)
+            .enumerate()
+            .skip(top as usize)
+            .take((bottom - top) as usize)
+            .for_each(|(y, row)| {
+                // 画素の中心を原寸の座標に戻す
+                let oy = (y as f64 + 0.5 + offset.1) / scale.1;
+                for x in left..right {
+                    let ox = (f64::from(x) + 0.5 + offset.0) / scale.0;
+                    let weight = local.weight(ox, oy);
+                    if weight <= 0.0 {
+                        continue;
+                    }
+                    let target = adjusted.get_pixel(x - left, y as u32 - top);
+                    let pixel = &mut row[x as usize * 4..x as usize * 4 + 3];
+                    for c in 0..3 {
+                        let (a, b) = (f32::from(pixel[c]), f32::from(target[c]));
+                        pixel[c] = (a + (b - a) * weight).round().clamp(0.0, 255.0) as u8;
+                    }
+                }
+            });
     }
     image
+}
+
+impl LocalAdjust {
+    /// size の画像（原寸の (x, y) が (x * scale - offset) にある）で、範囲が効きうる画素の四角（左, 上, 右, 下。右・下は
+    /// 含まない）。円は外接する四角、帯は画像全体。画像と重ならなければ None。
+    fn pixel_bounds(
+        &self,
+        (width, height): (u32, u32),
+        scale: (f64, f64),
+        offset: (f64, f64),
+    ) -> Option<(u32, u32, u32, u32)> {
+        let (left, top, right, bottom) = match self.shape {
+            LocalShape::Ellipse { rect } => (
+                (rect.x as f64 * scale.0 - offset.0).floor(),
+                (rect.y as f64 * scale.1 - offset.1).floor(),
+                (rect.right() as f64 * scale.0 - offset.0).ceil(),
+                (rect.bottom() as f64 * scale.1 - offset.1).ceil(),
+            ),
+            LocalShape::Band { .. } => (0.0, 0.0, f64::from(width), f64::from(height)),
+        };
+        let clamp = |v: f64, max: u32| v.clamp(0.0, f64::from(max)) as u32;
+        let (left, right) = (clamp(left, width), clamp(right, width));
+        let (top, bottom) = (clamp(top, height), clamp(bottom, height));
+        (left < right && top < bottom).then_some((left, top, right, bottom))
+    }
 }
 
 #[cfg(test)]
@@ -185,6 +227,71 @@ mod tests {
         assert_eq!(out, image);
         // 境目のぼかし幅 0 なら、縁までくっきり
         assert_eq!(ellipse(CropRect::new(0, 0, 10, 10), 0).weight(5.0, 1.0), 1.0);
+    }
+
+    /// 速くする前のかけ方（画像全体を調整して、全部の画素で重みを求める）。
+    fn reference(
+        mut image: RgbaImage,
+        adjusts: &[LocalAdjust],
+        scale: (f64, f64),
+        offset: (f64, f64),
+        adjust: impl Fn(&RgbaImage, &LocalAdjust) -> RgbaImage,
+    ) -> RgbaImage {
+        for local in adjusts.iter().filter(|a| !a.is_neutral()) {
+            let adjusted = adjust(&image, local);
+            for (x, y, pixel) in image.enumerate_pixels_mut() {
+                let ox = (f64::from(x) + 0.5 + offset.0) / scale.0;
+                let oy = (f64::from(y) + 0.5 + offset.1) / scale.1;
+                let weight = local.weight(ox, oy);
+                if weight <= 0.0 {
+                    continue;
+                }
+                let target = adjusted.get_pixel(x, y);
+                for c in 0..3 {
+                    let (a, b) = (f32::from(pixel[c]), f32::from(target[c]));
+                    pixel[c] = (a + (b - a) * weight).round().clamp(0.0, 255.0) as u8;
+                }
+            }
+        }
+        image
+    }
+
+    #[test]
+    fn same_result_as_adjusting_the_whole_image() {
+        // 画素ごとに決まる調整（色を反転し、少し足す）で、はみ出す円・帯・重なる範囲を、倍率とずれ付きで比べる
+        let invert = |image: &RgbaImage, a: &LocalAdjust| {
+            let mut out = image.clone();
+            for p in out.pixels_mut() {
+                for c in 0..3 {
+                    p[c] = (255 - p[c]).saturating_add(a.contrast as u8);
+                }
+            }
+            out
+        };
+        let image = RgbaImage::from_fn(300, 200, |x, y| {
+            Rgba([(x * 7 % 256) as u8, (y * 5 % 256) as u8, ((x + y) % 256) as u8, 255])
+        });
+        let adjusts = [
+            LocalAdjust { contrast: 10, ..ellipse(CropRect::new(-100, 50, 400, 300), 40) },
+            LocalAdjust { contrast: 20, ..ellipse(CropRect::new(500, 100, 200, 120), 0) },
+            LocalAdjust {
+                shape: LocalShape::Band { from: [0, 380], to: [600, 0] },
+                contrast: 5,
+                ..LocalAdjust::default()
+            },
+            // 画像の外の円は何もしない
+            LocalAdjust { contrast: 30, ..ellipse(CropRect::new(2000, 2000, 50, 50), 50) },
+        ];
+        for (scale, offset) in
+            [((1.0, 1.0), (0.0, 0.0)), ((0.5, 0.5), (0.0, 0.0)), ((0.37, 0.41), (12.5, 7.0))]
+        {
+            let fast = apply_local(image.clone(), &adjusts, scale, offset, invert);
+            assert_eq!(
+                fast,
+                reference(image.clone(), &adjusts, scale, offset, invert),
+                "{scale:?} {offset:?}"
+            );
+        }
     }
 
     #[test]

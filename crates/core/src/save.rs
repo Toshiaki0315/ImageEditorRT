@@ -144,6 +144,26 @@ pub fn is_savable(path: &Path) -> bool {
     SaveFormat::from_path(path).is_some()
 }
 
+/// 複数の大きさで保存するときの名前: base（保存ダイアログで選んだ名前）の後ろに `_<長辺>` を付ける
+/// （photo_edited.jpg → photo_edited_1080.jpg）。すでにあるファイル・ほかの大きさの名前と重なれば _2、_3 … を付ける。
+pub fn sized_paths(base: &Path, long_sides: &[u32]) -> Vec<PathBuf> {
+    let folder = base.parent().map(Path::to_path_buf).unwrap_or_default();
+    let stem = base.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let suffix = base.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+    let mut taken: Vec<PathBuf> = Vec::new();
+    for side in long_sides {
+        let path = (1..)
+            .map(|n| match n {
+                1 => folder.join(format!("{stem}_{side}{suffix}")),
+                n => folder.join(format!("{stem}_{side}_{n}{suffix}")),
+            })
+            .find(|p| !p.exists() && !taken.iter().any(|t| is_same_file(t, p)))
+            .expect("候補は終わりなく続く");
+        taken.push(path);
+    }
+    taken
+}
+
 /// 元の画像を保存するときの拡張子（元のつづりのまま。保存できない形式なら jpg）。
 pub fn save_suffix(source: &Path) -> String {
     match source.extension().and_then(|e| e.to_str()) {
@@ -430,6 +450,25 @@ fn fit_size(
 mod tests {
     use super::*;
     use image::Rgba;
+
+    #[test]
+    fn sized_names_add_the_long_side_and_skip_existing() {
+        let dir = std::env::temp_dir().join(format!("imageeditorrt-sized-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let base = dir.join("photo_edited.jpg");
+        assert_eq!(
+            sized_paths(&base, &[1080, 1600]),
+            [dir.join("photo_edited_1080.jpg"), dir.join("photo_edited_1600.jpg")]
+        );
+        // すでにあれば _2。同じ大きさを 2 回選んでも重ならない
+        std::fs::write(dir.join("photo_edited_1080.jpg"), b"x").unwrap();
+        assert_eq!(
+            sized_paths(&base, &[1080, 1080]),
+            [dir.join("photo_edited_1080_2.jpg"), dir.join("photo_edited_1080_3.jpg")]
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn pasted_names() {

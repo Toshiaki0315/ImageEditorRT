@@ -474,6 +474,22 @@ pub fn output_size(original_size: (u32, u32), settings: &EditSettings) -> Result
     Ok(frames::framed_size(size, settings.frame))
 }
 
+/// 出力の長辺を long_side px にした設定（複数の大きさで保存。旧版にはない）。
+///
+/// 回転・反転して切り抜いた後の写真（フレーム・円の比に合わせた範囲を含む）の向きで、横長なら幅、
+/// 縦長なら高さを決め、縦横比は保つ。ほかの設定はそのまま。original_size は回転・反転する前の原寸。
+pub fn long_side_settings(
+    original_size: (u32, u32),
+    settings: &EditSettings,
+    long_side: u32,
+) -> EditSettings {
+    let size = settings.orientation.size(original_size);
+    let (width, height) = effective_crop(size, settings.crop, settings.frame, settings.shape)
+        .map_or(size, |r| (r.width as u32, r.height as u32));
+    let (width, height) = if width >= height { (Some(long_side), None) } else { (None, Some(long_side)) };
+    EditSettings { width, height, keep_aspect: true, ..settings.clone() }
+}
+
 /// 加工前の表示（旧版 FR-UI-44）の設定: 向き（水平の補正を含む）と、実際に切り抜く範囲だけを残す。
 ///
 /// 色の調整・テイスト・ディテール・ジオラマ・周辺減光・経年劣化・形・フレーム・文字・リサイズは外す。
@@ -732,6 +748,28 @@ mod tests {
         let guide = diorama_guide((200, 100), &vertical, 1.0);
         assert!(!guide.horizontal);
         assert!((guide.lines[1].0 - 0.4).abs() < 1e-9);
+    }
+
+    #[test]
+    fn long_side_follows_the_cropped_and_rotated_photo() {
+        // 横長の原寸を 90° 回すと縦長 → 高さを決める
+        let rotated = EditSettings {
+            orientation: Orientation::new(90, false),
+            width: Some(10),
+            ..EditSettings::default()
+        };
+        let tall = long_side_settings((4000, 3000), &rotated, 1080);
+        assert_eq!((tall.width, tall.height, tall.keep_aspect), (None, Some(1080), true));
+        assert_eq!(output_size((4000, 3000), &tall).unwrap(), (810, 1080));
+        // 横長に切り抜いていれば幅（ほかの設定はそのまま）
+        let cropped = EditSettings {
+            crop: Some(CropRect::new(0, 0, 3000, 1000)),
+            exposure: 0.5,
+            ..EditSettings::default()
+        };
+        let wide = long_side_settings((3000, 4000), &cropped, 1600);
+        assert_eq!((wide.width, wide.height, wide.exposure), (Some(1600), None, 0.5));
+        assert_eq!(output_size((3000, 4000), &wide).unwrap(), (1600, 533));
     }
 
     #[test]

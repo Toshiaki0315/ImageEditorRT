@@ -105,6 +105,62 @@ pub async fn save_image(
     Ok(saved)
 }
 
+/// 複数の大きさで保存した 1 つ分（保存先と、保存した結果）。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SizedSaved {
+    path: String,
+    long_side: u32,
+    saved: save::Saved,
+}
+
+/// 今の設定を、長辺を long_sides のそれぞれにして原寸で処理し、path の名前に `_<長辺>` を付けて続けて保存する
+/// （複数の大きさで保存。旧版にはない）。すでにあるファイルには上書きしない。
+#[tauri::command]
+pub async fn save_sizes(
+    path: String,
+    settings: EditSettings,
+    options: SaveOptions,
+    long_sides: Vec<u32>,
+    state: State<'_, AppState>,
+) -> Result<Vec<SizedSaved>, SaveFailure> {
+    let base = PathBuf::from(path);
+    if !save::is_savable(&base) {
+        let message = SaveError::UnsupportedExtension(
+            base.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default(),
+        );
+        return Err(SaveFailure { kind: "extension", message: message.to_string() });
+    }
+    let opened = state.opened().map_err(SaveFailure::other)?;
+    let source = opened.source.clone();
+    let settings = opened.shown(settings, false);
+    let paths = save::sized_paths(&base, &long_sides);
+    // 元の画像には上書きしない
+    if source.path.as_deref().is_some_and(|p| paths.iter().any(|path| save::is_same_file(path, p))) {
+        return Err(SaveFailure { kind: "sameFile", message: SAME_FILE_MESSAGE.into() });
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        save_pool().install(|| {
+            // 肌・背景などの前もってかける処理は、大きさによらないので 1 回だけ
+            let original = opened.prepared(&opened.original, &settings);
+            let is_tiff = source.format == Some(Format::Tiff);
+            paths
+                .into_iter()
+                .zip(long_sides)
+                .map(|(path, long_side)| {
+                    let sized = pipeline::long_side_settings(original.dimensions(), &settings, long_side);
+                    let edited = pipeline::apply_edits(&original, &sized).map_err(SaveFailure::other)?;
+                    let saved = save::save_edited(&edited, &path, options, source.exif.as_deref(), is_tiff)
+                        .map_err(SaveFailure::other)?;
+                    Ok(SizedSaved { path: path.to_string_lossy().into_owned(), long_side, saved })
+                })
+                .collect()
+        })
+    })
+    .await
+    .map_err(SaveFailure::other)?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

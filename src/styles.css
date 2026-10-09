@@ -961,3 +961,9 @@ input[type="range"]:disabled::-webkit-slider-thumb {
 .split-label-after {
   right: 8px;
 }
+
+.sizes-list {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}

@@ -18,7 +18,9 @@ import {
 import { confirmDiscard, isEditingText, settingsChanged } from "./editing";
 import { updateMenus } from "./menus";
 import { type ClipboardContents, pasteAction, pasteStamp } from "./paste";
+import { SIZE_PRESETS } from "./output";
 import { presetNames } from "./presetsUi";
+import { parseSizes, savedSummary } from "./sizes";
 import { notify, showError, updateStatus } from "./status";
 import { defaultSettings, type OpenInfo } from "./types";
 import { fitToWindow, setComparing, stopSplit, updateGuide } from "./view";
@@ -182,6 +184,113 @@ export async function saveDialog() {
     if (!path) return;
     const result = await saveTo(path);
     if (result !== "sameFile") return;
+  }
+}
+
+/** 複数の大きさで保存で選んだ大きさを残す環境設定の名前 */
+const SIZES_STORAGE_KEY = "saveSizes";
+
+/** 複数の大きさで保存: 大きさを選び、保存ダイアログで名前を決め、長辺ごとに続けて保存する。 */
+export async function saveSizesDialog() {
+  const { loaded } = state;
+  if (!loaded || state.saving) return;
+  const sizes = await chooseSizes();
+  if (!sizes) return;
+  if (sizes.length === 0) {
+    notify("大きさが選ばれていないので、保存しません");
+    return;
+  }
+  const stamp = pasteStamp(new Date());
+  const defaultPath = (await invoke<string | null>("default_save_path", { stamp })) ?? `${loaded.name}_edited.jpg`;
+  for (;;) {
+    const path = await save({
+      title: "複数の大きさで保存（名前の後ろに長辺を付けます）",
+      defaultPath,
+      filters: [{ name: "画像ファイル", extensions: state.savableExtensions }],
+    });
+    if (!path) return;
+    if ((await saveSizesTo(path, sizes)) !== "sameFile") return;
+  }
+}
+
+/** 大きさを選んでもらう（キャンセルなら null）。選んだ大きさは環境設定に残す。 */
+function chooseSizes(): Promise<number[] | null> {
+  const dialog = document.getElementById("sizes-dialog") as HTMLDialogElement;
+  const list = document.getElementById("sizes-list") as HTMLElement;
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(SIZES_STORAGE_KEY);
+  } catch {
+    // 読めなければ既定
+  }
+  const chosen = parseSizes(
+    stored,
+    SIZE_PRESETS.map(([, px]) => px),
+  );
+  list.replaceChildren(
+    ...SIZE_PRESETS.map(([label, px]) => {
+      const row = document.createElement("label");
+      row.className = "check";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.value = String(px);
+      box.checked = chosen.includes(px);
+      row.append(box, ` ${label}`);
+      return row;
+    }),
+  );
+  dialog.returnValue = "";
+  dialog.showModal();
+  return new Promise((resolve) =>
+    dialog.addEventListener(
+      "close",
+      () => {
+        if (dialog.returnValue !== "ok") return resolve(null);
+        const sizes = [...list.querySelectorAll<HTMLInputElement>("input:checked")].map((box) => Number(box.value));
+        try {
+          localStorage.setItem(SIZES_STORAGE_KEY, JSON.stringify(sizes));
+        } catch {
+          // 残せなくても保存はする
+        }
+        resolve(sizes);
+      },
+      { once: true },
+    ),
+  );
+}
+
+/** 複数の大きさで保存した 1 つ分（Rust の saving::SizedSaved）。 */
+type SizedSaved = { path: string; longSide: number; saved: Saved };
+
+/** 長辺ごとに続けて保存する。元の画像と同じファイルになるなら "sameFile" を返す。 */
+async function saveSizesTo(path: string, sizes: number[]): Promise<"done" | "sameFile" | "failed"> {
+  const name = path.split("/").pop() ?? path;
+  setSaving(true);
+  void updateStatus(`保存中… ${sizes.length} つの大きさ`);
+  try {
+    const saved = structuredClone(state.settings);
+    const results = await invoke<SizedSaved[]>("save_sizes", {
+      path,
+      settings: saved,
+      options: saveOptions.value(),
+      longSides: sizes,
+    });
+    state.savedSettings = saved;
+    const fitted = results.filter((r) => r.saved.fitted).length;
+    const note = fitted > 0 ? `（${fitted} つは大きさの上限に合わせて品質を下げた・縮めた）` : "";
+    void updateStatus(`${savedSummary(results.map((r) => r.path))}${note}`);
+    return "done";
+  } catch (error) {
+    void updateStatus();
+    const failure = error as SaveFailure;
+    if (failure?.kind === "sameFile") {
+      await showError(SAVE_ERROR_TITLE, failure.message);
+      return "sameFile";
+    }
+    await showError(SAVE_ERROR_TITLE, `${name}\n(${failure?.message ?? error})`, failure?.kind === "extension");
+    return "failed";
+  } finally {
+    setSaving(false);
   }
 }
 

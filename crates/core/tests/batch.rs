@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use image::{Rgba, RgbaImage};
 use imageeditorrt_core::batch::{
-    batch_settings, collect_images, output_path, run_batch, summary, BatchOptions, BatchPrivacy,
+    batch_settings, collect_images, output_path, run_batch, summary, BatchOptions, BatchPrivacy, OutputNaming,
 };
 use imageeditorrt_core::frames::FrameType;
 use imageeditorrt_core::pipeline::EditSettings;
@@ -26,7 +26,13 @@ fn touch(path: &Path) {
 }
 
 fn options(look: Preset, long_side: Option<u32>) -> BatchOptions {
-    BatchOptions { look, long_side, save: SaveOptions::default(), privacy: BatchPrivacy::default() }
+    BatchOptions {
+        look,
+        long_side,
+        save: SaveOptions::default(),
+        privacy: BatchPrivacy::default(),
+        naming: OutputNaming::default(),
+    }
 }
 
 fn plain() -> Preset {
@@ -223,5 +229,40 @@ fn faces_are_covered_in_batch() {
         (140..180).flat_map(|x| (70..100).map(move |y| (x, y))).filter(|&(x, y)| diff(x, y) > 20).count();
     assert!(face_changed > 100, "{face_changed}");
     assert!(diff(5, 315) <= 6);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn naming_with_date_and_sequence() {
+    use imageeditorrt_core::batch::named_output_path;
+    use imageeditorrt_core::exif_info::CaptureDate;
+    let dir = temp_dir("naming");
+    let source = dir.join("in/IMG_0001.JPG");
+    touch(&source);
+    let out = dir.join("out");
+    let date = CaptureDate { year: 2026, month: 10, day: 9, hour: 8, minute: 0 };
+    let with_date = OutputNaming::WithDate;
+    assert_eq!(
+        named_output_path(&source, &out, &with_date, 0, Some(&date)),
+        out.join("IMG_0001_20261009.JPG")
+    );
+    // 撮影日がなければ元の名前。重なれば _2
+    assert_eq!(named_output_path(&source, &out, &with_date, 0, None), out.join("IMG_0001.JPG"));
+    touch(&out.join("IMG_0001_20261009.JPG"));
+    assert_eq!(
+        named_output_path(&source, &out, &with_date, 0, Some(&date)),
+        out.join("IMG_0001_20261009_2.JPG")
+    );
+    // 連番（一覧の順に 001 から。空なら「写真」、/ と : は _）
+    let trip = OutputNaming::Sequence { prefix: " 旅行/京都 ".into() };
+    assert_eq!(named_output_path(&source, &out, &trip, 0, None), out.join("旅行_京都_001.JPG"));
+    assert_eq!(named_output_path(&source, &out, &trip, 11, None), out.join("旅行_京都_012.JPG"));
+    let empty = OutputNaming::Sequence { prefix: "".into() };
+    assert_eq!(named_output_path(&dir.join("in/a.heic"), &out, &empty, 2, None), out.join("写真_003.jpg"));
+    // 元の名前は今までどおり
+    assert_eq!(
+        named_output_path(&source, &out, &OutputNaming::Original, 5, Some(&date)),
+        output_path(&source, &out)
+    );
     std::fs::remove_dir_all(&dir).unwrap();
 }

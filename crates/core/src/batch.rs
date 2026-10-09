@@ -24,6 +24,64 @@ pub struct BatchOptions {
     pub save: SaveOptions,
     /// 投稿加工（位置情報を消す・顔や文字を見つけて隠す。旧版にはない）
     pub privacy: BatchPrivacy,
+    /// 保存するファイルの名前の決め方（旧版にはない）
+    pub naming: OutputNaming,
+}
+
+/// まとめて処理で保存するファイルの名前の決め方。
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum OutputNaming {
+    /// 元と同じ名前（同じ名前があれば _edited。旧版と同じ）
+    #[default]
+    Original,
+    /// 元の名前＋撮影日（photo_20261009。撮影日がなければ元の名前）
+    WithDate,
+    /// 連番（prefix_001、prefix_002 …。一覧の順）
+    Sequence { prefix: String },
+}
+
+/// 連番の名前が空のときの名前。
+const SEQUENCE_DEFAULT: &str = "写真";
+
+/// 決め方 naming の保存先（index は一覧の中の順番、date は撮影日時）。すでにあるファイル・元のファイルには
+/// 上書きしないよう、重なれば _2、_3 … を付ける（元の名前は今までどおり _edited）。
+pub fn named_output_path(
+    source: &Path,
+    out_dir: &Path,
+    naming: &OutputNaming,
+    index: usize,
+    date: Option<&crate::exif_info::CaptureDate>,
+) -> PathBuf {
+    let stem = source.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let base = match naming {
+        OutputNaming::Original => return output_path(source, out_dir),
+        OutputNaming::WithDate => match date {
+            Some(d) => format!("{stem}_{}{:02}{:02}", d.year, d.month, d.day),
+            None => stem,
+        },
+        OutputNaming::Sequence { prefix } => {
+            let prefix = sanitized(prefix);
+            let prefix = if prefix.is_empty() { SEQUENCE_DEFAULT.to_string() } else { prefix };
+            format!("{prefix}_{:03}", index + 1)
+        }
+    };
+    let suffix = save::save_suffix(source);
+    (1..)
+        .map(|n| {
+            if n == 1 {
+                out_dir.join(format!("{base}.{suffix}"))
+            } else {
+                out_dir.join(format!("{base}_{n}.{suffix}"))
+            }
+        })
+        .find(|candidate| !candidate.exists() && !save::is_same_file(candidate, source))
+        .expect("候補は終わりなく続く")
+}
+
+/// ファイル名に使えない文字（/ と :）を _ にし、前後の空白を除く。
+fn sanitized(name: &str) -> String {
+    name.trim().chars().map(|c| if matches!(c, '/' | ':') { '_' } else { c }).collect()
 }
 
 /// まとめて処理の投稿加工。顔・文字は 1 枚ごとに見つけ、kind・strength・stamp で隠す。
@@ -171,6 +229,17 @@ pub fn collect_images(paths: &[PathBuf], existing: &[PathBuf]) -> Vec<PathBuf> {
 /// 1 枚を読み込み、加工して out_dir に保存し、保存先を返す（元の画像は変えない）。
 #[cfg(target_os = "macos")]
 pub fn process_image(source: &Path, out_dir: &Path, options: &BatchOptions) -> Result<PathBuf, String> {
+    process_image_at(source, 0, out_dir, options)
+}
+
+/// process_image と同じ。index は一覧の中の順番（連番の名前に使う）。
+#[cfg(target_os = "macos")]
+pub fn process_image_at(
+    source: &Path,
+    index: usize,
+    out_dir: &Path,
+    options: &BatchOptions,
+) -> Result<PathBuf, String> {
     use crate::formats::Format;
 
     let loaded = crate::load::load_file(source).map_err(|e| e.to_string())?;
@@ -192,7 +261,7 @@ pub fn process_image(source: &Path, out_dir: &Path, options: &BatchOptions) -> R
         }
     }
     let edited = crate::pipeline::apply_edits(&image, &settings).map_err(|e| e.to_string())?;
-    let path = output_path(source, out_dir);
+    let path = named_output_path(source, out_dir, &options.naming, index, date.as_ref());
     std::fs::create_dir_all(out_dir).map_err(|e| format!("保存先のフォルダを作れません（{e}）"))?;
     let is_tiff = decoded.format == Format::Tiff;
     save::save_edited(&edited, &path, options.save_options(), loaded.raw_exif.as_deref(), is_tiff)

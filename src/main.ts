@@ -12,7 +12,8 @@ import { bench, benchSave, verdict } from "./bench";
 import { ColorPanel } from "./colorPanel";
 import { setupAssist } from "./assist";
 import { CropController } from "./crop";
-import { redo, settingsChanged, setupHistory, undo, userChanged } from "./editing";
+import { isEditingText, redo, settingsChanged, setupHistory, undo, userChanged } from "./editing";
+import { isEscapeKey } from "./keys";
 import {
   makeCollage,
   openDialog,
@@ -38,6 +39,7 @@ import { TextDialog } from "./textDialog";
 import type { AspectRatio, FilterType, FrameKind, OpenInfo, ShapeType, TextFont, TextPosition } from "./types";
 import {
   fitToWindow,
+  isZoomed,
   onPreviewDoubleClick,
   placeBadge,
   setupCompare,
@@ -162,6 +164,7 @@ function connectControls() {
   dom.canvas.addEventListener("dblclick", (event) => void onPreviewDoubleClick(event));
   setupCompare();
   setupSplit();
+  setupEscape();
   tabs.setEnabled("exif", false);
   tabs.onSelect = () => {
     updateOverlays();
@@ -169,6 +172,25 @@ function connectControls() {
   };
   updateOverlays();
   setupDrop();
+}
+
+/**
+ * Esc キーで、開いているタブの範囲の指定を解除する（切り抜き: 範囲をクリア、投稿加工: 範囲の選択を外す、加工: 部分補正の
+ * 道具・範囲の選択をやめる）。文字の入力中・ダイアログを開いているとき・100% 表示の間は、何もしない。
+ */
+function setupEscape() {
+  window.addEventListener("keydown", (event) => {
+    if (!isEscapeKey(event) || event.defaultPrevented || !state.loaded || isZoomed()) return;
+    if (isEditingText() || document.querySelector("dialog[open]")) return;
+    const tab = tabs.selected();
+    const handled =
+      tab === "crop"
+        ? parts.crop.cancelRange()
+        : tab === "privacy"
+          ? parts.privacy.deselect()
+          : tab === "adjust" && parts.localPanel.cancel();
+    if (handled) event.preventDefault();
+  });
 }
 
 /** Rust からのイベント（メニュー・終了の求め・想定外のエラー・Finder から開くファイル）をつなぐ。 */

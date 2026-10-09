@@ -192,6 +192,18 @@ export class CropController {
     return this.drag !== null;
   }
 
+  /**
+   * Esc キー: トリミング範囲をクリアする（「範囲をクリア」と同じ。ドラッグの途中ならドラッグもやめる）。
+   * 範囲が見えていない（画像がない・切り抜いた表示）か、範囲がなければ何もせず false。
+   */
+  cancelRange(): boolean {
+    if (!this.size || this.isTrimmed() || !this.settings.crop) return false;
+    this.drag = null;
+    this.sequence += 1; // 問い合わせ中のドラッグの結果は使わない
+    this.setCrop(null);
+    return true;
+  }
+
   isTrimmed(): boolean {
     return this.trim.getAttribute("aria-pressed") === "true";
   }

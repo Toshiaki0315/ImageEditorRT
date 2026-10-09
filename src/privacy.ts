@@ -142,6 +142,15 @@ export class PrivacyPanel {
     this.draw();
   }
 
+  /** Esc キー: 選んでいる範囲の選択を外す（範囲は消さない。ドラッグの途中ならドラッグもやめる）。選んでいなければ false。 */
+  deselect(): boolean {
+    this.drag = null;
+    if (this.selected === null) return false;
+    this.selected = null;
+    this.show();
+    return true;
+  }
+
   /** 画像を開いた・閉じたとき（選んでいる範囲をなくす）。 */
   reset() {
     this.selected = null;

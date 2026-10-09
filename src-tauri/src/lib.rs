@@ -67,6 +67,7 @@ pub fn run() {
             image::detect_faces,
             image::detect_text,
             image::auto_straighten,
+            image::auto_crop,
             image::auto_adjust,
             image::prepare_background,
             image::prepare_faces,

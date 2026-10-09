@@ -28,4 +28,4 @@ objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSDictionary", "NSError", "NSIndexSet", "NSObject", "NSString"] }
 # 背景を消す（被写体のマスクは CoreVideo の画素の入れ物で受け取る）
 objc2-core-video = { version = "0.3", default-features = false, features = ["std", "CVBase", "CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
-objc2-vision = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation", "objc2-core-graphics", "VNRequestHandler", "VNRequest", "VNDetectFaceRectanglesRequest", "VNDetectHorizonRequest", "VNRecognizeTextRequest", "VNGenerateForegroundInstanceMaskRequest", "objc2-core-video", "VNObservation", "VNTypes"] }
+objc2-vision = { version = "0.3", default-features = false, features = ["std", "objc2-core-foundation", "objc2-core-graphics", "VNRequestHandler", "VNRequest", "VNDetectFaceRectanglesRequest", "VNDetectHorizonRequest", "VNRecognizeTextRequest", "VNGenerateForegroundInstanceMaskRequest", "VNGenerateAttentionBasedSaliencyImageRequest", "objc2-core-video", "VNObservation", "VNTypes"] }

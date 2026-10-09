@@ -10,6 +10,8 @@ import type { AspectRatio, CropRect, EditSettings, FrameKind, OrientOp, Orientat
 type DragMode = "new" | "move" | "resize";
 type Drag = { mode: DragMode; anchor: [number, number]; start: CropRect | null };
 type Oriented = { orientation: Orientation; crop: CropRect | null; regions: Region[]; size: [number, number] };
+/** 範囲に保たせる縦横比の指定（Rust の crop::AspectChoice）。 */
+type AspectChoice = { ratio: AspectRatio; portrait: boolean; frame: FrameKind; shape: ShapeType };
 /** アンドゥ／リドゥで範囲と一緒に戻す、比の選択と「縦向き」（戻した範囲と比の固定が食い違わないように） */
 export type AspectState = { ratio: AspectRatio; portrait: boolean };
 
@@ -44,6 +46,11 @@ export class CropController {
   private readonly portrait = $<HTMLInputElement>("portrait");
   private readonly trim = $<HTMLButtonElement>("trim");
   private readonly clear = $<HTMLButtonElement>("clear-crop");
+  private readonly autoCrop = $<HTMLButtonElement>("auto-crop");
+  /** おまかせ切り抜きの範囲を問い合わせる（見つからなければ null、失敗なら undefined。assist.ts が入れる） */
+  findSubjectCrop: (aspect: AspectChoice) => Promise<CropRect | null | undefined> = async () => undefined;
+  /** おまかせ切り抜きの結果を知らせる（範囲にしたか） */
+  onAutoCrop: (found: boolean) => void = () => {};
   private readonly frame = $<HTMLSelectElement>("frame");
   private readonly shape = $<HTMLSelectElement>("shape");
   private readonly guide = $<HTMLSelectElement>("crop-guide");
@@ -117,6 +124,7 @@ export class CropController {
       input.addEventListener("input", () => void this.spinEdited(field as keyof CropRect));
     }
     this.clear.addEventListener("click", () => this.setCrop(null));
+    this.autoCrop.addEventListener("click", () => void this.cropAutomatically());
     this.trim.addEventListener("click", () => this.setTrimmed(!this.isTrimmed()));
     this.overlay.addEventListener("pointerdown", (e) => this.pointerDown(e));
     this.overlay.addEventListener("pointermove", (e) => void this.pointerMove(e));
@@ -275,13 +283,27 @@ export class CropController {
 
   // --- 範囲・比・向き ----------------------------------------------------------
 
-  private aspectChoice() {
+  private aspectChoice(): AspectChoice {
     return {
       ratio: this.chosenRatio,
       portrait: this.portrait.checked,
       frame: this.settings.frame,
       shape: this.settings.shape,
     };
+  }
+
+  /** おまかせ切り抜き: 目立つ被写体が中央寄りに入る範囲にする（見つからなければ範囲はそのまま）。 */
+  private async cropAutomatically() {
+    if (!this.size) return;
+    this.autoCrop.disabled = true;
+    try {
+      const crop = await this.findSubjectCrop(this.aspectChoice());
+      if (crop === undefined) return;
+      if (crop) this.setCrop(crop);
+      this.onAutoCrop(crop !== null);
+    } finally {
+      this.autoCrop.disabled = this.size === null;
+    }
   }
 
   /** フレーム・円を選んでいれば、比をそれに固定する（比のプルダウンは選べない）。 */
@@ -393,6 +415,7 @@ export class CropController {
     this.cornerValue.textContent = `${this.settings.cornerRadius}%`;
     this.corner.disabled = !loaded || this.settings.shape !== "rounded";
     this.clear.disabled = !loaded || !crop;
+    this.autoCrop.disabled = !loaded;
     for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orient]")) button.disabled = !loaded;
     // 範囲・フレーム・形（矩形以外）のどれもなければ「トリミング実行」は押せず、全体の表示に戻す
     const canTrim = loaded && (crop !== null || this.settings.frame !== "none" || this.settings.shape !== "rectangle");

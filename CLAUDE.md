@@ -61,7 +61,8 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     load.rs               # 画像のファイルを読む（拡張子・中身・EXIF。開く・まとめて処理・起動確認で共通）
     batch.rs              # まとめて処理（保存先の名前・画像の集め方・1 枚ずつの処理と中止）
     presets.rs            # プリセット（名前付きの加工の組み合わせ）の保存・読み込み（旧版と同じ JSON）
-    pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
+    pipeline.rs           # apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
+    pipeline/             #   settings.rs（EditSettings）・sizes.rs（出力の大きさ・切り抜く範囲・換算）・guide.rs（ジオラマのガイド）・tests.rs
     prepare.rs            # 元の画像に前もってかける処理（赤目 → 肌をなめらかに → 背景。顔の枠・マスクは画面側が 1 回作って渡す）
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
     local.rs              # 部分補正（円・帯の範囲の重みで、範囲の調整をかけた画像を混ぜる）
@@ -137,6 +138,7 @@ src/                      # 画面（TypeScript）
   panel.ts / tabs.ts      # 設定パネルのスライダー・タブ
   exif.ts                 # 「EXIF」タブ（折りたたみの一覧・選んだ行のコピー・マップで開く）
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）
+  cropOverlay.ts / cropShape.ts # 「切り抜き」の線の描画（範囲・形・ガイド）と形の輪郭のパス
   guides.ts               # 切り抜きのガイド線（三分割・黄金比・対角線）の位置の計算
   photoControls.ts        # 「切り抜き」タブの水平の補正（自動を含む）と背景（消す・ぼかす）
   localPanel.ts / localShapes.ts # 「加工」タブの部分補正（範囲のドラッグ）と範囲の当たり判定・線の位置

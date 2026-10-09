@@ -4,8 +4,10 @@
 // 座標はどれも、回転・反転した後の原寸画像の座標（px）。
 
 import { invoke } from "@tauri-apps/api/core";
-import { GUIDE_KINDS, type GuideKind, guideLines, parseGuide } from "./guides";
-import { HANDLE_HIT, handleElement } from "./overlay";
+import { drawCropOverlay } from "./cropOverlay";
+import { shapeOutline } from "./cropShape";
+import { GUIDE_KINDS, type GuideKind, parseGuide } from "./guides";
+import { HANDLE_HIT } from "./overlay";
 import { nearPoint, rectCorners, scaleRect, screenScale } from "./regions";
 import type {
   AspectRatio,
@@ -34,7 +36,6 @@ type AspectChoice = { ratio: AspectRatio; portrait: boolean; frame: FrameKind; s
 /** アンドゥ／リドゥで範囲と一緒に戻す、比の選択と「縦向き」（戻した範囲と比の固定が食い違わないように） */
 export type AspectState = { ratio: AspectRatio; portrait: boolean };
 
-const SVG = "http://www.w3.org/2000/svg";
 const TRIM_TEXT = "トリミング実行";
 /** フレーム・円を選んでいるときに比のプルダウンに出す項目 */
 const FOLLOW = "follow";
@@ -207,73 +208,14 @@ export class CropController {
     const active = this.size !== null && !this.isTrimmed() && !this.canvas.hidden;
     this.overlay.toggleAttribute("hidden", !active);
     if (!active || !this.size) return;
-    const [width, height] = [this.canvas.clientWidth, this.canvas.clientHeight];
-    this.overlay.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    this.overlay.replaceChildren();
-    const crop = this.settings.crop;
-    const outline = this.shapeOutline();
-    const r = crop ? this.toScreen(crop) : null;
-    this.drawGuide(r ?? { x: 0, y: 0, width, height });
-    if (!crop && !outline) return;
-    // 範囲の外と形の外側を暗くする（形があれば形、なければ範囲の内側だけを明るく残す。旧版 FR-UI-58）
-    const hole = outline ?? (r ? `M${r.x} ${r.y}h${r.width}v${r.height}h${-r.width}Z` : "");
-    const mask = document.createElementNS(SVG, "path");
-    mask.setAttribute("class", "mask");
-    mask.setAttribute("d", `M0 0H${width}V${height}H0Z ${hole}`);
-    this.overlay.append(mask);
-    // 枠と形の輪郭（明るい写真でも暗い写真でも見えるよう、白い線の外側に黒い線）
-    for (const kind of ["edge-shadow", "edge"]) {
-      if (outline) {
-        const path = document.createElementNS(SVG, "path");
-        path.setAttribute("class", kind);
-        path.setAttribute("d", outline);
-        this.overlay.append(path);
-      }
-      if (r) {
-        const rect = document.createElementNS(SVG, "rect");
-        rect.setAttribute("class", kind);
-        for (const [key, value] of Object.entries(r)) rect.setAttribute(key, String(value));
-        this.overlay.append(rect);
-      }
-    }
-    if (!r) return;
-    for (const [cx, cy] of rectCorners(r)) this.overlay.append(handleElement(cx, cy));
-  }
-
-  /** 範囲 area（画面の座標）にガイドの線を描く（影の上に白い線。ほかの線より下）。 */
-  private drawGuide(area: CropRect) {
-    const kind = this.guide.value as GuideKind;
-    if (!this.guideActive || kind === "none") return;
-    for (const className of ["guide-shadow", "guide-line"]) {
-      for (const [x1, y1, x2, y2] of guideLines(kind, area)) {
-        const line = document.createElementNS(SVG, "line");
-        line.setAttribute("class", className);
-        for (const [key, value] of Object.entries({ x1, y1, x2, y2 })) line.setAttribute(key, String(value));
-        this.overlay.append(line);
-      }
-    }
-  }
-
-  /** 形（角丸・円）の輪郭の SVG のパス（画面の座標）。矩形・半径 0 の角丸なら null。 */
-  private shapeOutline(): string | null {
-    if (!this.size) return null;
     const area = this.toScreen(this.shapeArea ?? { x: 0, y: 0, width: this.size[0], height: this.size[1] });
-    const short = Math.min(area.width, area.height);
-    if (this.settings.shape === "circle") {
-      // 中央の、短辺を直径とする正円
-      const [cx, cy, radius] = [area.x + area.width / 2, area.y + area.height / 2, short / 2];
-      return `M${cx - radius} ${cy}a${radius} ${radius} 0 1 0 ${2 * radius} 0a${radius} ${radius} 0 1 0 ${-2 * radius} 0Z`;
-    }
-    if (this.settings.shape === "rounded" && this.settings.cornerRadius > 0) {
-      const r = (short * Math.min(this.settings.cornerRadius, 50)) / 100;
-      const { x, y, width, height } = area;
-      return (
-        `M${x + r} ${y}H${x + width - r}A${r} ${r} 0 0 1 ${x + width} ${y + r}V${y + height - r}` +
-        `A${r} ${r} 0 0 1 ${x + width - r} ${y + height}H${x + r}A${r} ${r} 0 0 1 ${x} ${y + height - r}` +
-        `V${y + r}A${r} ${r} 0 0 1 ${x + r} ${y}Z`
-      );
-    }
-    return null;
+    drawCropOverlay(this.overlay, {
+      width: this.canvas.clientWidth,
+      height: this.canvas.clientHeight,
+      crop: this.settings.crop ? this.toScreen(this.settings.crop) : null,
+      outline: shapeOutline(this.settings.shape, this.settings.cornerRadius, area),
+      guide: this.guideActive ? (this.guide.value as GuideKind) : null,
+    });
   }
 
   /** 形をかける範囲を Rust に聞いて覚え、線を描き直す。 */

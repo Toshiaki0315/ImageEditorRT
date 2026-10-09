@@ -3,7 +3,8 @@
 //! 文字・ロゴを透明な板の中央に描いて切り出し（スタンプ）、斜めに回してから、レンガ積みのようにずらしながら
 //! 写真全体に重ねる。大きさ・不透明度・飾りは、ほかの位置に置くときと同じ設定を使う。
 
-use image::{imageops, Rgba, RgbaImage};
+use image::{imageops, Pixel, Rgba, RgbaImage};
+use rayon::prelude::*;
 
 use crate::logo::{self, LogoSettings};
 use crate::text::{self, TextPosition, TextSettings};
@@ -15,28 +16,57 @@ const GAP_RATIO: f64 = 0.06;
 
 /// 文字を写真全体に繰り返して描く。
 pub fn draw_tiled_text(image: &mut RgbaImage, settings: &TextSettings) {
-    if settings.is_empty() {
-        return;
-    }
-    let mut canvas = RgbaImage::new(image.width(), image.height());
-    let centered = TextSettings { position: TextPosition::Center, ..settings.clone() };
-    text::draw_text(&mut canvas, &centered, None, None);
-    if let Some(stamp) = cut_stamp(&canvas) {
+    if let Some(stamp) = text_stamp(image.dimensions(), settings) {
         tile(image, &stamp);
     }
 }
 
 /// ロゴを写真全体に繰り返して描く。
 pub fn draw_tiled_logo(image: &mut RgbaImage, settings: &LogoSettings) {
-    if settings.is_empty() {
-        return;
-    }
-    let mut canvas = RgbaImage::new(image.width(), image.height());
-    let centered = LogoSettings { position: TextPosition::Center, ..settings.clone() };
-    logo::draw_logo(&mut canvas, &centered, None, None);
-    if let Some(stamp) = cut_stamp(&canvas) {
+    if let Some(stamp) = logo_stamp(image.dimensions(), settings) {
         tile(image, &stamp);
     }
+}
+
+/// 文字のスタンプ: 写真（size）の中央に描いたときと同じ形・大きさ・飾りで、文字の入る板に描いて切り出す。
+fn text_stamp((width, height): (u32, u32), settings: &TextSettings) -> Option<RgbaImage> {
+    if settings.is_empty() {
+        return None;
+    }
+    let short = f64::from(width.min(height));
+    let size = f64::from(text::text_size_px(settings, short));
+    let lines = settings.text.replace("\r\n", "\n").split('\n').count() as f64;
+    // 行の高さ（文字の大きさの 1.3 倍ほど）と飾り（文字の大きさの 2 割ほど）が十分入る高さ
+    let needed = (lines + 1.0) * size * 2.0 + short * text::TEXT_MARGIN_RATIO * 2.0;
+    let mut canvas = RgbaImage::new(width, canvas_height(height, needed));
+    let centered = TextSettings { position: TextPosition::Center, ..settings.clone() };
+    text::draw_text(&mut canvas, &centered, None, Some(short));
+    cut_stamp(&canvas)
+}
+
+/// ロゴのスタンプ（文字と同じく、ロゴの入る板に描いて切り出す）。
+fn logo_stamp((width, height): (u32, u32), settings: &LogoSettings) -> Option<RgbaImage> {
+    if settings.is_empty() {
+        return None;
+    }
+    let short = f64::from(width.min(height));
+    let wanted = short * f64::from(settings.size.clamp(logo::LOGO_SIZE_MIN, logo::LOGO_SIZE_MAX)) / 100.0;
+    let needed = wanted + short * text::TEXT_MARGIN_RATIO * 2.0 + 4.0;
+    let mut canvas = RgbaImage::new(width, canvas_height(height, needed));
+    let centered = LogoSettings { position: TextPosition::Center, ..settings.clone() };
+    logo::draw_logo(&mut canvas, &centered, None, Some(short));
+    cut_stamp(&canvas)
+}
+
+/// スタンプを描く板の高さ: needed 以上で写真の高さ以下。写真の高さとの差を偶数にして、中央に置いたときの位置の
+/// 端数（文字の形のなめらかさに効く）が写真の上に描くときと同じになるようにする。
+fn canvas_height(height: u32, needed: f64) -> u32 {
+    let needed = needed.ceil() as u32;
+    if needed >= height {
+        return height;
+    }
+    let spare = height - needed;
+    height - (spare - spare % 2)
 }
 
 /// 透明な板から、描いた部分（透明でない画素）を囲む範囲を切り出す。何も描いていなければ None。
@@ -73,6 +103,7 @@ fn tile(image: &mut RgbaImage, stamp: &RgbaImage) {
     let columns = (reach / step).ceil() as i64 + 1;
     let rows = (reach / line).ceil() as i64 + 1;
     let (half_w, half_h) = (f64::from(rotated.width()) / 2.0, f64::from(rotated.height()) / 2.0);
+    let mut places = Vec::new();
     for row in -rows..=rows {
         let shift = if row.rem_euclid(2) == 1 { step / 2.0 } else { 0.0 };
         for column in -columns..=columns {
@@ -83,22 +114,33 @@ fn tile(image: &mut RgbaImage, stamp: &RgbaImage) {
             if cx < -half_w || cy < -half_h || cx > width + half_w || cy > height + half_h {
                 continue;
             }
-            overlay(image, &rotated, (cx - half_w).round() as i64, (cy - half_h).round() as i64);
+            places.push(((cx - half_w).round() as i64, (cy - half_h).round() as i64));
         }
     }
+    overlay_all(image, &rotated, &places);
 }
 
-/// stamp を image の (x, y) に「上に重ねる」（文字を描くときと同じ合成。はみ出す部分は描かない）。
-fn overlay(image: &mut RgbaImage, stamp: &RgbaImage, x: i64, y: i64) {
-    let (width, height) = (i64::from(image.width()), i64::from(image.height()));
-    for (sx, sy, p) in stamp.enumerate_pixels() {
-        let (px, py) = (x + i64::from(sx), y + i64::from(sy));
-        if p[3] == 0 || px < 0 || py < 0 || px >= width || py >= height {
-            continue;
+/// stamp を image の places（左上）すべてに、並んでいる順に「上に重ねる」（文字を描くときと同じ合成。
+/// はみ出す部分は描かない）。行ごとに並列に描く（どの画素も、重ねる順は places の順のまま）。
+fn overlay_all(image: &mut RgbaImage, stamp: &RgbaImage, places: &[(i64, i64)]) {
+    let width = image.width() as usize;
+    let (stamp_width, stamp_height) = (i64::from(stamp.width()), i64::from(stamp.height()));
+    image.as_mut().par_chunks_exact_mut(width * 4).enumerate().for_each(|(y, row)| {
+        let y = y as i64;
+        for &(left, top) in places.iter().filter(|&&(_, top)| (top..top + stamp_height).contains(&y)) {
+            let from = left.max(0);
+            let to = (left + stamp_width).min(width as i64);
+            for x in from..to {
+                let p = stamp.get_pixel((x - left) as u32, (y - top) as u32);
+                if p[3] == 0 {
+                    continue;
+                }
+                let at = x as usize * 4;
+                let pixel = Rgba::from_slice_mut(&mut row[at..at + 4]);
+                text::source_over(pixel, [p[0], p[1], p[2]].map(f32::from), f32::from(p[3]) / 255.0);
+            }
         }
-        let color = [p[0], p[1], p[2]].map(f32::from);
-        text::source_over(image.get_pixel_mut(px as u32, py as u32), color, f32::from(p[3]) / 255.0);
-    }
+    });
 }
 
 /// 画像を angle（ラジアン。左回り）だけ回し、はみ出さない大きさの透明な板に描く（バイリニア、透過を考えて混ぜる）。
@@ -230,6 +272,114 @@ mod tests {
         let white = image.pixels().filter(|p| p.0 == [255, 255, 255, 255]).count();
         assert!(white > 600 * 400 / 2, "{white}");
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// 速くする前のスタンプ（写真と同じ大きさの板に描いて切り出す）。
+    fn full_text_stamp(size: (u32, u32), settings: &TextSettings) -> Option<RgbaImage> {
+        let mut canvas = RgbaImage::new(size.0, size.1);
+        text::draw_text(
+            &mut canvas,
+            &TextSettings { position: TextPosition::Center, ..settings.clone() },
+            None,
+            None,
+        );
+        cut_stamp(&canvas)
+    }
+
+    fn full_logo_stamp(size: (u32, u32), settings: &LogoSettings) -> Option<RgbaImage> {
+        let mut canvas = RgbaImage::new(size.0, size.1);
+        logo::draw_logo(
+            &mut canvas,
+            &LogoSettings { position: TextPosition::Center, ..settings.clone() },
+            None,
+            None,
+        );
+        cut_stamp(&canvas)
+    }
+
+    #[test]
+    fn small_canvas_gives_the_same_stamp() {
+        // 写真と同じ大きさの板に描いたときと同じスタンプになる
+        use crate::text::{TextEffect, TextFont};
+        let sizes = [(600, 400), (601, 401), (400, 900), (1234, 777), (300, 300)];
+        let texts = [
+            white_text(),
+            TextSettings {
+                text: "二行の\n透かし".into(),
+                size: 12.0,
+                effect: TextEffect::Shadow,
+                ..white_text()
+            },
+            TextSettings {
+                text: "Outline".into(),
+                font: TextFont::GothicBold,
+                size: 30.0,
+                effect: TextEffect::Outline,
+                ..white_text()
+            },
+        ];
+        for size in sizes {
+            for settings in &texts {
+                let (a, b) = (text_stamp(size, settings).unwrap(), full_text_stamp(size, settings).unwrap());
+                assert_eq!(a.dimensions(), b.dimensions(), "{size:?} {:?}", settings.text);
+                // 置く位置の小数の丸めで、縁の不透明度が 1/255 違うことがある（見える色は同じ）
+                for (p, q) in a.pixels().zip(b.pixels()) {
+                    assert!(p[3].abs_diff(q[3]) <= 1, "{size:?} {:?}: {p:?} / {q:?}", settings.text);
+                    if p[3] > 0 && q[3] > 0 {
+                        assert_eq!([p[0], p[1], p[2]], [q[0], q[1], q[2]], "{size:?} {:?}", settings.text);
+                    }
+                }
+            }
+        }
+        let dir = std::env::temp_dir().join(format!("imageeditorrt-tile-stamp-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("logo.png");
+        RgbaImage::from_fn(37, 23, |x, y| {
+            Rgba([(x * 6) as u8, (y * 9) as u8, 200, if x < 30 { 255 } else { 90 }])
+        })
+        .save(&path)
+        .unwrap();
+        for size in sizes {
+            for logo_size in [5.0, 25.0, 60.0] {
+                let logo = LogoSettings {
+                    path: path.to_string_lossy().into_owned(),
+                    position: TextPosition::Tiled,
+                    size: logo_size,
+                    opacity: 70,
+                };
+                assert_eq!(logo_stamp(size, &logo), full_logo_stamp(size, &logo), "{size:?} {logo_size}");
+            }
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(canvas_height(1000, 301.2), 302);
+        assert_eq!(canvas_height(1001, 301.2), 303);
+        assert_eq!(canvas_height(200, 301.2), 200);
+    }
+
+    #[test]
+    fn parallel_overlay_matches_one_by_one() {
+        // 半透明で重なり合うスタンプを、1 つずつ順に重ねたときと同じになる（はみ出しも含む）
+        let stamp =
+            RgbaImage::from_fn(30, 20, |x, y| Rgba([(x * 8) as u8, (y * 12) as u8, 90, ((x + y) * 6) as u8]));
+        let places = [(-10, -5), (5, 3), (20, 10), (90, 50), (15, 4), (100, 70)];
+        let base = RgbaImage::from_fn(110, 80, |x, y| Rgba([(x * 2) as u8, (y * 3) as u8, 40, 255]));
+        let mut one_by_one = base.clone();
+        for &(left, top) in &places {
+            for (sx, sy, p) in stamp.enumerate_pixels() {
+                let (x, y) = (left + i64::from(sx), top + i64::from(sy));
+                if p[3] == 0 || x < 0 || y < 0 || x >= 110 || y >= 80 {
+                    continue;
+                }
+                text::source_over(
+                    one_by_one.get_pixel_mut(x as u32, y as u32),
+                    [p[0], p[1], p[2]].map(f32::from),
+                    f32::from(p[3]) / 255.0,
+                );
+            }
+        }
+        let mut parallel = base;
+        overlay_all(&mut parallel, &stamp, &places);
+        assert_eq!(parallel, one_by_one);
     }
 
     #[test]

@@ -114,7 +114,7 @@
           </label>
           <h2>保存の設定</h2>
           <label class="row">
-            JPEG 品質
+            品質（JPEG・HEIC）
             <input id="jpeg-quality" type="range" min="1" max="100" step="1" title="ダブルクリックで 90 に戻す" />
             <output id="jpeg-quality-value"></output>
           </label>
@@ -122,7 +122,7 @@
           <label class="check"><input id="keep-gps" type="checkbox" /> 位置情報 (GPS) も残す</label>
           <label class="check limit-size"
             ><input id="limit-size" type="checkbox" /> ファイルの大きさを
-            <input id="limit-mb" type="number" min="0.05" max="100" step="0.1" /> MB 以下にする（JPEG）</label
+            <input id="limit-mb" type="number" min="0.05" max="100" step="0.1" /> MB 以下にする（JPEG・HEIC）</label
           >
         </div>
         <div id="page-diorama" class="page" role="tabpanel" hidden></div>
@@ -256,6 +256,14 @@
             </select>
             <input type="text" id="batch-prefix" placeholder="写真" title="連番の前に付ける名前（写真_001 …）" disabled />
           </span>
+          <span>形式</span>
+          <span class="batch-resize">
+            <select id="batch-format">
+              <option value="original">元と同じ</option>
+              <option value="jpeg">JPEG</option>
+              <option value="heic">HEIC（JPEG より小さい）</option>
+            </select>
+          </span>
           <span>保存先</span>
           <span class="batch-out">
             <span id="batch-out-dir" class="batch-out-dir">（まだ選んでいません）</span>
@@ -263,8 +271,8 @@
           </span>
         </div>
         <p class="note">
-          トリミング範囲と回転・反転はかけません（フレーム・円のときは各画像の中央をその比で切り抜きます）。顔・文字は 1 枚ごとに見つけて隠します（処理はこの Mac の中だけ）。元と同じ名前・形式で保存し、同じ名前があれば
-          _edited を付けて上書きしません。JPEG 品質・EXIF は「保存の設定」に従います。
+          トリミング範囲と回転・反転はかけません（フレーム・円のときは各画像の中央をその比で切り抜きます）。顔・文字は 1 枚ごとに見つけて隠します（処理はこの Mac の中だけ）。保存名・形式は選んだとおりにし（RAW は元と同じ形式にできないので JPEG）、同じ名前があれば
+          _edited などを付けて上書きしません。品質・EXIF・ファイルの大きさの上限は「保存の設定」に従います。
         </p>
         <div class="buttons dialog-buttons">
           <button type="submit" value="start" id="batch-start">開始</button>
@@ -345,7 +353,7 @@
             <dt>切り抜き</dt>
             <dd>比を選んでプレビューをドラッグ（三分割・黄金比・対角線のガイドも出せる）。回転・反転・水平の補正（傾きの自動補正も）・背景を消す／ぼかす・フレーム・形（角丸・円）</dd>
             <dt>出力</dt>
-            <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG の品質・EXIF・位置情報・ファイルの大きさの上限</dd>
+            <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限</dd>
             <dt>ジオラマ</dt>
             <dd>ミニチュア風。ピントの帯のガイドがプレビューに出る</dd>
             <dt>投稿加工</dt>

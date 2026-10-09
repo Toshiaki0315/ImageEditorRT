@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use imageeditorrt_core::batch::{self, BatchOptions, BatchPrivacy, OutputNaming};
+use imageeditorrt_core::batch::{self, BatchOptions, BatchPrivacy, OutputFormat, OutputNaming};
 use imageeditorrt_core::pipeline::EditSettings;
 use imageeditorrt_core::presets::Preset;
 use imageeditorrt_core::save::SaveOptions;
@@ -78,6 +78,7 @@ pub async fn run_batch(
     save: SaveOptions,
     privacy: BatchPrivacy,
     naming: OutputNaming,
+    format: OutputFormat,
     app: AppHandle,
     presets: State<'_, PresetStore>,
     batch_state: State<'_, BatchState>,
@@ -86,7 +87,7 @@ pub async fn run_batch(
         Some(name) => presets.find(name).ok_or_else(|| format!("プリセット「{name}」がありません"))?,
         None => Preset::from_settings(CURRENT_LOOK, &settings),
     };
-    let options = BatchOptions { look, long_side, save, privacy, naming };
+    let options = BatchOptions { look, long_side, save, privacy, naming, format };
     let sources: Vec<PathBuf> = sources.into_iter().map(PathBuf::from).collect();
     let out_dir = PathBuf::from(out_dir);
     batch_state.0.store(false, Ordering::SeqCst);

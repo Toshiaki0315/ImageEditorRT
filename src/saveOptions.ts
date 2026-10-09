@@ -1,8 +1,8 @@
-// 「出力」タブの「保存の設定」（JPEG 品質・EXIF・位置情報・ファイルの大きさの上限）と、「投稿加工」タブの「位置情報を消して保存する」
+// 「出力」タブの「保存の設定」（JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限）と、「投稿加工」タブの「位置情報を消して保存する」
 // （位置情報を残すかの逆。どちらで変えても両方に反映する）。
 // 保存の好みなので画像を開いても戻さず、アプリを終了しても残す（旧版 FR-UI-56）。
 
-/** Rust の save::SaveOptions。maxKb はファイルの大きさの上限（KB、JPEG のとき。なければ null）。 */
+/** Rust の save::SaveOptions。maxKb はファイルの大きさの上限（KB、JPEG・HEIC のとき。なければ null）。 */
 export type SaveOptions = { quality: number; keepExif: boolean; keepGps: boolean; maxKb: number | null };
 
 /** 画面で持つ設定（上限を外しても、入れた MB は覚えておく）。 */

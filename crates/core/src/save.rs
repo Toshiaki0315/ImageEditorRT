@@ -12,16 +12,16 @@ use serde::{Deserialize, Serialize};
 use crate::formats::has_transparency;
 use crate::tiff::{tiff_block, ExifBlock, Order, TAG_ORIENTATION, TAG_PIXEL_X, TAG_PIXEL_Y};
 
-/// JPEG の品質の既定値と範囲。
+/// JPEG・HEIC の品質の既定値と範囲。
 pub const DEFAULT_JPEG_QUALITY: u8 = 90;
 pub const JPEG_QUALITY_MIN: u8 = 1;
 pub const JPEG_QUALITY_MAX: u8 = 100;
-/// 読み込みだけできる形式（HEIC など）の画像を保存するときの拡張子。
+/// 読み込みだけできる形式（RAW）の画像を保存するときの拡張子。
 pub const FALLBACK_SAVE_SUFFIX: &str = "jpg";
 /// JPEG の APP1 に入る EXIF の大きさの上限（これを超えると MakerNote を外す）。
 pub const MAX_EXIF_BYTES: usize = 65533;
 /// 保存できる拡張子（小文字・ドットなし）。
-pub const SAVABLE_EXTENSIONS: [&str; 7] = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp"];
+pub const SAVABLE_EXTENSIONS: [&str; 9] = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic", "heif"];
 /// 元の画像と同じファイルを選んだときの説明。
 pub const SAME_FILE_MESSAGE: &str =
     "元の画像と同じファイルには保存できません。別のファイル名を指定してください。";
@@ -30,13 +30,13 @@ pub const SAME_FILE_MESSAGE: &str =
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SaveOptions {
-    /// JPEG の品質 1〜100
+    /// JPEG・HEIC の品質 1〜100
     pub quality: u8,
-    /// 撮影日時などの EXIF を残す（JPEG・PNG・TIFF）
+    /// 撮影日時などの EXIF を残す（JPEG・PNG・TIFF・HEIC）
     pub keep_exif: bool,
     /// EXIF を残すとき、位置情報 (GPS) も残す
     pub keep_gps: bool,
-    /// ファイルの大きさの上限（KB。JPEG のときだけ。None なら指定なし。旧版にはない）
+    /// ファイルの大きさの上限（KB。JPEG・HEIC のときだけ。None なら指定なし。旧版にはない）
     pub max_kb: Option<u32>,
 }
 
@@ -50,7 +50,7 @@ impl Default for SaveOptions {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Saved {
-    /// 保存した JPEG の品質（JPEG 以外は設定の品質のまま）
+    /// 保存した JPEG・HEIC の品質（それ以外は設定の品質のまま）
     pub quality: u8,
     /// 保存した画像の大きさ（px）
     pub size: (u32, u32),
@@ -60,7 +60,7 @@ pub struct Saved {
     pub fitted: bool,
 }
 
-/// 大きさの上限に合わせるときに下げる JPEG の品質の下限（これより下げるより、画像を縮める）。
+/// 大きさの上限に合わせるときに下げる JPEG・HEIC の品質の下限（これより下げるより、画像を縮める）。
 const FIT_QUALITY_MIN: u8 = 40;
 /// 上限に合わせて縮めるときの、短辺の下限（px）。
 const FIT_MIN_SIDE: u32 = 64;
@@ -75,6 +75,8 @@ pub enum SaveFormat {
     Gif,
     Tiff,
     Bmp,
+    /// HEIC（macOS の ImageIO で書き出す。旧版にはない）
+    Heic,
 }
 
 impl SaveFormat {
@@ -86,6 +88,7 @@ impl SaveFormat {
             "gif" => Some(Self::Gif),
             "tif" | "tiff" => Some(Self::Tiff),
             "bmp" => Some(Self::Bmp),
+            "heic" | "heif" => Some(Self::Heic),
             _ => None,
         }
     }
@@ -97,7 +100,12 @@ impl SaveFormat {
 
     /// EXIF を書き込める形式か。
     fn has_exif(self) -> bool {
-        matches!(self, Self::Jpeg | Self::Png | Self::Tiff)
+        matches!(self, Self::Jpeg | Self::Png | Self::Tiff | Self::Heic)
+    }
+
+    /// 品質で大きさが変わる形式か（ファイルの大きさの上限に合わせられる）。
+    fn is_lossy(self) -> bool {
+        matches!(self, Self::Jpeg | Self::Heic)
     }
 }
 
@@ -106,7 +114,7 @@ impl SaveFormat {
 pub enum SaveError {
     /// 保存できない拡張子（ドットなし。拡張子がなければ空）
     UnsupportedExtension(String),
-    /// JPEG の品質が範囲外
+    /// JPEG・HEIC の品質が範囲外
     Quality(u8),
     /// 書き出し・書き込みに失敗した
     Write(String),
@@ -312,6 +320,14 @@ pub fn encode(
                 .write_image(&flatten_alpha(image), width, height, ExtendedColorType::Rgb8)
                 .map_err(|e| write_error(&e))?;
         }
+        SaveFormat::Heic => {
+            #[cfg(target_os = "macos")]
+            {
+                out = crate::heic::encode_heic(image, quality, exif).map_err(|e| write_error(&e))?;
+            }
+            #[cfg(not(target_os = "macos"))]
+            return Err(SaveError::Write("HEIC は macOS でだけ保存できます".into()));
+        }
         SaveFormat::Tiff => {
             let block = exif.and_then(ExifBlock::parse).unwrap_or_else(|| ExifBlock::empty(Order::Little));
             out = if alpha {
@@ -347,9 +363,9 @@ pub fn save_edited(
         });
         encode(image, format, quality, exif.as_deref())
     };
-    let limit = options.max_kb.filter(|_| format == SaveFormat::Jpeg).map(|kb| u64::from(kb) * 1024);
+    let limit = options.max_kb.filter(|_| format.is_lossy()).map(|kb| u64::from(kb) * 1024);
     let (bytes, quality, size) = match limit {
-        Some(limit) => fit_jpeg(image, options.quality, limit, encode_at)?,
+        Some(limit) => fit_size(image, options.quality, limit, encode_at)?,
         None => (encode_at(image, options.quality)?, options.quality, image.dimensions()),
     };
     let saved = Saved {
@@ -362,13 +378,13 @@ pub fn save_edited(
     Ok(saved)
 }
 
-/// 大きさの上限に合わせた JPEG（バイト列・品質・画像の大きさ）。
+/// 大きさの上限に合わせた JPEG・HEIC（バイト列・品質・画像の大きさ）。
 type Fitted = (Vec<u8>, u8, (u32, u32));
 
-/// JPEG を limit バイト以下にする: いちばん高い品質（quality 以下、40 以上）を探し、それでも収まらなければ
+/// JPEG・HEIC を limit バイト以下にする: いちばん高い品質（quality 以下、40 以上）を探し、それでも収まらなければ
 /// 画像を縮めて（Lanczos）探し直す。どうしても収まらなければ、いちばん小さくしたものを返す。
 /// 返すのはバイト列・品質・画像の大きさ。
-fn fit_jpeg(
+fn fit_size(
     image: &RgbaImage,
     quality: u8,
     limit: u64,
@@ -438,7 +454,8 @@ mod tests {
     #[test]
     fn suffixes_and_names() {
         assert_eq!(save_suffix(Path::new("/a/photo.JPG")), "JPG");
-        assert_eq!(save_suffix(Path::new("/a/photo.heic")), "jpg");
+        // HEIC は HEIC のまま（保存できる）
+        assert_eq!(save_suffix(Path::new("/a/photo.heic")), "heic");
         // RAW には保存できないので JPEG
         assert_eq!(save_suffix(Path::new("/a/IMG_0001.CR3")), "jpg");
         assert!(!is_savable(Path::new("x.dng")));
@@ -453,7 +470,8 @@ mod tests {
         );
         assert!(
             is_savable(Path::new("x.TIFF"))
-                && !is_savable(Path::new("x.heic"))
+                && is_savable(Path::new("x.HEIC"))
+                && is_savable(Path::new("x.heif"))
                 && !is_savable(Path::new("x"))
         );
     }
@@ -462,7 +480,9 @@ mod tests {
     fn default_path_skips_existing() {
         let dir = std::env::temp_dir().join(format!("imageeditorrt-save-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let source = dir.join("photo.heic");
+        // RAW は保存できないので JPEG（HEIC は HEIC のまま）
+        assert_eq!(default_save_path(&dir.join("photo.heic")), dir.join("photo_edited.heic"));
+        let source = dir.join("photo.dng");
         assert_eq!(default_save_path(&source), dir.join("photo_edited.jpg"));
         std::fs::write(dir.join("photo_edited.jpg"), b"x").unwrap();
         assert_eq!(default_save_path(&source), dir.join("photo_edited_2.jpg"));
@@ -500,9 +520,9 @@ mod tests {
     #[test]
     fn unsupported_extension() {
         let err =
-            save_edited(&RgbaImage::new(1, 1), Path::new("/tmp/x.heic"), SaveOptions::default(), None, false)
+            save_edited(&RgbaImage::new(1, 1), Path::new("/tmp/x.webp"), SaveOptions::default(), None, false)
                 .unwrap_err();
-        assert_eq!(err.to_string(), "対応していない拡張子です: .heic");
+        assert_eq!(err.to_string(), "対応していない拡張子です: .webp");
     }
 
     #[test]

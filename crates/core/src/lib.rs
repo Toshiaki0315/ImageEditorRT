@@ -28,6 +28,8 @@ pub mod filters;
 pub mod foreground;
 pub mod formats;
 pub mod frames;
+#[cfg(target_os = "macos")]
+pub mod heic;
 pub mod histogram;
 #[cfg(target_os = "macos")]
 pub mod horizon;

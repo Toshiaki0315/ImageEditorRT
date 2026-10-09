@@ -14,7 +14,7 @@ pub enum Format {
     Gif,
     Tiff,
     Bmp,
-    /// HEIC / HEIF（読み込みのみ）
+    /// HEIC / HEIF（保存は macOS の ImageIO で HEIC に）
     Heif,
     /// カメラの RAW（読み込みのみ。現像は macOS の ImageIO。旧版にはない）
     Raw,
@@ -33,7 +33,7 @@ pub const SUPPORTED_EXTENSIONS: [&str; 23] = [
 
 /// エラーのダイアログに添える、対応形式の説明。
 pub const FORMATS_TEXT: &str =
-    "PNG / JPEG / GIF / TIFF / BMP（HEIC / HEIF・カメラの RAW（DNG・CR2・CR3・NEF・ARW・RAF など）は読み込みのみ）";
+    "PNG / JPEG / GIF / TIFF / BMP / HEIC / HEIF（カメラの RAW（DNG・CR2・CR3・NEF・ARW・RAF など）は読み込みのみ）";
 
 impl Format {
     /// 拡張子から形式を決める（大文字・小文字は区別しない）。読めない拡張子なら None。

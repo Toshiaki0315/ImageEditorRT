@@ -61,7 +61,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     batch.rs              # まとめて処理（保存先の名前・画像の集め方・1 枚ずつの処理と中止）
     presets.rs            # プリセット（名前付きの加工の組み合わせ）の保存・読み込み（旧版と同じ JSON）
     pipeline.rs           # EditSettings と apply_edits()（保存）・render_preview()（プレビュー）。処理順はここで固定
-    prepare.rs            # 元の画像に前もってかける処理（肌をなめらかに → 背景。顔の枠・マスクは画面側が 1 回作って渡す）
+    prepare.rs            # 元の画像に前もってかける処理（赤目 → 肌をなめらかに → 背景。顔の枠・マスクは画面側が 1 回作って渡す）
     adjust.rs             # 変換表（LUT）・露出・明るさ・コントラスト・色温度・彩度・周辺減光・経年劣化
     curve.rs              # トーンカーブ（単調な 3 次補間）と色ごとの調整（8 色の色相・彩度・明るさ）
     auto.rs               # 自動補正（色の分布から露出・コントラスト・色温度を求める）
@@ -70,6 +70,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     filters.rs            # テイスト（フィルター 23 種）
     effects.rs            # ディテール（シャープ・ぼかし・ノイズ除去）
     skin.rs               # 肌をなめらかに（顔のまわりの楕円だけ、輪郭を残してなめらかに）
+    redeye.rs             # 赤目の補正（顔の枠の目のあたりで、強い赤だけを暗い無彩色に）
     diorama.rs            # ジオラマ風（ミニチュア風・ティルトシフト）
     frames.rs             # フレーム（ポラロイド・チェキ）
     histogram.rs          # ヒストグラム（R・G・B・輝度の分布）の計算
@@ -79,9 +80,11 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     collage.rs            # 並べて 1 枚に（並べ方・枠に合わせた切り抜き）
     sample.rs             # 計測用の画像
     pyrandom.rs           # Python の random.Random と同じ乱数（経年劣化の粒子を旧版とそろえる）
-    text.rs               # 文字・透かし（フォント・9 か所とフレームの余白・大きさ・色・不透明度。ab_glyph で描く）
+    text.rs               # 文字・透かし（フォント・9 か所とフレームの余白・大きさ・色・不透明度・縁取り／影。ab_glyph で描く）
+    tile.rs               # 文字・ロゴを写真全体に斜めに繰り返して敷く
     logo.rs               # ロゴの透かし（画像ファイルを文字と同じ位置の決め方で重ねる）
     encode.rs             # JPEG への書き出し（プレビューの計測用）
+    heic.rs               # HEIC での書き出し（ImageIO。EXIF は ImageIO のプロパティにして渡す。macOS のみ）
     save.rs               # 保存（形式・名前の決め方・元の画像への上書きの防止・EXIF を残す）
     exif_info.rs          # EXIF・GPS・MakerNote を表示用に読む
     exifread_note.rs      # 主なメーカーの MakerNote を exifread と同じに読む（表は exifread_tables.rs、自動生成）
@@ -115,7 +118,8 @@ src/                      # 画面（TypeScript）
   app.ts                  # 共有の状態（開いている画像・保存中など）・画面の要素・部品
   editing.ts              # 設定の変更の知らせ・元に戻す／やり直す・未保存の変更の確認
   assist.ts               # 自動の処理（傾き・背景の被写体・顔／文字を隠す・肌のための顔・自動補正）の問い合わせと知らせ
-  view.ts                 # 加工前との比較・100% 表示・左上の表示・ジオラマのガイド
+  view.ts                 # 加工前との比較（左右に分けて比べるを含む）・100% 表示・左上の表示・ジオラマのガイド
+  split.ts                # 左右に分けて比べる表示の計算（境目の位置・加工前の置き方。tests-ts/ で npm test）
   files.ts                # 開く・ドロップ・保存・貼り付け・まとめて処理・リセット・終了
   presetsUi.ts            # 「プリセット ▾」のメニュー・保存・当てはめ・削除
   menus.ts                # メニューの項目の ID（Rust と同じ）と使える・使えない
@@ -131,6 +135,7 @@ src/                      # 画面（TypeScript）
   panel.ts / tabs.ts      # 設定パネルのスライダー・タブ
   exif.ts                 # 「EXIF」タブ（折りたたみの一覧・選んだ行のコピー・マップで開く）
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）
+  guides.ts               # 切り抜きのガイド線（三分割・黄金比・対角線）の位置の計算
   photoControls.ts        # 「切り抜き」タブの水平の補正（自動を含む）と背景（消す・ぼかす）
   privacy.ts / regions.ts # 「投稿加工」タブ（範囲のドラッグ・顔／文字を見つけて隠す）と範囲の計算
   colorPanel.ts / curve.ts # トーンカーブのグラフと色ごとの調整（曲線の計算は Rust と同じ）
@@ -138,7 +143,7 @@ src/                      # 画面（TypeScript）
   collageDialog.ts        # 並べて 1 枚に のダイアログ
   textDialog.ts           # 「文字・透かし」のダイアログ（⌘T・「文字…」）
   output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）
-  saveOptions.ts          # 保存の設定（JPEG 品質・EXIF・GPS・ファイルの大きさの上限。localStorage に残す）
+  saveOptions.ts          # 保存の設定（JPEG・HEIC の品質・EXIF・GPS・ファイルの大きさの上限。localStorage に残す）
   types.ts                # Rust とやりとりする型
   styles.css
 index.html

@@ -51,6 +51,7 @@ export class BatchDialog {
   private readonly strength = $<HTMLInputElement>("batch-strength");
   private readonly strengthValue = $<HTMLOutputElement>("batch-strength-value");
   private readonly naming = $<HTMLSelectElement>("batch-naming");
+  private readonly format = $<HTMLSelectElement>("batch-format");
   private readonly prefix = $<HTMLInputElement>("batch-prefix");
   private outDir: string | null = null;
 
@@ -142,6 +143,7 @@ export class BatchDialog {
           this.naming.value === "sequence"
             ? { kind: "sequence", prefix: this.prefix.value }
             : { kind: this.naming.value },
+        format: this.format.value,
       });
     } finally {
       unlisten();

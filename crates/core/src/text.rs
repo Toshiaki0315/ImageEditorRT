@@ -90,11 +90,13 @@ pub enum TextPosition {
     BottomRight,
     /// ポラロイド・チェキの広い余白（フレームがなければ下中央）
     FrameMargin,
+    /// 写真全体に斜めに繰り返して敷く（旧版にはない）
+    Tiled,
 }
 
 impl TextPosition {
     /// すべての位置（画面のプルダウンの順）。
-    pub const ALL: [TextPosition; 10] = [
+    pub const ALL: [TextPosition; 11] = [
         Self::TopLeft,
         Self::Top,
         Self::TopRight,
@@ -105,6 +107,7 @@ impl TextPosition {
         Self::Bottom,
         Self::BottomRight,
         Self::FrameMargin,
+        Self::Tiled,
     ];
 
     /// 画面に出す名前。
@@ -120,6 +123,7 @@ impl TextPosition {
             Self::Bottom => "下",
             Self::BottomRight => "右下",
             Self::FrameMargin => "フレームの余白",
+            Self::Tiled => "全体に繰り返す（斜め）",
         }
     }
 
@@ -130,7 +134,7 @@ impl TextPosition {
             Self::Top => (0.5, 0.0),
             Self::TopRight => (1.0, 0.0),
             Self::Left => (0.0, 0.5),
-            Self::Center | Self::FrameMargin => (0.5, 0.5),
+            Self::Center | Self::FrameMargin | Self::Tiled => (0.5, 0.5),
             Self::Right => (1.0, 0.5),
             Self::BottomLeft => (0.0, 1.0),
             Self::Bottom => (0.5, 1.0),
@@ -392,7 +396,7 @@ pub fn draw_text(
 }
 
 /// 画素に色 color を不透明度 source_alpha で「上に重ねる」（source over）。
-fn source_over(pixel: &mut image::Rgba<u8>, color: [f32; 3], source_alpha: f32) {
+pub(crate) fn source_over(pixel: &mut image::Rgba<u8>, color: [f32; 3], source_alpha: f32) {
     let dest_alpha = f32::from(pixel[3]) / 255.0;
     let out_alpha = source_alpha + dest_alpha * (1.0 - source_alpha);
     for c in 0..3 {

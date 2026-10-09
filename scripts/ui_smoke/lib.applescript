@@ -41,6 +41,34 @@ on collectTexts(e, depth, out)
 	end tell
 end collectTexts
 
+-- role の要素の「名前=値」を集める（名前は title、なければ description）。プルダウンの選択・チェックの状態を確かめる
+on collectValues(e, wantRole, depth, out)
+	tell application "System Events"
+		try
+			if role of e is wantRole then
+				set n to ""
+				try
+					set n to title of e as text
+				end try
+				if n is "" or n is "missing value" then
+					try
+						set n to description of e as text
+					end try
+				end if
+				set end of out to (n & "=" & (value of e as text))
+			end if
+		end try
+		if depth < 12 then
+			try
+				repeat with c in (UI elements of e)
+					set out to my collectValues(c, wantRole, depth + 1, out)
+				end repeat
+			end try
+		end if
+		return out
+	end tell
+end collectValues
+
 on run argv
 	set requested to item 1 of argv
 	set pid to (item 2 of argv) as integer
@@ -84,6 +112,14 @@ on run argv
 			set names to name of every menu item of menu 1 of menu item (item 4 of argv) of menu 1 of menu bar item (item 3 of argv) of menu bar 1 of p
 			set AppleScript's text item delimiters to linefeed
 			return names as text
+		else if requested is "values" then
+			-- role（AXPopUpButton・AXCheckBox など）の要素すべての「名前=値」（改行で区切る）
+			set AppleScript's text item delimiters to linefeed
+			set out to {}
+			repeat with w in windows of p
+				set out to my collectValues(w, item 3 of argv, 0, out)
+			end repeat
+			return out as text
 		else if requested is "menu-enabled" then
 			return enabled of menu item (item 4 of argv) of menu 1 of menu bar item (item 3 of argv) of menu bar 1 of p
 		end if

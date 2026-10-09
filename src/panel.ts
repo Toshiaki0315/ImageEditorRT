@@ -139,8 +139,9 @@ export class Panel {
     // 赤目の補正（旧版にはない。肌をなめらかにと同じく、見つけた顔の目のあたりだけ）
     const redEyeRow = document.createElement("label");
     redEyeRow.className = "check";
-    redEyeRow.title = "フラッシュで赤く写った瞳を、暗い色に戻します（顔を見つけて目のあたりだけ。処理はこの Mac の中だけ）";
     this.redEye.type = "checkbox";
+    // 説明はチェックに付ける（行に付けると、読み上げの名前が「赤目を補正」ではなく説明になる）
+    this.redEye.title = "フラッシュで赤く写った瞳を、暗い色に戻します（顔を見つけて目のあたりだけ。処理はこの Mac の中だけ）";
     this.redEye.addEventListener("change", () => {
       this.settings.redEye = this.redEye.checked;
       this.onChange();

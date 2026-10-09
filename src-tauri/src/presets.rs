@@ -18,6 +18,9 @@ const APPLY_PREFIX: &str = "preset-apply:";
 const DELETE_PREFIX: &str = "preset-delete:";
 /// 「今の加工をプリセットとして保存…」
 const SAVE_ID: &str = "preset-save";
+/// 「プリセットを書き出す…」「プリセットを読み込む…」
+const EXPORT_ID: &str = "preset-export";
+const IMPORT_ID: &str = "preset-import";
 
 /// 読み込んだプリセットの一覧。読み書きは保存先のパスを受け取る（テストでは一時フォルダを渡す）。
 #[derive(Default)]
@@ -28,6 +31,13 @@ pub struct PresetStore(Mutex<Vec<Preset>>);
 pub struct Loaded {
     names: Vec<String>,
     error: Option<String>,
+}
+
+/// 読み込んだ結果: 読み込んだ数と、名前の一覧。
+#[derive(Debug, PartialEq, Serialize)]
+pub struct Imported {
+    names: Vec<String>,
+    added: usize,
 }
 
 /// 名前を確かめた結果。
@@ -99,6 +109,25 @@ impl PresetStore {
         self.store(path, |list| presets::remove_preset(list, name))
     }
 
+    /// 今のプリセットをすべて file に書き出す（presets.json と同じ形）。
+    fn export(&self, file: &Path) -> Result<usize, String> {
+        let list = self.list()?;
+        presets::save_presets(file, &list).map_err(|e| e.to_string())?;
+        Ok(list.len())
+    }
+
+    /// file のプリセットを読み込んで足す（同じ名前は付け替える）。足した数と名前の一覧を返す。
+    fn import(&self, path: &Path, file: &Path) -> Result<Imported, String> {
+        let imported = presets::read_presets_file(file).map_err(|e| e.to_string())?;
+        let mut added = 0;
+        let names = self.store(path, |list| {
+            let (merged, count) = presets::merge_presets(list, imported);
+            added = count;
+            merged
+        })?;
+        Ok(Imported { names, added })
+    }
+
     fn apply(&self, name: &str, settings: &EditSettings) -> Result<EditSettings, String> {
         let preset = self.find(name).ok_or_else(|| format!("プリセット「{name}」がありません"))?;
         Ok(preset.apply(settings))
@@ -153,9 +182,22 @@ pub fn apply_preset(
     store.apply(&name, &settings)
 }
 
+/// 「プリセットを書き出す…」: 今のプリセットをすべて path に書く。書き出した数を返す。
+#[tauri::command]
+pub fn export_presets(path: String, store: State<'_, PresetStore>) -> Result<usize, String> {
+    store.export(Path::new(&path))
+}
+
+/// 「プリセットを読み込む…」: path のプリセットを今の一覧に足す（同じ名前は「名前 (2)」に）。
+#[tauri::command]
+pub fn import_presets(path: String, store: State<'_, PresetStore>) -> Result<Imported, String> {
+    store.import(&self::path()?, Path::new(&path))
+}
+
 /// 「プリセット ▾」のメニューを (x, y)（ウィンドウの中の位置）に出す。
 ///
-/// 一覧（選ぶと当てはめる）／「今の加工をプリセットとして保存…」／「削除」（一覧のサブメニュー）。
+/// 一覧（選ぶと当てはめる）／「今の加工をプリセットとして保存…」／「削除」（一覧のサブメニュー）／
+/// 「プリセットを書き出す…」「プリセットを読み込む…」。
 /// プリセットがなければ「（保存したプリセットはありません）」と出し、「削除」は選べない。
 /// 画像がなければ、当てはめ・保存は選べない。
 #[tauri::command]
@@ -189,10 +231,16 @@ pub async fn show_preset_menu(
         let item = MenuItemBuilder::with_id(format!("{DELETE_PREFIX}{i}"), name).build(&window);
         delete = delete.item(&item.map_err(error)?);
     }
+    let export =
+        MenuItemBuilder::with_id(EXPORT_ID, "プリセットを書き出す…").enabled(!list.is_empty()).build(&window);
+    let import = MenuItemBuilder::with_id(IMPORT_ID, "プリセットを読み込む…").build(&window);
     let menu = menu
         .separator()
         .item(&save.map_err(error)?)
         .item(&delete.build().map_err(error)?)
+        .separator()
+        .item(&export.map_err(error)?)
+        .item(&import.map_err(error)?)
         .build()
         .map_err(error)?;
     window.popup_menu_at(&menu, LogicalPosition::new(x, y)).map_err(error)
@@ -304,5 +352,24 @@ mod tests {
         assert!(path.exists());
         assert_eq!(presets::load_presets(&legacy).unwrap().len(), 1);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn export_and_import_files() {
+        let dir = temp_dir("io");
+        let store = PresetStore::default();
+        let path = dir.join("presets.json");
+        store
+            .save(&path, "A", &EditSettings { filter: FilterType::Sepia, ..EditSettings::default() })
+            .unwrap();
+        let file = dir.join("out.json");
+        assert_eq!(store.export(&file).unwrap(), 1);
+        // 同じものを読み込むと「A (2)」として足す。プリセットのファイルにも書く
+        let imported = store.import(&path, &file).unwrap();
+        assert_eq!(imported, Imported { names: vec!["A".into(), "A (2)".into()], added: 1 });
+        assert_eq!(presets::load_presets(&path).unwrap().len(), 2);
+        // 読めないファイルは一覧を変えない
+        assert!(store.import(&path, &dir.join("none.json")).is_err());
+        assert_eq!(store.list().unwrap().len(), 2);
     }
 }

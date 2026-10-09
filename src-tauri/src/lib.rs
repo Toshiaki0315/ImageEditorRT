@@ -106,6 +106,8 @@ pub fn run() {
             presets::check_preset_name,
             presets::save_preset,
             presets::delete_preset,
+            presets::export_presets,
+            presets::import_presets,
             presets::apply_preset,
             presets::show_preset_menu,
             batch::batch_current_source,

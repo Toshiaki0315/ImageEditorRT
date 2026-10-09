@@ -2,7 +2,7 @@
 // 保存せずに使い回す「加工をコピー／ペースト」（旧版にはない）。
 
 import { invoke } from "@tauri-apps/api/core";
-import { ask } from "@tauri-apps/plugin-dialog";
+import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import { $, parts, state } from "./app";
 import { userChanged } from "./editing";
 import { MENU, updateMenus } from "./menus";
@@ -34,6 +34,8 @@ export async function showPresetMenu(button: HTMLElement) {
 export function onPresetMenu(id: string) {
   const named = (prefix: string) => (id.startsWith(prefix) ? names[Number(id.slice(prefix.length))] : undefined);
   if (id === MENU.presetSave) void savePresetDialog();
+  if (id === MENU.presetExport) void exportPresets();
+  if (id === MENU.presetImport) void importPresets();
   const apply = named(MENU.presetApply);
   if (apply !== undefined) void applyPreset(apply);
   const remove = named(MENU.presetDelete);
@@ -78,6 +80,33 @@ async function applyLook(failure: string, fetch: () => Promise<EditSettings>) {
   // フレーム・円の比が変わったら、手で選んだときと同じく範囲をその比に直す
   await parts.crop.refit();
   userChanged();
+}
+
+const PRESET_FILTER = [{ name: "プリセット（JSON）", extensions: ["json"] }];
+
+/** 「プリセットを書き出す…」: 今のプリセットをすべて、選んだファイルに書く。 */
+async function exportPresets() {
+  const path = await save({ title: "プリセットを書き出す", defaultPath: "ImageEditorRT のプリセット.json", filters: PRESET_FILTER });
+  if (!path) return;
+  try {
+    const count = await invoke<number>("export_presets", { path });
+    notify(`プリセットを ${count} 件書き出しました: ${path.split("/").pop()}`);
+  } catch (error) {
+    await showError("プリセットを書き出せません", error);
+  }
+}
+
+/** 「プリセットを読み込む…」: 選んだファイルのプリセットを足す（同じ名前は「名前 (2)」に）。 */
+async function importPresets() {
+  const path = await open({ title: "プリセットを読み込む", multiple: false, filters: PRESET_FILTER });
+  if (typeof path !== "string") return;
+  try {
+    const result = await invoke<{ names: string[]; added: number }>("import_presets", { path });
+    names = result.names;
+    notify(`プリセットを ${result.added} 件読み込みました`);
+  } catch (error) {
+    await showError("プリセットを読み込めません", error);
+  }
 }
 
 /** 名前を入力してもらう（キャンセルなら null）。 */

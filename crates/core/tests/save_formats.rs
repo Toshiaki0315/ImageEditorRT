@@ -212,3 +212,33 @@ fn exif_pixel_size_follows_the_saved_image() {
     assert!(prepared.gps.is_none());
     assert!(prepared.maker_note.is_some());
 }
+
+#[test]
+fn heic_keeps_exif_and_fits_the_size_limit() {
+    let dir = TempDir::new("heic");
+    // 細かい模様の写真（大きなファイルになる）
+    let image = RgbaImage::from_fn(640, 480, |x, y| {
+        Rgba([((x * 7 + y * 3) % 256) as u8, ((x * x + y) % 256) as u8, ((y * 11) % 256) as u8, 255])
+    });
+    let source = raw_exif(&fixture("pentax.jpg")).unwrap();
+    let path = dir.join("pentax_edited.heic");
+    let full = save_edited(&image, &path, SaveOptions::default(), Some(&source), false).unwrap();
+    let bytes = std::fs::read(&path).unwrap();
+    let decoded = decode_file(&bytes).unwrap();
+    assert_eq!((decoded.format, decoded.image.dimensions()), (Format::Heif, (640, 480)));
+    // EXIF（撮影日時・機種）は残り、位置情報は外す（既定）。MakerNote は ImageIO が書かない
+    let info = read_exif_info(&bytes);
+    let value = |tag: &str| info.entries.iter().find(|e| e.tag == tag).map(|e| e.value.clone());
+    assert_eq!(value("Model").as_deref(), Some("PENTAX K-1"));
+    assert!(value("DateTimeOriginal").is_some());
+    assert!(info.gps.is_none());
+    // 位置情報も残す設定なら残る
+    let keep = SaveOptions { keep_gps: true, ..SaveOptions::default() };
+    save_edited(&image, &path, keep, Some(&source), false).unwrap();
+    assert!(read_exif_info(&std::fs::read(&path).unwrap()).gps.is_some(), "位置情報が残る");
+    // ファイルの大きさの上限も JPEG と同じく効く
+    let limit_kb = (full.bytes / 2 / 1024) as u32;
+    let options = SaveOptions { max_kb: Some(limit_kb), ..SaveOptions::default() };
+    let saved = save_edited(&image, &path, options, Some(&source), false).unwrap();
+    assert!(saved.fitted && saved.bytes <= u64::from(limit_kb) * 1024, "{saved:?}");
+}

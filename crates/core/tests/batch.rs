@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 
 use image::{Rgba, RgbaImage};
 use imageeditorrt_core::batch::{
-    batch_settings, collect_images, output_path, run_batch, summary, BatchOptions, BatchPrivacy, OutputNaming,
+    batch_settings, collect_images, output_path, run_batch, summary, BatchOptions, BatchPrivacy,
+    OutputFormat, OutputNaming,
 };
 use imageeditorrt_core::frames::FrameType;
 use imageeditorrt_core::pipeline::EditSettings;
@@ -32,6 +33,7 @@ fn options(look: Preset, long_side: Option<u32>) -> BatchOptions {
         save: SaveOptions::default(),
         privacy: BatchPrivacy::default(),
         naming: OutputNaming::default(),
+        format: OutputFormat::default(),
     }
 }
 
@@ -53,7 +55,9 @@ fn output_names() {
     touch(&out.join("photo_edited.JPG"));
     assert_eq!(output_path(&source, &out), out.join("photo_edited_2.JPG"));
     // 保存できない形式（HEIC）は .jpg
-    assert_eq!(output_path(&dir.join("in/live.heic"), &out), out.join("live.jpg"));
+    // HEIC は HEIC のまま、RAW は JPEG
+    assert_eq!(output_path(&dir.join("in/live.heic"), &out), out.join("live.heic"));
+    assert_eq!(output_path(&dir.join("in/raw.CR3"), &out), out.join("raw.jpg"));
     // 元と同じフォルダに保存しても、元のファイルには書かない
     assert_eq!(output_path(&source, &dir.join("in")), dir.join("in/photo_edited.JPG"));
     std::fs::remove_dir_all(&dir).unwrap();
@@ -243,26 +247,60 @@ fn naming_with_date_and_sequence() {
     let date = CaptureDate { year: 2026, month: 10, day: 9, hour: 8, minute: 0 };
     let with_date = OutputNaming::WithDate;
     assert_eq!(
-        named_output_path(&source, &out, &with_date, 0, Some(&date)),
+        named_output_path(&source, &out, &with_date, OutputFormat::Original, 0, Some(&date)),
         out.join("IMG_0001_20261009.JPG")
     );
     // 撮影日がなければ元の名前。重なれば _2
-    assert_eq!(named_output_path(&source, &out, &with_date, 0, None), out.join("IMG_0001.JPG"));
+    assert_eq!(
+        named_output_path(&source, &out, &with_date, OutputFormat::Original, 0, None),
+        out.join("IMG_0001.JPG")
+    );
     touch(&out.join("IMG_0001_20261009.JPG"));
     assert_eq!(
-        named_output_path(&source, &out, &with_date, 0, Some(&date)),
+        named_output_path(&source, &out, &with_date, OutputFormat::Original, 0, Some(&date)),
         out.join("IMG_0001_20261009_2.JPG")
     );
     // 連番（一覧の順に 001 から。空なら「写真」、/ と : は _）
     let trip = OutputNaming::Sequence { prefix: " 旅行/京都 ".into() };
-    assert_eq!(named_output_path(&source, &out, &trip, 0, None), out.join("旅行_京都_001.JPG"));
-    assert_eq!(named_output_path(&source, &out, &trip, 11, None), out.join("旅行_京都_012.JPG"));
+    assert_eq!(
+        named_output_path(&source, &out, &trip, OutputFormat::Original, 0, None),
+        out.join("旅行_京都_001.JPG")
+    );
+    assert_eq!(
+        named_output_path(&source, &out, &trip, OutputFormat::Original, 11, None),
+        out.join("旅行_京都_012.JPG")
+    );
     let empty = OutputNaming::Sequence { prefix: "".into() };
-    assert_eq!(named_output_path(&dir.join("in/a.heic"), &out, &empty, 2, None), out.join("写真_003.jpg"));
+    assert_eq!(
+        named_output_path(&dir.join("in/a.heic"), &out, &empty, OutputFormat::Original, 2, None),
+        out.join("写真_003.heic")
+    );
     // 元の名前は今までどおり
     assert_eq!(
-        named_output_path(&source, &out, &OutputNaming::Original, 5, Some(&date)),
+        named_output_path(&source, &out, &OutputNaming::Original, OutputFormat::Original, 5, Some(&date)),
         output_path(&source, &out)
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn output_format_changes_the_suffix() {
+    use imageeditorrt_core::batch::named_output_path;
+    let dir = temp_dir("format");
+    let source = dir.join("in/IMG_0001.JPG");
+    touch(&source);
+    let out = dir.join("out");
+    let original = OutputNaming::Original;
+    let path = |format| named_output_path(&source, &out, &original, format, 0, None);
+    assert_eq!(path(OutputFormat::Original), out.join("IMG_0001.JPG"));
+    assert_eq!(path(OutputFormat::Heic), out.join("IMG_0001.heic"));
+    // 同じ名前があれば _edited（形式を変えても上書きしない）
+    touch(&out.join("IMG_0001.heic"));
+    assert_eq!(path(OutputFormat::Heic), out.join("IMG_0001_edited.heic"));
+    let trip = OutputNaming::Sequence { prefix: "旅行".into() };
+    assert_eq!(
+        named_output_path(&dir.join("in/b.png"), &out, &trip, OutputFormat::Jpeg, 0, None),
+        out.join("旅行_001.jpg")
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }

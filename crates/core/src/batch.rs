@@ -26,6 +26,31 @@ pub struct BatchOptions {
     pub privacy: BatchPrivacy,
     /// 保存するファイルの名前の決め方（旧版にはない）
     pub naming: OutputNaming,
+    /// 保存する形式（旧版にはない）
+    pub format: OutputFormat,
+}
+
+/// まとめて処理で保存する形式。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputFormat {
+    /// 元と同じ形式（保存できない RAW は JPEG。今まで・旧版と同じ）
+    #[default]
+    Original,
+    Jpeg,
+    /// HEIC（同じ画質で JPEG より小さい）
+    Heic,
+}
+
+impl OutputFormat {
+    /// source を保存するときの拡張子。
+    pub fn suffix(self, source: &Path) -> String {
+        match self {
+            Self::Original => save::save_suffix(source),
+            Self::Jpeg => "jpg".into(),
+            Self::Heic => "heic".into(),
+        }
+    }
 }
 
 /// まとめて処理で保存するファイルの名前の決め方。
@@ -50,12 +75,13 @@ pub fn named_output_path(
     source: &Path,
     out_dir: &Path,
     naming: &OutputNaming,
+    format: OutputFormat,
     index: usize,
     date: Option<&crate::exif_info::CaptureDate>,
 ) -> PathBuf {
     let stem = source.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let base = match naming {
-        OutputNaming::Original => return output_path(source, out_dir),
+        OutputNaming::Original => return output_path_as(source, out_dir, &format.suffix(source)),
         OutputNaming::WithDate => match date {
             Some(d) => format!("{stem}_{}{:02}{:02}", d.year, d.month, d.day),
             None => stem,
@@ -66,7 +92,7 @@ pub fn named_output_path(
             format!("{prefix}_{:03}", index + 1)
         }
     };
-    let suffix = save::save_suffix(source);
+    let suffix = format.suffix(source);
     (1..)
         .map(|n| {
             if n == 1 {
@@ -181,10 +207,18 @@ pub fn batch_settings(options: &BatchOptions, image_size: (u32, u32)) -> Result<
 /// 同じ名前のファイルがすでにある、または元のファイルそのものになる場合は `<名前>_edited`、
 /// `_edited_2` … と、既存のファイルと重ならない名前にする。
 pub fn output_path(source: &Path, out_dir: &Path) -> PathBuf {
+    output_path_as(source, out_dir, &save::save_suffix(source))
+}
+
+/// output_path と同じ。拡張子は suffix にする。
+fn output_path_as(source: &Path, out_dir: &Path, suffix: &str) -> PathBuf {
     let stem = source.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    let same_name = out_dir.join(format!("{stem}.{}", save::save_suffix(source)));
-    std::iter::once(same_name)
-        .chain(save::edited_names(source, out_dir))
+    (0..)
+        .map(|n| match n {
+            0 => out_dir.join(format!("{stem}.{suffix}")),
+            1 => out_dir.join(format!("{stem}_edited.{suffix}")),
+            n => out_dir.join(format!("{stem}_edited_{n}.{suffix}")),
+        })
         .find(|candidate| !candidate.exists() && !save::is_same_file(candidate, source))
         .expect("候補は終わりなく続く")
 }
@@ -261,7 +295,7 @@ pub fn process_image_at(
         }
     }
     let edited = crate::pipeline::apply_edits(&image, &settings).map_err(|e| e.to_string())?;
-    let path = named_output_path(source, out_dir, &options.naming, index, date.as_ref());
+    let path = named_output_path(source, out_dir, &options.naming, options.format, index, date.as_ref());
     std::fs::create_dir_all(out_dir).map_err(|e| format!("保存先のフォルダを作れません（{e}）"))?;
     let is_tiff = decoded.format == Format::Tiff;
     save::save_edited(&edited, &path, options.save_options(), loaded.raw_exif.as_deref(), is_tiff)

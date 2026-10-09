@@ -116,6 +116,11 @@ pub(crate) fn to_image_rect(rect: CGRect, (width, height): (u32, u32)) -> CropRe
 
 /// RGBA の画像を CGImage にする（sRGB）。
 pub(crate) fn cg_image(image: &RgbaImage) -> Option<CFRetained<CGImage>> {
+    cg_image_with_alpha(image, true)
+}
+
+/// RGBA の画像を CGImage にする（sRGB）。alpha が false なら不透明な画像として作る（アルファを持たない）。
+pub(crate) fn cg_image_with_alpha(image: &RgbaImage, alpha: bool) -> Option<CFRetained<CGImage>> {
     let (width, height) = (image.width() as usize, image.height() as usize);
     // CoreGraphics は乗算済みのアルファで持つので、色にアルファを掛けて渡す
     let mut pixels: Vec<u8> = image
@@ -140,7 +145,7 @@ pub(crate) fn cg_image(image: &RgbaImage) -> Option<CFRetained<CGImage>> {
             8,
             width * 4,
             Some(&srgb),
-            CGImageAlphaInfo::PremultipliedLast.0,
+            if alpha { CGImageAlphaInfo::PremultipliedLast.0 } else { CGImageAlphaInfo::NoneSkipLast.0 },
         )
     }?;
     CGBitmapContextCreateImage(Some(&context))

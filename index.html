@@ -325,6 +325,17 @@
       </div>
     </dialog>
     <!-- プリセットの名前の入力（「今の加工をプリセットとして保存…」） -->
+    <dialog id="sizes-dialog" class="preset-dialog" aria-labelledby="sizes-title">
+      <form method="dialog">
+        <h2 id="sizes-title">複数の大きさで保存</h2>
+        <div id="sizes-list" class="sizes-list"></div>
+        <p class="note">次の画面で選んだ名前の後ろに「_1080」などの長辺を付けて、続けて保存します（今の加工・切り抜き・保存の設定のまま。同じ名前があれば上書きしません）。</p>
+        <div class="buttons dialog-buttons">
+          <button type="submit" value="ok" id="sizes-ok">保存…</button>
+          <button type="submit" value="cancel" formnovalidate>キャンセル</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="preset-dialog" class="preset-dialog">
       <form method="dialog">
         <h2>プリセットを保存</h2>
@@ -344,6 +355,7 @@
           <ul>
             <li>ウィンドウにドロップ・⌘O・⌘V（クリップボードの画像・Finder でコピーしたファイル）・「ファイル &gt; 最近使った項目」で開く。RAW も開ける</li>
             <li>⌘S で保存（元の画像には上書きしない）。保存していない変更があるまま閉じると確かめる</li>
+            <li>「ファイル &gt; 複数の大きさで保存…」で Instagram・X などの大きさを続けて保存（名前に _1080 などを付ける）</li>
             <li>「ファイル &gt; まとめて処理…」で複数の画像に同じ加工。「並べて 1 枚に…」で 2〜4 枚を並べる</li>
           </ul>
           <h3>タブ</h3>

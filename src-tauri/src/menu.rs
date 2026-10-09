@@ -18,6 +18,8 @@ pub const OPEN: &str = "open";
 pub const SAVE: &str = "save";
 /// 「ファイル > まとめて処理…」
 pub const BATCH: &str = "batch";
+/// 「ファイル > 複数の大きさで保存…」（よく使う大きさから選んで、続けて保存する）
+pub const SAVE_SIZES: &str = "save-sizes";
 /// 「ファイル > 並べて 1 枚に…」（2〜4 枚の写真を並べた画像を作って開く）
 pub const COLLAGE: &str = "collage";
 /// 「編集 > 元に戻す」（設定の変更。入力欄の文字は画面が入力欄に任せる）
@@ -63,12 +65,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // 最近使った項目（中身は起動後に recent::refresh_menu が作る）
     let recent = SubmenuBuilder::with_id(app, crate::recent::MENU_ID, "最近使った項目").build()?;
     let save = MenuItemBuilder::with_id(SAVE, "保存…").accelerator("CmdOrCtrl+S").build(app)?;
+    let save_sizes = MenuItemBuilder::with_id(SAVE_SIZES, "複数の大きさで保存…").build(app)?;
     let batch = MenuItemBuilder::with_id(BATCH, "まとめて処理…").build(app)?;
     let collage = MenuItemBuilder::with_id(COLLAGE, "並べて 1 枚に…").build(app)?;
     let file = SubmenuBuilder::new(app, "ファイル")
         .item(&open)
         .item(&recent)
         .item(&save)
+        .item(&save_sizes)
         .item(&batch)
         .item(&collage)
         .separator()

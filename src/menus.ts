@@ -10,6 +10,7 @@ export const MENU = {
   open: "open",
   save: "save",
   batch: "batch",
+  saveSizes: "save-sizes",
   collage: "collage",
   undo: "undo",
   redo: "redo",

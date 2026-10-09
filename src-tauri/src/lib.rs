@@ -79,6 +79,7 @@ pub fn run() {
             image::clipboard_text,
             image::open_clipboard_image,
             saving::save_image,
+            saving::save_sizes,
             saving::default_save_path,
             settings::supported_formats,
             settings::filter_types,

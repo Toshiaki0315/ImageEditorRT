@@ -140,7 +140,9 @@ src/                      # 画面（TypeScript）
   guides.ts               # 切り抜きのガイド線（三分割・黄金比・対角線）の位置の計算
   photoControls.ts        # 「切り抜き」タブの水平の補正（自動を含む）と背景（消す・ぼかす）
   localPanel.ts / localShapes.ts # 「加工」タブの部分補正（範囲のドラッグ）と範囲の当たり判定・線の位置
-  privacy.ts / regions.ts # 「投稿加工」タブ（範囲のドラッグ・顔／文字を見つけて隠す）と範囲の計算
+  overlay.ts              # プレビューに重ねる SVG の部品（ハンドルなど。切り抜き・投稿加工・部分補正で共通）
+  storage.ts              # 画面の環境設定（localStorage）の読み書き（使えなくても既定の値で動く）
+  privacy.ts / regions.ts # 「投稿加工」タブ（範囲のドラッグ・顔／文字を見つけて隠す）と範囲の計算（画面と原寸の換算もここ）
   colorPanel.ts / curve.ts # トーンカーブのグラフと色ごとの調整（曲線の計算は Rust と同じ）
   tasteGallery.ts         # テイストの一覧（見本を並べて選ぶ）
   collageDialog.ts        # 並べて 1 枚に のダイアログ

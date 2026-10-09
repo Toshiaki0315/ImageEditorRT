@@ -1,6 +1,7 @@
 // 「加工」タブのトーンカーブと色ごとの調整（旧版にはない）。曲線の計算は curve.ts（Rust と同じ）。
 
 import { addPoint, type CurvePoint, curveRow, identityCurve, movePoint } from "./curve";
+import { signedText } from "./panel";
 import { type EditSettings, type HslAdjust, neutralHsl } from "./types";
 
 /** 色ごとの調整の色（Rust の curve::HSL_CENTERS と同じ順）。 */
@@ -25,8 +26,6 @@ const HSL_SLIDERS: { key: HslKey; label: string; max: number }[] = [
 /** グラフの大きさ（CSS の px）と、点の当たり判定の半径。 */
 const SIZE = 220;
 const HIT = 9;
-
-const signed = (v: number) => (v > 0 ? `+${v}` : String(v));
 
 export class ColorPanel {
   private readonly canvas = document.createElement("canvas");
@@ -109,7 +108,7 @@ export class ColorPanel {
     for (const { key } of HSL_SLIDERS) {
       const { input, output } = this.sliders.get(key)!;
       input.value = String(values[key]);
-      output.textContent = signed(values[key]);
+      output.textContent = signedText(values[key]);
     }
     this.draw();
   }

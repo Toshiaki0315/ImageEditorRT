@@ -47,6 +47,19 @@ impl CropRect {
     pub fn short_side(&self) -> i64 {
         self.width.min(self.height)
     }
+
+    /// x・y・幅・高さをそれぞれ scale 倍して四捨五入した範囲（プレビューで見つけた範囲を原寸の座標にするなど）。
+    pub fn scaled(self, scale: f64) -> Self {
+        let v = |n: i64| (n as f64 * scale).round() as i64;
+        Self::new(v(self.x), v(self.y), v(self.width), v(self.height))
+    }
+
+    /// 原寸を factor 倍に縮めたプレビューで見つけた範囲を、原寸の座標にする（x・y・幅・高さをそれぞれ factor で
+    /// 割って四捨五入。顔・文字・目立つ部分の認識）。
+    pub fn to_original(self, factor: f64) -> Self {
+        let v = |n: i64| (n as f64 / factor).round() as i64;
+        Self::new(v(self.x), v(self.y), v(self.width), v(self.height))
+    }
 }
 
 /// トリミングの縦横比の選択肢。
@@ -418,6 +431,15 @@ pub(crate) fn round_half_even(value: f64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rect_scaling_rounds_each_value() {
+        let rect = CropRect::new(10, 21, 33, 7);
+        assert_eq!(rect.scaled(2.0), CropRect::new(20, 42, 66, 14));
+        assert_eq!(rect.scaled(0.5), CropRect::new(5, 11, 17, 4));
+        // プレビュー（0.4 倍）で見つけた範囲を原寸に戻す
+        assert_eq!(CropRect::new(40, 41, 80, 10).to_original(0.4), CropRect::new(100, 103, 200, 25));
+    }
 
     #[test]
     fn round_like_python() {

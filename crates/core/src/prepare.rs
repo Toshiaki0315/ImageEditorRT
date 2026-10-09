@@ -43,7 +43,7 @@ pub fn prepare(image: &RgbaImage, settings: &EditSettings, sources: &Sources) ->
     let mut out = image.clone();
     if let Some(faces) = sources.faces.filter(|_| uses_faces(settings)) {
         let scale = f64::from(image.width()) / f64::from(sources.preview_width.max(1));
-        let fitted: Vec<CropRect> = faces.iter().map(|r| scale_rect(*r, scale)).collect();
+        let fitted: Vec<CropRect> = faces.iter().map(|r| r.scaled(scale)).collect();
         if settings.red_eye {
             redeye::fix_red_eyes(&mut out, &fitted);
         }
@@ -55,12 +55,6 @@ pub fn prepare(image: &RgbaImage, settings: &EditSettings, sources: &Sources) ->
         out = background::apply_background(&out, mask, settings.background, settings.background_blur);
     }
     Some(out)
-}
-
-/// 枠を scale 倍にする（各値を四捨五入）。
-fn scale_rect(r: CropRect, scale: f64) -> CropRect {
-    let v = |n: i64| (n as f64 * scale).round() as i64;
-    CropRect::new(v(r.x), v(r.y), v(r.width), v(r.height))
 }
 
 #[cfg(test)]

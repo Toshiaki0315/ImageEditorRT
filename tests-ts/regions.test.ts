@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hitRegion, moveRect, rectCorners, rectFromPoints } from "../src/regions.ts";
+import { hitRegion, moveRect, nearPoint, rectCorners, rectFromPoints, scaleRect, screenScale } from "../src/regions.ts";
 
 test("2 点から範囲を作る（逆向きのドラッグ・画像の外は端に収める）", () => {
   assert.deepEqual(rectFromPoints([50, 40], [10, 20], [100, 80]), { x: 10, y: 20, width: 40, height: 20 });
@@ -30,4 +30,12 @@ test("押した点の範囲は、上に重なっているほうを選ぶ", () =>
     [50, 50],
     [0, 50],
   ]);
+});
+
+test("画面と原寸の倍率・範囲の拡大・ハンドルの当たり", () => {
+  const scale = screenScale([400, 300], [4000, 3000]);
+  assert.deepEqual(scale, [0.1, 0.1]);
+  assert.deepEqual(scaleRect({ x: 100, y: 200, width: 1000, height: 500 }, scale), { x: 10, y: 20, width: 100, height: 50 });
+  assert.ok(nearPoint([10, 10], [18, 2], 10));
+  assert.ok(!nearPoint([10, 10], [21, 10], 10));
 });

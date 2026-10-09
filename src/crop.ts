@@ -5,6 +5,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { GUIDE_KINDS, type GuideKind, guideLines, parseGuide } from "./guides";
+import { HANDLE_HIT, handleElement } from "./overlay";
+import { nearPoint, rectCorners, scaleRect, screenScale } from "./regions";
 import type {
   AspectRatio,
   CropRect,
@@ -16,6 +18,7 @@ import type {
   Region,
   ShapeType,
 } from "./types";
+import { readStored, writeStored } from "./storage";
 
 type DragMode = "new" | "move" | "resize";
 type Drag = { mode: DragMode; anchor: [number, number]; start: CropRect | null };
@@ -32,9 +35,6 @@ type AspectChoice = { ratio: AspectRatio; portrait: boolean; frame: FrameKind; s
 export type AspectState = { ratio: AspectRatio; portrait: boolean };
 
 const SVG = "http://www.w3.org/2000/svg";
-/** ハンドルの大きさと、当たり判定の半径（画面の px） */
-const HANDLE_SIZE = 8;
-const HANDLE_HIT = 10;
 const TRIM_TEXT = "トリミング実行";
 /** フレーム・円を選んでいるときに比のプルダウンに出す項目 */
 const FOLLOW = "follow";
@@ -109,9 +109,10 @@ export class CropController {
     follow.disabled = true;
     this.aspect.add(follow);
     for (const [value, label] of GUIDE_KINDS) this.guide.add(new Option(label, value));
-    this.guide.value = loadGuide();
+    // 環境設定に残したガイド（読めなければなし）
+    this.guide.value = parseGuide(readStored(GUIDE_STORAGE_KEY));
     this.guide.addEventListener("change", () => {
-      saveGuide(this.guide.value);
+      writeStored(GUIDE_STORAGE_KEY, this.guide.value);
       this.draw();
     });
     for (const [value, label] of frames) this.frame.add(new Option(label, value));
@@ -236,15 +237,7 @@ export class CropController {
       }
     }
     if (!r) return;
-    for (const [cx, cy] of corners(r)) {
-      const handle = document.createElementNS(SVG, "rect");
-      handle.setAttribute("class", "handle");
-      handle.setAttribute("x", String(cx - HANDLE_SIZE / 2));
-      handle.setAttribute("y", String(cy - HANDLE_SIZE / 2));
-      handle.setAttribute("width", String(HANDLE_SIZE));
-      handle.setAttribute("height", String(HANDLE_SIZE));
-      this.overlay.append(handle);
-    }
+    for (const [cx, cy] of rectCorners(r)) this.overlay.append(handleElement(cx, cy));
   }
 
   /** 範囲 area（画面の座標）にガイドの線を描く（影の上に白い線。ほかの線より下）。 */
@@ -462,10 +455,7 @@ export class CropController {
 
   /** 原寸画像の座標の範囲を、画面（重ねている SVG）の座標にする。 */
   private toScreen(crop: CropRect): CropRect {
-    const [width, height] = this.size!;
-    const sx = this.canvas.clientWidth / width;
-    const sy = this.canvas.clientHeight / height;
-    return { x: crop.x * sx, y: crop.y * sy, width: crop.width * sx, height: crop.height * sy };
+    return scaleRect(crop, screenScale([this.canvas.clientWidth, this.canvas.clientHeight], this.size!));
   }
 
   /** 画面の点が四隅のハンドルの上なら、角の番号（左上から時計回りに 0〜3）。 */
@@ -473,8 +463,8 @@ export class CropController {
     if (!this.settings.crop) return null;
     const box = this.overlay.getBoundingClientRect();
     const [px, py] = [event.clientX - box.left, event.clientY - box.top];
-    const index = corners(this.toScreen(this.settings.crop)).findIndex(
-      ([cx, cy]) => Math.abs(px - cx) <= HANDLE_HIT && Math.abs(py - cy) <= HANDLE_HIT,
+    const index = rectCorners(this.toScreen(this.settings.crop)).findIndex((corner) =>
+      nearPoint(corner, [px, py], HANDLE_HIT),
     );
     return index >= 0 ? index : null;
   }
@@ -550,32 +540,5 @@ export class CropController {
           : this.inside(event)
             ? "move"
             : "crosshair";
-  }
-}
-
-/** 左上・右上・右下・左下の順の角。 */
-function corners(r: CropRect): [number, number][] {
-  return [
-    [r.x, r.y],
-    [r.x + r.width, r.y],
-    [r.x + r.width, r.y + r.height],
-    [r.x, r.y + r.height],
-  ];
-}
-
-/** 環境設定に残したガイド（読めなければなし）。 */
-function loadGuide(): GuideKind {
-  try {
-    return parseGuide(localStorage.getItem(GUIDE_STORAGE_KEY));
-  } catch {
-    return "none";
-  }
-}
-
-function saveGuide(value: string) {
-  try {
-    localStorage.setItem(GUIDE_STORAGE_KEY, value);
-  } catch {
-    // 残せなくても表示は切り替える
   }
 }

@@ -3,12 +3,10 @@
 // 範囲の当たり判定・線の位置は localShapes.ts。
 
 import { bandLines, distanceToSegment, insideEllipse, moveShape, type Point, rectBetween, shapeLabel } from "./localShapes";
+import { HANDLE_HIT as HIT, handleElement, svgElement } from "./overlay";
+import { evText, kelvinText, percentText, signedText } from "./panel";
+import { nearPoint, rectCorners, scaleRect, screenScale } from "./regions";
 import type { EditSettings, LocalAdjust, LocalShape } from "./types";
-
-const SVG = "http://www.w3.org/2000/svg";
-const HANDLE_SIZE = 8;
-/** ハンドル・帯の線をつかめる距離（画面の px） */
-const HIT = 10;
 /** これより小さい範囲（クリックしただけなど）は足さない（画面の px） */
 const MIN_DRAG = 6;
 
@@ -22,16 +20,12 @@ type Drag =
 
 /** スライダー（値の範囲・刻み・既定値・表示）。 */
 const SLIDERS: { key: NumberKey; label: string; min: number; max: number; step: number; initial: number; text: (v: number) => string }[] = [
-  { key: "exposure", label: "露出", min: -3, max: 3, step: 0.1, initial: 0, text: (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)} EV` },
-  { key: "contrast", label: "コントラスト", min: -100, max: 100, step: 1, initial: 0, text: signed },
-  { key: "temperature", label: "色温度", min: 2000, max: 10000, step: 100, initial: 6500, text: (v) => `${v} K` },
-  { key: "saturation", label: "彩度", min: -100, max: 100, step: 1, initial: 0, text: signed },
-  { key: "feather", label: "境目のぼかし", min: 0, max: 100, step: 1, initial: 50, text: (v) => `${v}%` },
+  { key: "exposure", label: "露出", min: -3, max: 3, step: 0.1, initial: 0, text: evText },
+  { key: "contrast", label: "コントラスト", min: -100, max: 100, step: 1, initial: 0, text: signedText },
+  { key: "temperature", label: "色温度", min: 2000, max: 10000, step: 100, initial: 6500, text: kelvinText },
+  { key: "saturation", label: "彩度", min: -100, max: 100, step: 1, initial: 0, text: signedText },
+  { key: "feather", label: "境目のぼかし", min: 0, max: 100, step: 1, initial: 50, text: percentText },
 ];
-
-function signed(value: number): string {
-  return value > 0 ? `+${value}` : String(value);
-}
 
 /** 新しく置く範囲の調整（すぐ効き目が見えるよう、円は少し明るく、帯は少し暗く）。 */
 function newAdjust(shape: LocalShape): LocalAdjust {
@@ -209,10 +203,10 @@ export class LocalPanel {
       if (shape.kind === "ellipse") {
         const { x, y, width: w, height: h } = shape.rect;
         for (const kind of ["edge-shadow", selected ? "edge selected" : "edge"]) {
-          const ellipse = this.element("ellipse", kind, { cx: x + w / 2, cy: y + h / 2, rx: w / 2, ry: h / 2 });
+          const ellipse = svgElement("ellipse", kind, { cx: x + w / 2, cy: y + h / 2, rx: w / 2, ry: h / 2 });
           this.overlay.append(ellipse);
         }
-        if (selected) for (const [cx, cy] of corners(shape.rect)) this.handle(cx, cy);
+        if (selected) for (const [cx, cy] of rectCorners(shape.rect)) this.overlay.append(handleElement(cx, cy));
       } else {
         const [start, end] = bandLines(shape.from, shape.to, width, height);
         if (!start || !end) return;
@@ -222,29 +216,15 @@ export class LocalPanel {
         ] as const) {
           for (const kind of ["edge-shadow", selected ? "edge selected" : "edge"]) {
             const [[x1, y1], [x2, y2]] = line;
-            this.overlay.append(this.element("line", dashed ? `${kind} dashed` : kind, { x1, y1, x2, y2 }));
+            this.overlay.append(svgElement("line", dashed ? `${kind} dashed` : kind, { x1, y1, x2, y2 }));
           }
         }
         if (selected) {
           const [[x1, y1], [x2, y2]] = [shape.from, shape.to];
-          this.overlay.append(this.element("line", "edge", { x1, y1, x2, y2 }));
-          this.handle(x1, y1);
-          this.handle(x2, y2);
+          this.overlay.append(svgElement("line", "edge", { x1, y1, x2, y2 }), handleElement(x1, y1), handleElement(x2, y2));
         }
       }
     });
-  }
-
-  private element(name: string, className: string, attributes: Record<string, number>): SVGElement {
-    const element = document.createElementNS(SVG, name);
-    element.setAttribute("class", className);
-    for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, String(value));
-    return element;
-  }
-
-  private handle(cx: number, cy: number) {
-    const s = HANDLE_SIZE;
-    this.overlay.append(this.element("rect", "handle", { x: cx - s / 2, y: cy - s / 2, width: s, height: s }));
   }
 
   private current(): LocalAdjust | null {
@@ -282,16 +262,12 @@ export class LocalPanel {
 
   /** 原寸 1px が画面の何 px か（横・縦）。 */
   private scale(): Point {
-    const [width, height] = this.size()!;
-    return [this.canvas.clientWidth / width, this.canvas.clientHeight / height];
+    return screenScale([this.canvas.clientWidth, this.canvas.clientHeight], this.size()!);
   }
 
   private toScreenShape(shape: LocalShape): LocalShape {
     const [sx, sy] = this.scale();
-    if (shape.kind === "ellipse") {
-      const { x, y, width, height } = shape.rect;
-      return { kind: "ellipse", rect: { x: x * sx, y: y * sy, width: width * sx, height: height * sy } };
-    }
+    if (shape.kind === "ellipse") return { kind: "ellipse", rect: scaleRect(shape.rect, [sx, sy]) };
     return { kind: "band", from: [shape.from[0] * sx, shape.from[1] * sy], to: [shape.to[0] * sx, shape.to[1] * sy] };
   }
 
@@ -313,13 +289,13 @@ export class LocalPanel {
   private hitHandle(point: Point): Drag | null {
     const current = this.current();
     if (!current) return null;
-    const near = ([x, y]: Point) => Math.abs(point[0] - x) <= HIT && Math.abs(point[1] - y) <= HIT;
+    const near = (handle: Point) => nearPoint(handle, point, HIT);
     const shape = this.toScreenShape(current.shape);
     if (shape.kind === "ellipse") {
       const original = current.shape.kind === "ellipse" ? current.shape.rect : null;
-      const index = corners(shape.rect).findIndex(near);
+      const index = rectCorners(shape.rect).findIndex(near);
       if (index < 0 || !original) return null;
-      return { mode: "corner", anchor: corners(original)[(index + 2) % 4] };
+      return { mode: "corner", anchor: rectCorners(original)[(index + 2) % 4] };
     }
     if (near(shape.from)) return { mode: "end", end: "from" };
     if (near(shape.to)) return { mode: "end", end: "to" };
@@ -408,14 +384,4 @@ export class LocalPanel {
     }
     this.changed();
   }
-}
-
-/** 範囲の四隅（左上から時計回り）。 */
-function corners({ x, y, width, height }: { x: number; y: number; width: number; height: number }): Point[] {
-  return [
-    [x, y],
-    [x + width, y],
-    [x + width, y + height],
-    [x, y + height],
-  ];
 }

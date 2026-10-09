@@ -22,8 +22,9 @@ import { SIZE_PRESETS } from "./output";
 import { presetNames } from "./presetsUi";
 import { parseSizes, savedSummary } from "./sizes";
 import { notify, showError, updateStatus } from "./status";
-import { defaultSettings, type OpenInfo } from "./types";
+import { defaultSettings, type EditSettings, type OpenInfo } from "./types";
 import { fitToWindow, setComparing, stopSplit, updateGuide } from "./view";
+import { readStored, writeStored } from "./storage";
 
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
 const LOAD_ERROR_TITLE = "画像を読み込めません";
@@ -218,14 +219,8 @@ export async function saveSizesDialog() {
 function chooseSizes(): Promise<number[] | null> {
   const dialog = document.getElementById("sizes-dialog") as HTMLDialogElement;
   const list = document.getElementById("sizes-list") as HTMLElement;
-  let stored: string | null = null;
-  try {
-    stored = localStorage.getItem(SIZES_STORAGE_KEY);
-  } catch {
-    // 読めなければ既定
-  }
   const chosen = parseSizes(
-    stored,
+    readStored(SIZES_STORAGE_KEY),
     SIZE_PRESETS.map(([, px]) => px),
   );
   list.replaceChildren(
@@ -248,11 +243,7 @@ function chooseSizes(): Promise<number[] | null> {
       () => {
         if (dialog.returnValue !== "ok") return resolve(null);
         const sizes = [...list.querySelectorAll<HTMLInputElement>("input:checked")].map((box) => Number(box.value));
-        try {
-          localStorage.setItem(SIZES_STORAGE_KEY, JSON.stringify(sizes));
-        } catch {
-          // 残せなくても保存はする
-        }
+        writeStored(SIZES_STORAGE_KEY, JSON.stringify(sizes));
         resolve(sizes);
       },
       { once: true },
@@ -264,35 +255,18 @@ function chooseSizes(): Promise<number[] | null> {
 type SizedSaved = { path: string; longSide: number; saved: Saved };
 
 /** 長辺ごとに続けて保存する。元の画像と同じファイルになるなら "sameFile" を返す。 */
-async function saveSizesTo(path: string, sizes: number[]): Promise<"done" | "sameFile" | "failed"> {
-  const name = path.split("/").pop() ?? path;
-  setSaving(true);
-  void updateStatus(`保存中… ${sizes.length} つの大きさ`);
-  try {
-    const saved = structuredClone(state.settings);
+function saveSizesTo(path: string, sizes: number[]): Promise<SaveResult> {
+  return runSave(path, `保存中… ${sizes.length} つの大きさ`, async (settings) => {
     const results = await invoke<SizedSaved[]>("save_sizes", {
       path,
-      settings: saved,
+      settings,
       options: saveOptions.value(),
       longSides: sizes,
     });
-    state.savedSettings = saved;
     const fitted = results.filter((r) => r.saved.fitted).length;
     const note = fitted > 0 ? `（${fitted} つは大きさの上限に合わせて品質を下げた・縮めた）` : "";
-    void updateStatus(`${savedSummary(results.map((r) => r.path))}${note}`);
-    return "done";
-  } catch (error) {
-    void updateStatus();
-    const failure = error as SaveFailure;
-    if (failure?.kind === "sameFile") {
-      await showError(SAVE_ERROR_TITLE, failure.message);
-      return "sameFile";
-    }
-    await showError(SAVE_ERROR_TITLE, `${name}\n(${failure?.message ?? error})`, failure?.kind === "extension");
-    return "failed";
-  } finally {
-    setSaving(false);
-  }
+    return `${savedSummary(results.map((r) => r.path))}${note}`;
+  });
 }
 
 /** Rust の save::Saved（保存した品質・大きさ・ファイルの大きさ、上限に合わせたか）。 */
@@ -306,15 +280,29 @@ function fittedNote(saved: Saved): string {
 }
 
 /** 保存する。元の画像と同じファイルなら "sameFile" を返す。 */
-async function saveTo(path: string): Promise<"done" | "sameFile" | "failed"> {
+function saveTo(path: string): Promise<SaveResult> {
+  const name = path.split("/").pop() ?? path;
+  return runSave(path, `保存中… ${name}`, async (settings) => {
+    const result = await invoke<Saved>("save_image", { path, settings, options: saveOptions.value() });
+    return `保存しました: ${name}${fittedNote(result)}`;
+  });
+}
+
+type SaveResult = "done" | "sameFile" | "failed";
+
+/**
+ * 保存を走らせて結果を知らせる（保存中は保存・開くなどを止める）。run は今の設定の写しで保存し、ステータスバーに
+ * 出す文を返す。元の画像と同じファイルなら "sameFile"（呼んだ側が保存ダイアログを開き直す）。
+ */
+async function runSave(path: string, busy: string, run: (settings: EditSettings) => Promise<string>): Promise<SaveResult> {
   const name = path.split("/").pop() ?? path;
   setSaving(true);
-  void updateStatus(`保存中… ${name}`);
+  void updateStatus(busy);
   try {
     const saved = structuredClone(state.settings);
-    const result = await invoke<Saved>("save_image", { path, settings: saved, options: saveOptions.value() });
+    const done = await run(saved);
     state.savedSettings = saved;
-    void updateStatus(`保存しました: ${name}${fittedNote(result)}`);
+    void updateStatus(done);
     return "done";
   } catch (error) {
     void updateStatus();

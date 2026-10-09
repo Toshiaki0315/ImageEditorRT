@@ -3,8 +3,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { dom, preview, state, tabs, zoomView } from "./app";
 import { isCompareKey } from "./keys";
-import { updateMenus } from "./menus";
+import { MENU, setMenuChecked, updateMenus } from "./menus";
 import { readRawImage } from "./protocol";
+import { SPLIT_DEFAULT, splitClip, splitFraction } from "./split";
 import { showError } from "./status";
 import type { DioramaGuide } from "./types";
 
@@ -28,6 +29,11 @@ let zoomTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const isZoomed = () => zoomed;
 
+/** 左右に分けて比べているか */
+let splitting = false;
+/** 境目の位置（表示している画像の幅に対する比率） */
+let splitAt = SPLIT_DEFAULT;
+
 // --- 加工前との比較 -----------------------------------------------------------------
 
 /** 加工前の表示を切り替える（押している間だけ true）。設定は変えない。 */
@@ -36,6 +42,7 @@ export function setComparing(value: boolean) {
   if (value === comparing) return;
   comparing = value;
   preview.comparing = value;
+  updateSplit();
   updateBadge();
   void updateGuide();
   preview.request(state.settings);
@@ -69,11 +76,63 @@ export function setupCompare() {
   }
 }
 
+// --- 左右に分けて比べる -------------------------------------------------------------
+
+/** 左右に分けて比べる表示を切り替える（100% 表示の間・画像がないときは使わない）。 */
+export function toggleSplit() {
+  const next = !splitting && state.loaded !== null && !zoomed;
+  setMenuChecked(MENU.split, next); // メニューは選ぶとチェックが変わるので、使えないときも合わせ直す
+  if (next === splitting) return;
+  splitting = next;
+  preview.splitCanvas = splitting ? dom.splitCanvas : null;
+  updateSplit();
+  if (splitting) preview.request(state.settings);
+}
+
+/** 境目の位置・表示する・しないを今の状態に合わせる（加工前の表示中は全体が加工前なので出さない）。 */
+export function updateSplit() {
+  dom.split.hidden = !(splitting && state.loaded !== null && !comparing);
+  dom.splitCanvas.style.clipPath = splitClip(splitAt);
+  dom.splitLine.style.left = `${splitAt * 100}%`;
+}
+
+/** 画像を閉じたとき: 左右に分けて比べるのをやめる。 */
+export function stopSplit() {
+  if (splitting) toggleSplit();
+}
+
+/** 境目のドラッグ。 */
+export function setupSplit() {
+  const line = dom.splitLine;
+  const move = (event: PointerEvent) => {
+    const rect = dom.canvas.getBoundingClientRect();
+    splitAt = splitFraction(event.clientX, rect.left, rect.width);
+    updateSplit();
+  };
+  line.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    line.setPointerCapture(event.pointerId);
+    move(event);
+  });
+  line.addEventListener("pointermove", (event) => {
+    if (line.hasPointerCapture(event.pointerId)) move(event);
+  });
+  // ダブルクリックで真ん中に戻す
+  line.addEventListener("dblclick", (event) => {
+    event.stopPropagation();
+    splitAt = SPLIT_DEFAULT;
+    updateSplit();
+  });
+}
+
 // --- 100% 表示 ----------------------------------------------------------------------
 
 /** 100% 表示にする。center は表示の中央にしたい点（保存結果の画像の座標。省略時は画像の中央）。 */
 export function showActualSize(center: [number, number] | null = null) {
   if (!state.loaded) return;
+  stopSplit(); // 100% 表示の間は使わない
   zoomed = true;
   zoomCenter = center;
   void renderZoom();

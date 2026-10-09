@@ -38,6 +38,10 @@ export const dom = {
   /** 全体表示のプレビュー（canvas・範囲の選択・ガイド）。100% 表示の間は隠す */
   frame: document.querySelector<HTMLElement>(".frame")!,
   badge: $<HTMLElement>("badge"),
+  /** 左右に分けて比べる表示（加工前の canvas・境目） */
+  split: $<HTMLElement>("split"),
+  splitCanvas: $<HTMLCanvasElement>("split-canvas"),
+  splitLine: $<HTMLElement>("split-line"),
 };
 
 /** 開いている画像と、操作の状態。 */

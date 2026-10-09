@@ -2,6 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { type Histogram, readPreview } from "./protocol";
+import { fitInside } from "./split";
 import type { EditSettings } from "./types";
 
 /** 1 回の描き直しの内訳 (ms)。 */
@@ -32,6 +33,8 @@ export class Preview {
   trimmed = false;
   /** 加工前を表示する（向きと切り抜く範囲だけを残す） */
   comparing = false;
+  /** 左右に分けて比べるとき、加工前を描く canvas（null なら描かない。加工前の表示中も描かない） */
+  splitCanvas: HTMLCanvasElement | null = null;
   /** 画像を閉じるたびに増やす（閉じる前の依頼の結果は描かない） */
   private generation = 0;
   /** 表示の大きさが変わったとき（ガイド・範囲の線を描き直す） */
@@ -100,6 +103,25 @@ export class Preview {
     }
   }
 
+  /** 加工前（向き・切り抜く範囲だけ）を作らせ、加工後と同じ大きさの canvas に縦横比を保って中央に描く。 */
+  private async renderBefore(target: HTMLCanvasElement, settings: EditSettings, trimmed: boolean) {
+    const generation = this.generation;
+    const buffer = await invoke<ArrayBuffer>("render_preview", { settings, trimmed, comparing: true });
+    if (generation !== this.generation || this.splitCanvas !== target) return;
+    const { width, height, pixels } = readPreview(buffer);
+    const source = new OffscreenCanvas(width, height);
+    source.getContext("2d")!.putImageData(new ImageData(pixels, width, height), 0, 0);
+    target.width = this.canvas.width;
+    target.height = this.canvas.height;
+    const context = target.getContext("2d")!;
+    // 加工後と比が違う（フレームなど）ときの余りは、表示エリアの背景の色で埋める
+    context.fillStyle = getComputedStyle(this.stage).backgroundColor;
+    context.fillRect(0, 0, target.width, target.height);
+    const place = fitInside(width, height, target.width, target.height);
+    context.clearRect(place.x, place.y, place.width, place.height);
+    context.drawImage(source, place.x, place.y, place.width, place.height);
+  }
+
   /** Rust にプレビューを作らせて描き、内訳を返す。 */
   async render(settings: EditSettings, trimmed = false): Promise<Timing> {
     const start = performance.now();
@@ -115,6 +137,7 @@ export class Preview {
     }
     this.context.putImageData(new ImageData(pixels, width, height), 0, 0);
     this.onHistogram(histogram);
+    if (this.splitCanvas && !this.comparing) await this.renderBefore(this.splitCanvas, settings, trimmed);
     await nextFrame(); // 画面に出るところまで含める
     const end = performance.now();
     return { render, transfer: received - start - render, draw: end - received, total: end - start };

@@ -34,7 +34,16 @@ import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
 import { TasteGallery } from "./tasteGallery";
 import { TextDialog } from "./textDialog";
 import type { AspectRatio, FilterType, FrameKind, OpenInfo, ShapeType, TextFont, TextPosition } from "./types";
-import { fitToWindow, onPreviewDoubleClick, placeBadge, setupCompare, showActualSize, updateGuide } from "./view";
+import {
+  fitToWindow,
+  onPreviewDoubleClick,
+  placeBadge,
+  setupCompare,
+  setupSplit,
+  showActualSize,
+  toggleSplit,
+  updateGuide,
+} from "./view";
 
 catchUnexpectedErrors();
 hooks.userChanged = userChanged;
@@ -58,6 +67,7 @@ const menuActions: Record<string, () => void> = {
   [MENU.pasteLook]: () => void pasteLook(),
   [MENU.actualSize]: () => showActualSize(),
   [MENU.fit]: fitToWindow,
+  [MENU.split]: toggleSplit,
   [MENU.help]: () => {
     const help = $<HTMLDialogElement>("help-dialog");
     if (!help.open) help.showModal();
@@ -144,6 +154,7 @@ function connectControls() {
   };
   dom.canvas.addEventListener("dblclick", (event) => void onPreviewDoubleClick(event));
   setupCompare();
+  setupSplit();
   tabs.setEnabled("exif", false);
   tabs.onSelect = () => {
     updatePrivacyActive();

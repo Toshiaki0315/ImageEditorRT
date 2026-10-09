@@ -72,6 +72,8 @@ wait_for 60 ax click "$PID" "加工" || { echo "画面が出ませんでした" 
 echo "==> 確かめる"
 wait_for 30 sh -c "osascript '$LIB' texts $PID | grep -q '原寸 512×512'" || true
 check "画像を開く（ステータスバー）" "smoke.png ｜ 原寸 512×512 px" "$(ax texts "$PID" | grep '原寸' || true)"
+# 起動直後に押したタブは、画面の準備（前に開いていたタブに戻す）で戻ることがあるので、開き終えてから押し直す
+ax click "$PID" "加工" >/dev/null; sleep 0.5
 
 # モーダルのダイアログは、タブを切り替えた後に開くとアクセシビリティに中身が出ない（WebKit の動き）ので、最初に確かめる
 ax menu "$PID" "ファイル" "並べて 1 枚に…" >/dev/null

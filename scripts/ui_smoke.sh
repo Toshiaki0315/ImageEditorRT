@@ -83,7 +83,7 @@ wait_for 10 sh -c "osascript '$LIB' texts $PID | grep -q '投稿加工'" || true
 check "まとめて処理（投稿加工の欄）" "投稿加工" "$(ax texts "$PID" | grep '投稿加工' | head -1 || true)"
 ax click "$PID" "キャンセル" >/dev/null; sleep 0.5
 ax menu "$PID" "ファイル" "複数の大きさで保存…" >/dev/null; sleep 0.5
-check "複数の大きさで保存（大きさの一覧）" "Instagram（1080px）" "$(ax texts "$PID" | grep 'Instagram' | head -1 || true)"
+check "複数の大きさで保存（大きさの一覧）" "5" "$(ax values "$PID" AXCheckBox | grep -c 'px）=[01]$' || true)"
 ax click "$PID" "キャンセル" >/dev/null; sleep 0.5
 # 使い方（モーダルのダイアログは、タブを切り替えた後だと中身が AX に出ないので先に確かめる）
 ax menu "$PID" "ヘルプ" "ImageEditorRT の使い方" >/dev/null; sleep 0.5
@@ -106,9 +106,14 @@ check "色ごとの調整をリセット" "0" "$(ax slider "$PID" "色相" 0)"
 check "肌をなめらかに（スライダー）" "3" "$(ax slider "$PID" "肌をなめらかに" 3)"
 wait_for 15 sh -c "osascript '$LIB' texts $PID | grep -q '顔が見つからない'" || true
 check "肌をなめらかに（顔のない画像の知らせ）" "顔が見つからない" "$(ax texts "$PID" | grep '顔が見つからない' || true)"
-check "部分補正（欄）" "部分補正" "$(ax texts "$PID" | grep '^部分補正$' || true)"
-check "部分補正（円を足すを押せる）" "ok" "$(ax click "$PID" "円を足す" 2>&1)"
+check "部分補正（範囲の一覧はまだ空）" "範囲=（まだありません）" "$(ax values "$PID" AXPopUpButton | grep '^範囲=' || true)"
 ax click "$PID" "円を足す" >/dev/null; sleep 0.3
+check "部分補正（円を足すを押した状態）" "円を足す=1" "$(ax values "$PID" AXCheckBox | grep '^円を足す=' || true)"
+ax click "$PID" "円を足す" >/dev/null; sleep 0.3
+check "部分補正（もう一度押すと戻る）" "円を足す=0" "$(ax values "$PID" AXCheckBox | grep '^円を足す=' || true)"
+ax click "$PID" "赤目を補正" >/dev/null; sleep 0.5
+check "赤目を補正（チェックが入る・元に戻せる）" "赤目を補正=1 true" "$(ax values "$PID" AXCheckBox | grep '^赤目を補正=' || true) $(ax menu-enabled "$PID" "編集" "元に戻す")"
+ax click "$PID" "赤目を補正" >/dev/null; sleep 0.3
 
 ax click "$PID" "自動補正" >/dev/null
 wait_for 15 sh -c "osascript '$LIB' texts $PID | grep -q '自動補正:'" || true
@@ -116,6 +121,7 @@ check "自動補正（ステータスバー）" "自動補正: 露出" "$(ax tex
 
 ax click "$PID" "切り抜き" >/dev/null; sleep 0.5
 check "水平の補正のスライダー" "0.3" "$(ax slider "$PID" "水平の補正" 3)"
+check "切り抜きのガイド（選択肢がある）" "ガイド=" "$(ax values "$PID" AXPopUpButton | grep '^ガイド=' || true)"
 ax click "$PID" "傾きを自動で直す" >/dev/null
 wait_for 15 sh -c "osascript '$LIB' texts $PID | grep -q '傾き'" || true
 check "傾きを自動で直す（ステータスバー）" "傾き" "$(ax texts "$PID" | grep '傾き' || true)"
@@ -146,6 +152,7 @@ ax menu "$PID" "編集" "加工をペースト" >/dev/null; sleep 0.5
 ax menu "$PID" "編集" "文字・透かし…" >/dev/null
 wait_for 10 sh -c "osascript '$LIB' texts $PID | grep -q '（なし）'" || true
 check "文字・透かし（ロゴの欄）" "（なし）" "$(ax texts "$PID" | grep '（なし）' | head -1 || true)"
+check "文字・透かし（飾り・位置の既定）" "位置=右下 飾り=なし" "$(ax values "$PID" AXPopUpButton | grep -E '^(飾り|位置)=' | sort -u | tr '\n' ' ' | sed 's/ $//' || true)"
 ax click "$PID" "撮影日を入れる" >/dev/null; sleep 0.5
 check "撮影日を入れる（画像に撮影日時がないので文字は空のまま、元に戻せる）" "true" "$(ax menu-enabled "$PID" "編集" "元に戻す")"
 ax click "$PID" "文字を消す" >/dev/null; sleep 0.3

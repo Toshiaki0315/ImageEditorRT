@@ -39,6 +39,7 @@ import { Panel } from "./panel";
 import { PhotoControls } from "./photoControls";
 import { LocalPanel } from "./localPanel";
 import { LutControls } from "./lutControls";
+import { MaskedPanel } from "./maskedPanel";
 import { ColorMatchControls } from "./colorMatchControls";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
@@ -141,6 +142,7 @@ async function createParts() {
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
   parts.localPanel = new LocalPanel($("local-extra"), settings, dom.canvas, orientedSize, userChanged);
+  parts.maskedPanel = new MaskedPanel($("masked-extra"), settings, () => state.loaded !== null, userChanged);
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
   parts.textDrag = new TextDrag(settings, dom.canvas, orientedSize, () => parts.crop.photoArea(), userChanged);

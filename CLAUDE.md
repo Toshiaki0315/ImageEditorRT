@@ -85,6 +85,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     privacy.rs            # 投稿加工の範囲（ぼかし・モザイク・絵文字のスタンプ・修復）
     heal.rs               # スポット修復（楕円の中を押し引きでまわりから埋め、まわりと同じくらいのざらつきを足す）
     color_match.rs        # 参考の写真に色を合わせる（Lab の平均と広がりを近づける。参考は色の情報だけを数値で持つ）
+    masked.rs             # 被写体だけ・背景だけに補正（被写体のマスクで、露出・コントラスト・色温度・彩度を分けてかける）
     background.rs         # 背景を消す（透明・色）・ぼかす・画像に置き換える（被写体のマスクで）
     collage.rs            # 並べて 1 枚に（並べ方・枠に合わせた切り抜き）
     sample.rs             # 計測用の画像
@@ -160,6 +161,7 @@ src/                      # 画面（TypeScript）
   textDialog.ts           # 「文字・透かし」のダイアログ（⌘T・「文字…」）
   textDrag.ts / textPoint.ts # 文字・ロゴの「自由」な位置をプレビューの上でドラッグする（と、割合の計算）
   lutControls.ts          # 「加工」タブの LUT（ファイルを選ぶ・外す・強さ）
+  maskedPanel.ts          # 「加工」タブの被写体／背景の補正（対象を選んでスライダー。初めて動かすときマスクを作る）
   colorMatchControls.ts   # 「加工」タブの色を合わせる（参考の写真を選ぶ・外す・強さ）
   output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）
   sizes.ts                # 複数の大きさで保存（選んだ大きさの覚え方・知らせの文。tests-ts/ で npm test）

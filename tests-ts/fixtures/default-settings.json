@@ -54,6 +54,18 @@
     255
   ],
   "backgroundImage": "",
+  "subjectAdjust": {
+    "exposure": 0.0,
+    "contrast": 0,
+    "temperature": 6500,
+    "saturation": 0
+  },
+  "backgroundAdjust": {
+    "exposure": 0.0,
+    "contrast": 0,
+    "temperature": 6500,
+    "saturation": 0
+  },
   "toneCurve": [
     [
       0,

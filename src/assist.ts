@@ -31,6 +31,8 @@ export function setupAssist() {
     });
   };
   photo.onNoSubject = () => notify("被写体が見つからないので、背景はそのままにしました");
+  parts.maskedPanel.prepareMask = photo.prepareBackground;
+  parts.maskedPanel.onNoSubject = () => notify("被写体が見つからないので、被写体／背景の補正はかけません");
 
   parts.crop.findSubjectCrop = (aspect) => {
     notify("目立つ被写体を探しています…");

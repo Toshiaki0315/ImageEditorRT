@@ -15,7 +15,7 @@ import {
   state,
   tabs,
 } from "./app";
-import { confirmDiscard, isEditingText, settingsChanged } from "./editing";
+import { confirmDiscard, isEditingText, settingsChanged, userChanged } from "./editing";
 import { updateMenus } from "./menus";
 import { type ClipboardContents, pasteAction, pasteStamp } from "./paste";
 import { SIZE_PRESETS } from "./output";
@@ -51,6 +51,7 @@ export function showLoaded(info: OpenInfo, openNotes: string[]) {
   parts.crop.reset([info.width, info.height]);
   parts.privacy.reset();
   dom.revealButton.hidden = true;
+  dom.resumeButton.hidden = true;
   parts.localPanel.reset();
   output.reset(true);
   parts.textDialog.show();
@@ -71,12 +72,68 @@ async function openPath(path: string, openNotes: string[] = []) {
   try {
     // 未保存の変更があれば確かめ、キャンセルされたら開かない
     if (!(await confirmDiscard())) return;
+    // 加工したまま別の写真へ移るときは、今の写真の加工を覚えておく（次に開いたとき続けられる）
+    await rememberEdits();
     showLoaded(await invoke<OpenInfo>("open_path", { path }), openNotes);
+    await offerResume();
   } catch (error) {
     await showError(LOAD_ERROR_TITLE, error, true);
   } finally {
     state.opening = false;
   }
+}
+
+/** 開いている写真の今の加工を覚える（加工していなければ覚えない。覚えられなくても先へ進む）。 */
+export async function rememberEdits() {
+  if (!state.loaded) return;
+  try {
+    await invoke("remember_edits", { settings: structuredClone(state.settings) });
+  } catch {
+    // 覚えられなくても、開く・保存はそのまま
+  }
+}
+
+/** この写真の前回の加工を覚えていれば、「前回の加工を続ける」を出す。 */
+async function offerResume() {
+  dom.resumeButton.hidden = true;
+  let saved: EditSettings | null = null;
+  try {
+    saved = await invoke<EditSettings | null>("recall_edits");
+  } catch {
+    return;
+  }
+  if (!saved || !state.loaded) return;
+  resumable = saved;
+  dom.resumeButton.hidden = false;
+  notify("この写真を前に加工したときの設定があります（ステータスバーの「前回の加工を続ける」で当てはめる）");
+}
+
+/** 「前回の加工を続ける」で当てはめる設定 */
+let resumable: EditSettings | null = null;
+
+/** 「前回の加工を続ける」: 覚えていた設定（切り抜き・大きさを含む）を当てはめる。1 回の操作として元に戻せる。 */
+export async function resumeEdits() {
+  const { loaded } = state;
+  if (!loaded || !resumable || state.saving) return;
+  const saved = resumable;
+  resumable = null;
+  dom.resumeButton.hidden = true;
+  Object.assign(state.settings, defaultSettings(), structuredClone(saved));
+  parts.crop.restore({ ratio: "free", portrait: false }, [loaded.width, loaded.height]);
+  // 手で決めた幅・高さがあれば、それを出力の欄に戻す（なければ切り抜いた大きさに従う）
+  const side = saved.width !== null ? "width" : "height";
+  output.restore({
+    width: saved.width ?? 1,
+    height: saved.height ?? 1,
+    edited: saved.width !== null || saved.height !== null,
+    last: side,
+    keepAspect: saved.keepAspect,
+  });
+  parts.panel.show();
+  parts.textDialog.show();
+  parts.photoControls.show();
+  userChanged();
+  notify("前回の加工を当てはめました（⌘Z で戻せます）");
 }
 
 /** フォルダの中の前後の写真（Rust の batch::Neighbor）。number は何枚目か（1 から）。 */
@@ -333,6 +390,7 @@ async function runSave(
     const done = await run(saved);
     state.savedSettings = saved;
     state.savedPaths = done.paths;
+    void rememberEdits();
     dom.revealButton.hidden = false;
     void updateStatus(done.text);
     return "done";
@@ -465,6 +523,7 @@ export async function resetImage() {
   parts.crop.reset(null);
   parts.privacy.reset();
   dom.revealButton.hidden = true;
+  dom.resumeButton.hidden = true;
   parts.localPanel.reset();
   output.reset(false);
   parts.textDialog.close();
@@ -501,6 +560,8 @@ export async function requestQuit() {
       return;
     }
     if (!(await confirmDiscard("終了"))) return;
+    // 次にこの写真を開いたとき続けられるよう、今の加工を覚えておく
+    await rememberEdits();
     await invoke("quit_app");
   } finally {
     quitting = false;

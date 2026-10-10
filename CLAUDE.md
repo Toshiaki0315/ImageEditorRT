@@ -114,6 +114,7 @@ src-tauri/                # Tauri のアプリ本体（コマンドで core を�
   src/open.rs             # コマンドライン引数・Finder・Dock から開く
   src/batch.rs            # まとめて処理（進み具合のイベント・中止）
   src/clipboard.rs        # クリップボード（NSPasteboard）を読む（貼り付け）・加工後の画像を書く（⇧⌘C のときだけ）
+  src/edits.rs            # 写真ごとの加工を覚える（edits.json。保存・別の写真へ移る・終了のとき覚え、開いたとき「前回の加工を続ける」で当てはめる）
   src/share.rs            # 共有・印刷（加工後の画像を一時ファイルにして、macOS の共有の一覧・印刷ダイアログを出す。一時ファイルは終了時に消す）
   src/diagnostics.rs      # 想定外のエラーのログ（~/Library/Logs/ImageEditorRT/）と起動確認（--smoke-test）
   src/presets.rs          # プリセットの一覧・保存・削除・当てはめと「プリセット ▾」のメニュー

@@ -43,6 +43,7 @@ export const dom = {
   frame: document.querySelector<HTMLElement>(".frame")!,
   badge: $<HTMLElement>("badge"),
   revealButton: $<HTMLButtonElement>("reveal-saved"),
+  resumeButton: $<HTMLButtonElement>("resume-edits"),
   /** 左右に分けて比べる表示（加工前の canvas・境目） */
   split: $<HTMLElement>("split"),
   splitCanvas: $<HTMLCanvasElement>("split-canvas"),

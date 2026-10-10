@@ -185,6 +185,8 @@
     <footer class="status-bar">
       <span id="status" class="status">画像が読み込まれていません</span>
       <!-- 保存した後だけ出す（Finder で保存したファイルを選んだ状態で開く） -->
+      <!-- この写真の前回の加工を覚えているときだけ出す -->
+      <button type="button" id="resume-edits" class="reveal-saved" hidden title="この写真を前に加工したときの設定（切り抜き・大きさを含む）を当てはめます（元に戻せます）">前回の加工を続ける</button>
       <button type="button" id="reveal-saved" class="reveal-saved" hidden title="保存したファイルを Finder で表示します（ファイル > 保存したファイルを Finder で表示）">Finder で表示</button>
     </footer>
     <!-- 文字・透かし（開いたまま調整でき、変更はすぐプレビューに反映する） -->
@@ -423,6 +425,7 @@
               <tr><td>⌘O</td><td>開く</td></tr>
               <tr><td>⌘S</td><td>保存</td></tr>
               <tr><td>⌘P</td><td>プリント（用紙に収まるよう縮める）</td></tr>
+              <tr><td>前回の加工を続ける</td><td>前に加工した写真を開くと、ステータスバーに出る。押すと前回の設定を当てはめる（⌘Z で戻せる）</td></tr>
               <tr><td>⌘] ／ ⌘[</td><td>同じフォルダの次の写真／前の写真</td></tr>
               <tr><td>⌘V</td><td>画像をペーストして開く</td></tr>
               <tr><td>⌘Z ／ ⇧⌘Z</td><td>元に戻す／やり直す</td></tr>

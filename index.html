@@ -91,6 +91,16 @@
             <input id="straighten" type="range" min="-45" max="45" step="0.1" title="ダブルクリックで 0° に戻す" />
             <output id="straighten-value"></output>
           </label>
+          <label class="row">
+            縦の遠近
+            <input id="perspective-vertical" type="range" min="-100" max="100" step="1" title="見上げて撮った建物など、上が細くなった縦の線をまっすぐにします（正で上を広げる。ダブルクリックで 0 に戻す）" />
+            <output id="perspective-vertical-value"></output>
+          </label>
+          <label class="row">
+            横の遠近
+            <input id="perspective-horizontal" type="range" min="-100" max="100" step="1" title="斜めから撮った壁など、片側が細くなった横の線をまっすぐにします（正で左を広げる。ダブルクリックで 0 に戻す）" />
+            <output id="perspective-horizontal-value"></output>
+          </label>
           <div class="buttons">
             <button type="button" id="auto-straighten" title="写真の中の水平線・長い直線から傾きを求めて、水平の補正を入れます（処理はこの Mac の中だけ）">傾きを自動で直す</button>
           </div>
@@ -387,7 +397,7 @@
             <dt>加工</dt>
             <dd>テイストと強さ・LUT（.cube を選んでかける）・露出〜経年劣化・ハイライト／シャドウ・トーンカーブ・色ごとの調整・部分補正（円・帯の範囲だけ）・ディテール・肌をなめらかに・赤目の補正。「自動補正」でおまかせ、「一覧…」でテイストを見比べる。スライダーはダブルクリックで既定値</dd>
             <dt>切り抜き</dt>
-            <dd>比を選んでプレビューをドラッグ（三分割・黄金比・対角線のガイドも出せる）。「おまかせ」で目立つ被写体に合わせた範囲に。回転・反転・水平の補正（動かしている間は格子が出る。傾きの自動補正も）・背景を消す／ぼかす・フレーム・形（角丸・円）</dd>
+            <dd>比を選んでプレビューをドラッグ（三分割・黄金比・対角線のガイドも出せる）。「おまかせ」で目立つ被写体に合わせた範囲に。回転・反転・水平の補正（動かしている間は格子が出る。傾きの自動補正も）・遠近の補正（見上げた建物のすぼまった縦の線をまっすぐに）・背景を消す／ぼかす・フレーム・形（角丸・円）</dd>
             <dt>出力</dt>
             <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限</dd>
             <dt>ジオラマ</dt>

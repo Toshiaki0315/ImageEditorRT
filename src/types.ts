@@ -37,6 +37,9 @@ export type EditSettings = {
   orientation: Orientation;
   /** 水平の補正 -45〜45（度、正は時計回り）。回転・反転の後に回し、余白が出ないよう拡大する */
   straighten: number;
+  /** 遠近の補正 -100〜100（縦: 正で上が細くなった台形を直す、横: 正で左が細くなった台形を直す） */
+  perspectiveVertical: number;
+  perspectiveHorizontal: number;
   crop: CropRect | null;
   width: number | null;
   height: number | null;
@@ -143,6 +146,8 @@ export function defaultSettings(): EditSettings {
   return {
     orientation: { rotation: 0, mirror: false },
     straighten: 0,
+    perspectiveVertical: 0,
+    perspectiveHorizontal: 0,
     crop: null,
     width: null,
     height: null,

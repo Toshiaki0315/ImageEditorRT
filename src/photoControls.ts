@@ -7,6 +7,11 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 const BACKGROUND_BLUR_DEFAULT = 50;
 
+type PerspectiveKey = "perspectiveVertical" | "perspectiveHorizontal";
+
+/** 0 以外は符号付きで表示する（+30・-50）。 */
+const signed = (value: number) => (value > 0 ? `+${value}` : String(value));
+
 /** 角度を「+1.5°」「-0.3°」「0.0°」のように表示する。 */
 export const degreesText = (degrees: number) => `${degrees > 0 ? "+" : ""}${degrees.toFixed(1)}°`;
 
@@ -17,6 +22,11 @@ export class PhotoControls {
   private readonly straighten = $<HTMLInputElement>("straighten");
   private readonly straightenValue = $<HTMLOutputElement>("straighten-value");
   private readonly autoStraighten = $<HTMLButtonElement>("auto-straighten");
+  /** 遠近の補正（縦・横） */
+  private readonly perspective = {
+    perspectiveVertical: [$<HTMLInputElement>("perspective-vertical"), $<HTMLOutputElement>("perspective-vertical-value")],
+    perspectiveHorizontal: [$<HTMLInputElement>("perspective-horizontal"), $<HTMLOutputElement>("perspective-horizontal-value")],
+  } as const;
   private readonly background = $<HTMLSelectElement>("background");
   private readonly backgroundBlur = $<HTMLInputElement>("background-blur");
   private readonly backgroundBlurValue = $<HTMLOutputElement>("background-blur-value");
@@ -51,6 +61,16 @@ export class PhotoControls {
       this.straighten.addEventListener(type, () => this.onStraightenAdjust(false));
     }
     this.autoStraighten.addEventListener("click", () => void this.straightenAutomatically());
+    for (const [key, [input]] of Object.entries(this.perspective) as [PerspectiveKey, readonly [HTMLInputElement, HTMLOutputElement]][]) {
+      input.addEventListener("input", () => this.setPerspective(key, Number(input.value)));
+      input.addEventListener("dblclick", () => this.setPerspective(key, 0));
+      // 動かしている間は格子を出す（水平の補正と同じ）
+      input.addEventListener("pointerdown", () => this.onStraightenAdjust(true));
+      input.addEventListener("input", () => this.onStraightenAdjust(true));
+      for (const type of ["pointerup", "pointercancel", "change"]) {
+        input.addEventListener(type, () => this.onStraightenAdjust(false));
+      }
+    }
     this.background.addEventListener("change", () => void this.setBackground(this.background.value as BackgroundMode));
     this.backgroundBlur.addEventListener("input", () => this.setBackgroundBlur(Number(this.backgroundBlur.value)));
     this.backgroundBlur.addEventListener("dblclick", () => this.setBackgroundBlur(BACKGROUND_BLUR_DEFAULT));
@@ -63,6 +83,11 @@ export class PhotoControls {
     this.straighten.value = String(this.settings.straighten);
     this.straightenValue.textContent = degreesText(this.settings.straighten);
     this.straighten.disabled = this.autoStraighten.disabled = !loaded;
+    for (const [key, [input, output]] of Object.entries(this.perspective) as [PerspectiveKey, readonly [HTMLInputElement, HTMLOutputElement]][]) {
+      input.value = String(this.settings[key]);
+      output.textContent = signed(this.settings[key]);
+      input.disabled = !loaded;
+    }
     this.background.value = this.settings.background;
     this.background.disabled = !loaded;
     this.backgroundBlur.value = String(this.settings.backgroundBlur);
@@ -75,6 +100,13 @@ export class PhotoControls {
     const degrees = roundDegrees(value);
     if (this.settings.straighten === degrees) return;
     this.settings.straighten = degrees;
+    this.changed();
+  }
+
+  /** 遠近の補正（大きさは変わらないので、トリミング範囲はそのまま）。 */
+  private setPerspective(key: PerspectiveKey, value: number) {
+    if (this.settings[key] === value) return;
+    this.settings[key] = value;
     this.changed();
   }
 

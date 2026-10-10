@@ -34,6 +34,10 @@ pub struct EditSettings {
     /// 水平の補正 -45〜45（度、正は時計回り、0 = なし）。回転・反転の後に回し、余白が出ないよう拡大する
     /// （大きさは変わらない。旧版にはない）
     pub straighten: f64,
+    /// 遠近の補正 -100〜100（縦: 正で上が細くなった台形を、横: 正で左が細くなった台形を直す。水平の補正の後にかける。
+    /// 大きさは変わらない。旧版にはない）
+    pub perspective_vertical: i32,
+    pub perspective_horizontal: i32,
     pub crop: Option<CropRect>,
     pub width: Option<u32>,
     pub height: Option<u32>,
@@ -102,6 +106,8 @@ impl Default for EditSettings {
         Self {
             orientation: Orientation::default(),
             straighten: 0.0,
+            perspective_vertical: 0,
+            perspective_horizontal: 0,
             crop: None,
             width: None,
             height: None,

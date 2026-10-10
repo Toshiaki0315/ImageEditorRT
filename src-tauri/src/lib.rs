@@ -16,6 +16,8 @@ mod presets;
 mod recent;
 mod saving;
 mod settings;
+#[cfg(target_os = "macos")]
+mod share;
 mod state;
 mod system;
 
@@ -82,6 +84,8 @@ pub fn run() {
             saving::save_image,
             saving::save_sizes,
             #[cfg(target_os = "macos")]
+            share::share_image,
+            #[cfg(target_os = "macos")]
             saving::copy_image,
             saving::default_save_path,
             settings::supported_formats,
@@ -128,6 +132,9 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("ImageEditorRT を起動できませんでした");
+    // 前に終わったときに残った共有の一時ファイルを消す
+    #[cfg(target_os = "macos")]
+    share::clean();
     app.run(|handle, event| {
         // Dock の「終了」・ログアウトなどで届く終了の求めは、画面が未保存の変更を確かめるまで止める
         if let tauri::RunEvent::ExitRequested { code: None, api, .. } = &event {
@@ -135,6 +142,11 @@ pub fn run() {
                 api.prevent_exit();
                 return;
             }
+        }
+        // 共有に使った一時ファイルを消す
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Exit = event {
+            share::clean();
         }
         // Finder の「このアプリケーションで開く」・Dock のアイコンへのドロップ
         #[cfg(target_os = "macos")]

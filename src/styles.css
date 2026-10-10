@@ -303,6 +303,21 @@ button:disabled {
   stroke-width: 1.5;
 }
 
+/* 水平の補正の格子（細い白い線に、薄い影） */
+.straighten-grid line {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1;
+}
+
+.straighten-grid .grid-shadow {
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 2;
+}
+
+.straighten-grid .grid-line {
+  stroke: rgba(255, 255, 255, 0.7);
+}
+
 .guide .dashed {
   stroke-dasharray: 6 4;
 }

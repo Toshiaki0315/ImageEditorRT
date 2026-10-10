@@ -28,6 +28,8 @@ export class PhotoControls {
   prepareBackground: () => Promise<boolean | null> = async () => true;
   /** 被写体が見つからなかったとき */
   onNoSubject: () => void = () => {};
+  /** 水平の補正を動かしたとき（格子を出す。pressed はスライダーを押している間） */
+  onStraightenAdjust: (pressed: boolean) => void = () => {};
   private readonly settings: EditSettings;
   private readonly loaded: () => boolean;
   private readonly onChange: () => void;
@@ -42,6 +44,12 @@ export class PhotoControls {
     this.onChange = onChange;
     this.straighten.addEventListener("input", () => this.setStraighten(Number(this.straighten.value)));
     this.straighten.addEventListener("dblclick", () => this.setStraighten(0));
+    // 動かしている間（押している間と、離してから少しの間）は格子を出す
+    this.straighten.addEventListener("pointerdown", () => this.onStraightenAdjust(true));
+    this.straighten.addEventListener("input", () => this.onStraightenAdjust(true));
+    for (const type of ["pointerup", "pointercancel", "change"]) {
+      this.straighten.addEventListener(type, () => this.onStraightenAdjust(false));
+    }
     this.autoStraighten.addEventListener("click", () => void this.straightenAutomatically());
     this.background.addEventListener("change", () => void this.setBackground(this.background.value as BackgroundMode));
     this.backgroundBlur.addEventListener("input", () => this.setBackgroundBlur(Number(this.backgroundBlur.value)));
@@ -76,7 +84,10 @@ export class PhotoControls {
     try {
       const degrees = await this.findTilt();
       if (degrees === undefined) return;
-      if (degrees !== null) this.setStraighten(degrees);
+      if (degrees !== null) {
+        this.setStraighten(degrees);
+        this.onStraightenAdjust(false); // 直した結果を格子で見られるよう、少しの間出す
+      }
       this.onAutoStraighten(degrees);
     } finally {
       this.show();

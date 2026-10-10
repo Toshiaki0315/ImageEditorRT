@@ -40,6 +40,26 @@ export function guideLines(kind: GuideKind, rect: Rect): Line[] {
   }
 }
 
+/**
+ * 水平の補正で使う格子の線（width×height の画像に、正方形のマス目。短辺を cells 等分した間隔で、中心を通る線から
+ * 外へ並べる）。縦の線・横の線の順。
+ */
+export function straightenGrid(width: number, height: number, cells = 8): Line[] {
+  if (!(width > 0 && height > 0 && cells > 0)) return [];
+  const step = Math.min(width, height) / cells;
+  const positions = (length: number) => {
+    const center = length / 2;
+    const count = Math.floor(center / step);
+    const list: number[] = [];
+    for (let k = -count; k <= count; k++) list.push(center + k * step);
+    return list;
+  };
+  return [
+    ...positions(width).map((x): Line => [x, 0, x, height]),
+    ...positions(height).map((y): Line => [0, y, width, y]),
+  ];
+}
+
 /** 環境設定に残した値を読む（知らない値ならなし）。 */
 export function parseGuide(value: string | null): GuideKind {
   return GUIDE_KINDS.some(([kind]) => kind === value) ? (value as GuideKind) : "none";

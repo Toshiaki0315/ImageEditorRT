@@ -35,6 +35,7 @@ export const dom = {
   canvas: $<HTMLCanvasElement>("canvas"),
   guide: document.getElementById("guide") as unknown as SVGSVGElement,
   zoomGuide: document.getElementById("zoom-guide") as unknown as SVGSVGElement,
+  straightenGrid: document.getElementById("straighten-grid") as unknown as SVGSVGElement,
   zoomCanvas: $<HTMLCanvasElement>("zoom-canvas"),
   /** 全体表示のプレビュー（canvas・範囲の選択・ガイド）。100% 表示の間は隠す */
   frame: document.querySelector<HTMLElement>(".frame")!,

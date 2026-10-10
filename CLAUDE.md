@@ -48,7 +48,8 @@ cargo run --release -p imageeditorrt-core --example profile # 原寸の処理の
 crates/core/              # ★ Tauri に依存しない画像処理・EXIF（imageeditorrt_core）
   src/
     formats.rs            # 読み込める形式・拡張子・透過の有無
-    decode.rs             # ImageIO での読み込み（向きを直した sRGB の RGBA にする。macOS のみ）
+    decode.rs             # ImageIO での読み込み（向きを直した sRGB の RGBA にする。広い色域なら Display P3。macOS のみ）
+    color_space.rs        # 色空間（sRGB・Display P3）。P3 の色のプロファイル・JPEG への入れ方・sRGB への直し方
     vision.rs             # macOS の Vision の呼び出し（CPU でのやり直し・枠の変換・分けた部分ごとの認識。macOS のみ）
     faces.rs              # 顔の認識（Vision）と、隠す範囲の広げ方
     text_regions.rs       # 文字の認識（Vision。読めた文字の範囲だけ）
@@ -164,6 +165,7 @@ src/                      # 画面（TypeScript）
   textDrag.ts / textPoint.ts # 文字・ロゴの「自由」な位置をプレビューの上でドラッグする（と、割合の計算）
   lutControls.ts          # 「加工」タブの LUT（ファイルを選ぶ・外す・強さ）
   monoPanel.ts            # 「加工」タブの白黒（オン／オフと 8 色の明るさ）
+  colorSpace.ts           # プレビューの色空間（canvas は Display P3、画素には開いた画像の色空間を付けて描く）
   maskedPanel.ts          # 「加工」タブの被写体／背景の補正（対象を選んでスライダー。初めて動かすときマスクを作る）
   colorMatchControls.ts   # 「加工」タブの色を合わせる（参考の写真を選ぶ・外す・強さ）
   output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）

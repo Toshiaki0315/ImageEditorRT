@@ -85,9 +85,15 @@ fn unsupported_format_is_rejected() {
 }
 
 #[test]
-fn display_p3_is_converted_to_srgb() {
-    // P3 の (200, 100, 50) は sRGB では赤がより強く、緑・青がより弱い色になる
+fn display_p3_is_kept_as_p3() {
+    // 広い色域の画像は Display P3 のまま読む（P3 の (200, 100, 50) はそのままの値）
     let d = open("display_p3.png");
+    assert_eq!(d.color_space, imageeditorrt_core::color_space::ColorSpace::DisplayP3);
     let p = d.image.get_pixel(1, 1).0;
-    assert!(p[0] > 205 && p[1] < 98 && p[2] < 45, "sRGB に変換されていない: {p:?}");
+    assert!(p[0].abs_diff(200) <= 2 && p[1].abs_diff(100) <= 2 && p[2].abs_diff(50) <= 2, "{p:?}");
+    // sRGB に直すと、赤がより強く、緑・青がより弱い色になる
+    let mut srgb = d.image.clone();
+    imageeditorrt_core::color_space::p3_to_srgb(&mut srgb);
+    let p = srgb.get_pixel(1, 1).0;
+    assert!(p[0] > 205 && p[1] < 98 && p[2] < 45, "{p:?}");
 }

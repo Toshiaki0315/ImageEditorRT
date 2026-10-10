@@ -292,3 +292,44 @@ fn rights_are_written_and_maker_note_stays_intact() {
     save_edited(&sample(), &path, SaveOptions::default(), None, false).unwrap();
     assert!(raw_exif(&std::fs::read(&path).unwrap()).is_none());
 }
+
+#[test]
+fn display_p3_is_kept_through_save() {
+    use imageeditorrt_core::color_space::ColorSpace;
+    let dir = TempDir::new("p3");
+    // P3 の色のプロファイル付きの PNG（P3 の鮮やかな緑）
+    let image = RgbaImage::from_pixel(16, 16, Rgba([30, 220, 40, 255]));
+    let p3 = SaveOptions { color_space: ColorSpace::DisplayP3, ..SaveOptions::default() };
+    let source = dir.join("p3.png");
+    save_edited(&image, &source, p3.clone(), None, false).unwrap();
+    let decoded = decode_file(&std::fs::read(&source).unwrap()).unwrap();
+    assert_eq!(decoded.color_space, ColorSpace::DisplayP3, "広い色域なら P3 のまま読む");
+    assert!(
+        near(decoded.image.get_pixel(3, 3).0, [30, 220, 40, 255], 2),
+        "{:?}",
+        decoded.image.get_pixel(3, 3)
+    );
+    // JPEG・PNG・TIFF・HEIC は P3 のまま（プロファイルが付く）
+    for name in ["o.jpg", "o.png", "o.tif", "o.heic"] {
+        let path = dir.join(name);
+        save_edited(&decoded.image, &path, p3.clone(), None, false).unwrap();
+        let back = decode_file(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(back.color_space, ColorSpace::DisplayP3, "{name}");
+        assert!(
+            near(back.image.get_pixel(3, 3).0, [30, 220, 40, 255], 6),
+            "{name}: {:?}",
+            back.image.get_pixel(3, 3)
+        );
+    }
+    // プロファイルを付けられない BMP は sRGB に直す（P3 の鮮やかな緑は、sRGB では赤が 0 に切れる）
+    let bmp = dir.join("o.bmp");
+    save_edited(&decoded.image, &bmp, p3, None, false).unwrap();
+    let back = decode_file(&std::fs::read(&bmp).unwrap()).unwrap();
+    assert_eq!(back.color_space, ColorSpace::Srgb);
+    let p = back.image.get_pixel(3, 3).0;
+    assert!(p[1] > 215 && p[0] < 20, "{p:?}");
+    // sRGB の画像は sRGB のまま（プロファイルを付けない）
+    let plain = dir.join("s.png");
+    save_edited(&image, &plain, SaveOptions::default(), None, false).unwrap();
+    assert_eq!(decode_file(&std::fs::read(&plain).unwrap()).unwrap().color_space, ColorSpace::Srgb);
+}

@@ -1,8 +1,9 @@
 //! macOS の ImageIO（OS の機能）で画像を読む。
 //!
 //! HEIC を含め、macOS が読める形式はすべて同じ方法で読む。EXIF の向き (Orientation) は
-//! 読み込み時に直し、色は sRGB にそろえて RGBA（8bit）の画像にする。
-//! CMYK・16bit・パレット・グレーの画像も、同じく sRGB の RGBA（8bit）になる。
+//! 読み込み時に直し、色は sRGB にそろえて RGBA（8bit）の画像にする。ただし広い色域（Display P3・Adobe RGB
+//! など）の画像は Display P3 にそろえる（鮮やかな色を落とさないため。`color_space`）。
+//! CMYK・16bit・パレット・グレーの画像も、同じく RGBA（8bit）になる。
 //! GIF・TIFF などの複数のフレーム（ページ）がある画像は、先頭だけを読む。
 
 use std::ffi::c_void;
@@ -10,12 +11,14 @@ use std::ptr::NonNull;
 
 use image::RgbaImage;
 
+use crate::color_space::ColorSpace;
 use crate::formats::Format;
 use objc2_core_foundation::{
     CFBoolean, CFData, CFDictionary, CFNumber, CFRetained, CFString, CFType, CGPoint, CGRect, CGSize,
 };
 use objc2_core_graphics::{
-    kCGColorSpaceSRGB, CGBitmapContextCreate, CGColorSpace, CGContext, CGImage, CGImageAlphaInfo,
+    kCGColorSpaceDisplayP3, kCGColorSpaceSRGB, CGBitmapContextCreate, CGColorSpace, CGContext, CGImage,
+    CGImageAlphaInfo,
 };
 use objc2_image_io::{
     kCGImagePropertyPixelHeight, kCGImagePropertyPixelWidth, kCGImageSourceCreateThumbnailFromImageAlways,
@@ -54,6 +57,8 @@ pub struct Decoded {
     pub format: Format,
     /// 1 より大きければアニメーション GIF・複数ページの TIFF など（先頭だけを読んでいる）
     pub frame_count: usize,
+    /// 画素の色空間（広い色域の画像は Display P3）
+    pub color_space: ColorSpace,
 }
 
 /// ファイルの中身（バイト列）から画像を読み、向きを直した sRGB の RGBA 画像を返す。
@@ -74,8 +79,13 @@ pub fn decode_file(bytes: &[u8]) -> Result<Decoded, DecodeError> {
     let (width, height) = pixel_size(&source).ok_or(DecodeError::Unsupported)?;
     // 縮小しない（最大辺 = 元の長辺）サムネイルを、向きを直して作らせると、向きを直した原寸の画像になる
     let image = oriented_image(&source, width.max(height)).ok_or(DecodeError::Unsupported)?;
-    let image = render_rgba(&image).ok_or(DecodeError::Render)?;
-    Ok(Decoded { image, format, frame_count })
+    let color_space = if CGImage::color_space(Some(&image)).is_some_and(|space| space.is_wide_gamut_rgb()) {
+        ColorSpace::DisplayP3
+    } else {
+        ColorSpace::Srgb
+    };
+    let image = render_rgba(&image, color_space).ok_or(DecodeError::Render)?;
+    Ok(Decoded { image, format, frame_count, color_space })
 }
 
 /// 画像の大きさ（EXIF の向きを直す前）を返す。
@@ -117,8 +127,8 @@ fn oriented_image(source: &CGImageSource, max_side: usize) -> Option<CFRetained<
     unsafe { source.thumbnail_at_index(0, Some(options.as_opaque())) }
 }
 
-/// CGImage を sRGB の RGBA（ストレートアルファ）の画素にする。
-fn render_rgba(image: &CGImage) -> Option<RgbaImage> {
+/// CGImage を space（sRGB か Display P3）の RGBA（ストレートアルファ）の画素にする。
+fn render_rgba(image: &CGImage, space: ColorSpace) -> Option<RgbaImage> {
     let width = CGImage::width(Some(image));
     let height = CGImage::height(Some(image));
     if width == 0 || height == 0 {
@@ -126,7 +136,11 @@ fn render_rgba(image: &CGImage) -> Option<RgbaImage> {
     }
     let mut pixels = vec![0u8; width * height * 4];
     // SAFETY: 定数の名前から色空間を作るだけ
-    let srgb = CGColorSpace::with_name(Some(unsafe { kCGColorSpaceSRGB }))?;
+    let name = match space {
+        ColorSpace::Srgb => unsafe { kCGColorSpaceSRGB },
+        ColorSpace::DisplayP3 => unsafe { kCGColorSpaceDisplayP3 },
+    };
+    let srgb = CGColorSpace::with_name(Some(name))?;
     // SAFETY: pixels は width * height * 4 バイトあり、描き終わるまで生きている
     let context: CFRetained<CGContext> = unsafe {
         CGBitmapContextCreate(

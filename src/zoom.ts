@@ -1,6 +1,9 @@
 // 100% 表示: 原寸で処理した保存結果を、画像 1px = 画面の 1 画素（Retina では実ピクセル）で見せる（旧版 FR-UI-48）。
 // ドラッグとスクロールで見る場所を動かし、画像が表示より小さい向きは中央にそろえる。
 
+// Node のテスト（tests-ts/）からも読むので、拡張子まで書く
+import { context2d, imageData } from "./colorSpace.ts";
+
 /** マウスのホイールを行単位で送ってきたときの 1 行の移動量 (px)。1 段（3 行）で 30px（旧版と同じ） */
 const LINE_SCROLL_PX = 10;
 
@@ -44,7 +47,7 @@ export class ZoomView {
     this.container = container;
     this.holder = holder;
     this.canvas = canvas;
-    this.context = canvas.getContext("2d")!;
+    this.context = context2d(canvas);
     container.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || !this.size) return;
       container.setPointerCapture(event.pointerId);
@@ -94,7 +97,7 @@ export class ZoomView {
     const ratio = window.devicePixelRatio || 1;
     this.canvas.style.width = `${width / ratio}px`;
     this.canvas.style.height = `${height / ratio}px`;
-    this.context.putImageData(new ImageData(pixels, width, height), 0, 0);
+    this.context.putImageData(imageData(pixels, width, height), 0, 0);
     this.container.hidden = false;
     if (center || !previous || previous[0] !== width || previous[1] !== height) {
       const start = centeredOffset(center ?? [width / 2, height / 2], this.area(), ratio);

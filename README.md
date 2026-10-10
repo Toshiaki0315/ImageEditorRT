@@ -17,6 +17,7 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 - まとめて処理（保存名・形式を選べる）・複数の大きさで一度に保存・ファイルの大きさの上限
 - EXIF の表示（GPS・主なメーカーの MakerNote）と保存（EXIF・位置情報を残すかを選べる）
 - PNG / JPEG / GIF / TIFF / BMP / HEIC を読み書き（HEIF も読める）、カメラの RAW（DNG・CR2・CR3・NEF・ARW・RAF など）は読み込みのみ
+- 広い色域（Display P3）の写真は P3 のまま加工・保存する（鮮やかな色を落とさない。保存した画像に P3 の色のプロファイルを付ける）
 
 ## 実行環境
 

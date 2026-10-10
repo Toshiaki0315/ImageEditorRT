@@ -5,10 +5,12 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use image::{GrayImage, RgbaImage};
+use imageeditorrt_core::color_space::ColorSpace;
 use imageeditorrt_core::decode;
 use imageeditorrt_core::exif_info::{capture_date, CaptureDate, ExifInfo};
 use imageeditorrt_core::formats::{self, Format};
 use imageeditorrt_core::pipeline::{self, EditSettings, PREVIEW_MAX_SIDE};
+use imageeditorrt_core::save::SaveOptions;
 use imageeditorrt_core::text;
 use imageeditorrt_core::transform::CropRect;
 use serde::Serialize;
@@ -128,6 +130,15 @@ pub(crate) struct Source {
     pub(crate) exif: Option<Vec<u8>>,
     /// クリップボードから貼り付けた画像（保存の初期の名前を「クリップボード_日時.png」にする）
     pub(crate) pasted: bool,
+    /// 画素の色空間（Display P3 なら保存するとき色のプロファイルを付ける）
+    pub(crate) color_space: ColorSpace,
+}
+
+impl Source {
+    /// 保存の設定に、この画像の色空間を入れたもの。
+    pub(crate) fn save_options(&self, options: SaveOptions) -> SaveOptions {
+        SaveOptions { color_space: self.color_space, ..options }
+    }
 }
 
 /// 開いている画像（画面の操作はどれもこれを見る）。
@@ -153,6 +164,8 @@ pub(crate) struct OpenInfo {
     decode_ms: f64,
     resize_ms: f64,
     exif: ExifInfo,
+    /// 画素の色空間（画面のプレビューもこの色空間で描く）
+    color_space: ColorSpace,
 }
 
 pub(crate) fn elapsed_ms(start: Instant) -> f64 {
@@ -179,6 +192,7 @@ pub(crate) fn prepare(
     source: Source,
 ) -> (OpenInfo, Loaded) {
     let start = Instant::now();
+    let source = Source { color_space: decoded.color_space, ..source };
     let original = decoded.image;
     let (small, factor) = pipeline::make_preview(&original, PREVIEW_MAX_SIDE);
     let info = OpenInfo {
@@ -193,6 +207,7 @@ pub(crate) fn prepare(
         resize_ms: elapsed_ms(start),
         exif,
         name,
+        color_space: decoded.color_space,
     };
     let loaded = Loaded {
         original: Some(Arc::new(original)),

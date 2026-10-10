@@ -18,9 +18,15 @@ use crate::formats::has_transparency;
 const HEIC_UTI: &str = "public.heic";
 
 /// 画像を HEIC のバイト列にする（quality は 1〜100）。exif は prepare_exif で整えたもの（"Exif\0\0" 付き）。
-pub fn encode_heic(image: &RgbaImage, quality: u8, exif: Option<&[u8]>) -> Result<Vec<u8>, String> {
+/// space は画素の色空間（Display P3 なら、その色空間の画像として書き出す）。
+pub fn encode_heic(
+    image: &RgbaImage,
+    quality: u8,
+    exif: Option<&[u8]>,
+    space: crate::color_space::ColorSpace,
+) -> Result<Vec<u8>, String> {
     let failed = || "HEIC に書き出せません".to_string();
-    let cg = crate::vision::cg_image_with_alpha(image, has_transparency(image)).ok_or_else(failed)?;
+    let cg = crate::vision::cg_image_in(image, has_transparency(image), space).ok_or_else(failed)?;
     let properties = properties(quality, exif).ok_or_else(failed)?;
     let data = CFMutableData::new(None, 0).ok_or_else(failed)?;
     let uti = CFString::from_static_str(HEIC_UTI);
@@ -83,8 +89,8 @@ mod tests {
     #[test]
     fn heic_can_be_read_back_and_quality_changes_the_size() {
         let image = photo();
-        let high = encode_heic(&image, 95, None).unwrap();
-        let low = encode_heic(&image, 20, None).unwrap();
+        let high = encode_heic(&image, 95, None, Default::default()).unwrap();
+        let low = encode_heic(&image, 20, None, Default::default()).unwrap();
         assert!(low.len() < high.len(), "低い品質のほうが小さい: {} / {}", low.len(), high.len());
         let back = crate::decode::decode(&high).unwrap();
         assert_eq!(back.dimensions(), (160, 120));
@@ -100,7 +106,8 @@ mod tests {
                 image.put_pixel(x, y, Rgba([0, 0, 0, 0]));
             }
         }
-        let back = crate::decode::decode(&encode_heic(&image, 90, None).unwrap()).unwrap();
+        let back =
+            crate::decode::decode(&encode_heic(&image, 90, None, Default::default()).unwrap()).unwrap();
         assert!(back.get_pixel(10, 60)[3] < 16 && back.get_pixel(120, 60)[3] > 240);
     }
 }

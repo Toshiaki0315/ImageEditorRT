@@ -33,7 +33,8 @@ export async function updateStatus(extra?: string) {
   } catch {
     // 大きさの指定が範囲外のときは「—」
   }
-  let text = `${loaded.name} ｜ 原寸 ${loaded.width}×${loaded.height} px ｜ ${size}`;
+  const space = loaded.colorSpace === "display_p3" ? "・Display P3" : "";
+  let text = `${loaded.name} ｜ 原寸 ${loaded.width}×${loaded.height} px${space} ｜ ${size}`;
   const all = extra ? [...notes, extra] : notes;
   if (all.length) text += `（${all.join("／")}）`;
   dom.status.textContent = text;

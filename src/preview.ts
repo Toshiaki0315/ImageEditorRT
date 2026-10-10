@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { type Histogram, readPreview } from "./protocol";
 import { fitInside } from "./split";
 import type { EditSettings } from "./types";
+import { context2d, imageData } from "./colorSpace";
 
 /** 1 回の描き直しの内訳 (ms)。 */
 export type Timing = {
@@ -47,7 +48,7 @@ export class Preview {
     private readonly canvas: HTMLCanvasElement,
     private readonly onError: (error: unknown) => void,
   ) {
-    this.context = canvas.getContext("2d")!;
+    this.context = context2d(canvas);
     new ResizeObserver(() => this.fit()).observe(stage);
   }
 
@@ -110,10 +111,10 @@ export class Preview {
     if (generation !== this.generation || this.splitCanvas !== target) return;
     const { width, height, pixels } = readPreview(buffer);
     const source = new OffscreenCanvas(width, height);
-    source.getContext("2d")!.putImageData(new ImageData(pixels, width, height), 0, 0);
+    context2d(source).putImageData(imageData(pixels, width, height), 0, 0);
     target.width = this.canvas.width;
     target.height = this.canvas.height;
-    const context = target.getContext("2d")!;
+    const context = context2d(target);
     // 加工後と比が違う（フレームなど）ときの余りは、表示エリアの背景の色で埋める
     context.fillStyle = getComputedStyle(this.stage).backgroundColor;
     context.fillRect(0, 0, target.width, target.height);
@@ -135,7 +136,7 @@ export class Preview {
       this.canvas.height = height;
       this.fit();
     }
-    this.context.putImageData(new ImageData(pixels, width, height), 0, 0);
+    this.context.putImageData(imageData(pixels, width, height), 0, 0);
     this.onHistogram(histogram);
     if (this.splitCanvas && !this.comparing) await this.renderBefore(this.splitCanvas, settings, trimmed);
     await nextFrame(); // 画面に出るところまで含める

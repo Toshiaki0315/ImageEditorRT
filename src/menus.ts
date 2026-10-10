@@ -24,6 +24,8 @@ export const MENU = {
   copyImage: "copy-image",
   copyLook: "copy-look",
   pasteLook: "paste-look",
+  keepVersion: "keep-version",
+  versions: "versions",
   actualSize: "actual_size",
   fit: "fit",
   histogram: "histogram",
@@ -58,6 +60,8 @@ export function updateMenus() {
   setMenuEnabled(MENU.nextPhoto, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.previousPhoto, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.pasteLook, editable && state.copiedLook !== null);
+  setMenuEnabled(MENU.keepVersion, editable);
+  setMenuEnabled(MENU.versions, state.loaded !== null);
   setMenuEnabled(MENU.actualSize, state.loaded !== null && !isZoomed());
   setMenuEnabled(MENU.fit, isZoomed());
   setMenuEnabled(MENU.revealSaved, state.savedPaths.length > 0);

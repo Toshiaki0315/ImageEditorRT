@@ -82,6 +82,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     histogram.rs          # ヒストグラム（R・G・B・輝度の分布）の計算
     shapes.rs             # 形（角丸・円）の切り抜き
     privacy.rs            # 投稿加工の範囲（ぼかし・モザイク・絵文字のスタンプ）
+    color_match.rs        # 参考の写真に色を合わせる（Lab の平均と広がりを近づける。参考は色の情報だけを数値で持つ）
     background.rs         # 背景を消す（透明・色）・ぼかす・画像に置き換える（被写体のマスクで）
     collage.rs            # 並べて 1 枚に（並べ方・枠に合わせた切り抜き）
     sample.rs             # 計測用の画像
@@ -157,6 +158,7 @@ src/                      # 画面（TypeScript）
   textDialog.ts           # 「文字・透かし」のダイアログ（⌘T・「文字…」）
   textDrag.ts / textPoint.ts # 文字・ロゴの「自由」な位置をプレビューの上でドラッグする（と、割合の計算）
   lutControls.ts          # 「加工」タブの LUT（ファイルを選ぶ・外す・強さ）
+  colorMatchControls.ts   # 「加工」タブの色を合わせる（参考の写真を選ぶ・外す・強さ）
   output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）
   sizes.ts                # 複数の大きさで保存（選んだ大きさの覚え方・知らせの文。tests-ts/ で npm test）
   saveOptions.ts          # 保存の設定（JPEG・HEIC の品質・EXIF・GPS・ファイルの大きさの上限。localStorage に残す）

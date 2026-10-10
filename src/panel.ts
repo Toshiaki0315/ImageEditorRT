@@ -117,6 +117,10 @@ export class Panel {
     const lut = document.createElement("div");
     lut.id = "lut-extra";
     adjustPage.append(lut);
+    // 参考の写真に色を合わせる（colorMatchControls.ts が中身を作る）
+    const match = document.createElement("div");
+    match.id = "color-match-extra";
+    adjustPage.append(match);
     this.heading(adjustPage, "加工");
     // 今の写真から露出・コントラスト・色温度を求めてスライダーに入れる（旧版にはない。main.ts でつなぐ）
     const autoRow = document.createElement("div");
@@ -240,6 +244,7 @@ export class Panel {
   resetAdjustments() {
     this.settings.filter = "none";
     this.settings.lut = defaultSettings().lut;
+    this.settings.colorMatch = defaultSettings().colorMatch;
     for (const slider of [...STRENGTH, ...COLOR, ...DETAIL]) this.settings[slider.key] = slider.initial;
     this.settings.toneCurve = identityCurve();
     this.settings.hsl = neutralHsl();

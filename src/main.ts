@@ -39,6 +39,7 @@ import { Panel } from "./panel";
 import { PhotoControls } from "./photoControls";
 import { LocalPanel } from "./localPanel";
 import { LutControls } from "./lutControls";
+import { ColorMatchControls } from "./colorMatchControls";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
 import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
@@ -108,6 +109,9 @@ async function createParts() {
   parts.colorPanel = new ColorPanel($("color-extra"), settings, userChanged);
   parts.lutControls = new LutControls($("lut-extra"), settings, () => state.loaded !== null, userChanged);
   parts.lutControls.onError = (error) => void showError("LUT を読めません", error);
+  parts.colorMatchControls = new ColorMatchControls($("color-match-extra"), settings, () => state.loaded !== null, userChanged);
+  parts.colorMatchControls.extensions = () => state.extensions;
+  parts.colorMatchControls.onError = (error) => void showError("参考の写真を読めません", error);
   const ratios = await invoke<[AspectRatio, string][]>("aspect_ratios");
   const [frames, shapes] = await invoke<[[FrameKind, string][], [ShapeType, string][]]>("frame_shape_types");
   parts.crop = new CropController(

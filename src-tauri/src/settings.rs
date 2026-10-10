@@ -45,6 +45,24 @@ pub fn check_lut(path: String) -> Result<String, String> {
     imageeditorrt_core::lut::load_lut(&path).map(|lut| lut.title.clone())
 }
 
+/// 参考の写真の色の情報を測る（「色を合わせる…」。ファイルは覚えず、測った数値だけを設定に入れる）。
+#[tauri::command]
+pub async fn measure_reference(path: String) -> Result<imageeditorrt_core::color_match::ColorStats, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let name = std::path::Path::new(&path)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let loaded =
+            imageeditorrt_core::load::load_file(std::path::Path::new(&path)).map_err(|e| e.message(&name))?;
+        let image = loaded.decoded.image;
+        imageeditorrt_core::color_match::measure(&image)
+            .ok_or_else(|| "色を測れません（透明な画像です）".to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// 文字・透かしのフォントと位置の選択肢。
 #[tauri::command]
 pub fn text_options() -> (Choices<TextFont>, Choices<TextPosition>) {

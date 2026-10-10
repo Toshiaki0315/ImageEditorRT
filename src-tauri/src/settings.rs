@@ -39,6 +39,12 @@ pub fn frame_shape_types() -> (Choices<FrameType>, Choices<ShapeType>) {
     )
 }
 
+/// LUT（.cube）が読めるかを確かめる（読めれば TITLE、読めなければ理由）。
+#[tauri::command]
+pub fn check_lut(path: String) -> Result<String, String> {
+    imageeditorrt_core::lut::load_lut(&path).map(|lut| lut.title.clone())
+}
+
 /// 文字・透かしのフォントと位置の選択肢。
 #[tauri::command]
 pub fn text_options() -> (Choices<TextFont>, Choices<TextPosition>) {

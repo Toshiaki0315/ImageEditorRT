@@ -34,6 +34,7 @@ import { MENU, setMenuChecked } from "./menus";
 import { Panel } from "./panel";
 import { PhotoControls } from "./photoControls";
 import { LocalPanel } from "./localPanel";
+import { LutControls } from "./lutControls";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
 import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
@@ -97,6 +98,8 @@ async function createParts() {
   const filters = await invoke<[FilterType, string][]>("filter_types");
   parts.panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, userChanged);
   parts.colorPanel = new ColorPanel($("color-extra"), settings, userChanged);
+  parts.lutControls = new LutControls($("lut-extra"), settings, () => state.loaded !== null, userChanged);
+  parts.lutControls.onError = (error) => void showError("LUT を読めません", error);
   const ratios = await invoke<[AspectRatio, string][]>("aspect_ratios");
   const [frames, shapes] = await invoke<[[FrameKind, string][], [ShapeType, string][]]>("frame_shape_types");
   parts.crop = new CropController(

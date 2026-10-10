@@ -10,6 +10,7 @@ use crate::filters::FilterType;
 use crate::frames::FrameType;
 use crate::local::LocalAdjust;
 use crate::logo::LogoSettings;
+use crate::lut::LutSettings;
 use crate::privacy::Region;
 use crate::shapes::{self, ShapeType};
 use crate::text::TextSettings;
@@ -88,6 +89,8 @@ pub struct EditSettings {
     pub hsl: [HslAdjust; HSL_BANDS],
     /// ロゴの透かし（文字と同じく写真の上・フレームの余白に描く。旧版にはない）
     pub logo: LogoSettings,
+    /// LUT（.cube。テイストの後にかける。ファイルの場所で覚える。旧版にはない）
+    pub lut: LutSettings,
     /// 肌をなめらかに 0〜100（顔の枠が要るので、背景と同じくアプリ本体が元の画像に前もってかける。旧版にはない）
     pub skin_smooth: u32,
     /// 赤目の補正（肌をなめらかにと同じく、顔の枠を使って元の画像に前もってかける。旧版にはない）
@@ -132,6 +135,7 @@ impl Default for EditSettings {
             tone_curve: curve::identity_curve(),
             hsl: [HslAdjust::default(); HSL_BANDS],
             logo: LogoSettings::default(),
+            lut: LutSettings::default(),
             skin_smooth: 0,
             red_eye: false,
             local_adjustments: Vec::new(),

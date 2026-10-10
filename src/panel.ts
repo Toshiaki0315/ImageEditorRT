@@ -1,7 +1,7 @@
 // 設定のスライダー（「加工」「ジオラマ」タブ）。範囲・刻み・値の表示は旧版と同じ（FR-UI-21〜28・53・60）。
 
 import { identityCurve } from "./curve";
-import { type EditSettings, type FilterType, neutralHsl } from "./types";
+import { defaultSettings, type EditSettings, type FilterType, neutralHsl } from "./types";
 
 /** スライダーで変える数値の項目。 */
 type NumberKey = { [K in keyof EditSettings]: EditSettings[K] extends number ? K : never }[keyof EditSettings];
@@ -113,6 +113,10 @@ export class Panel {
     row.append(this.filter, galleryButton, presetButton, textButton);
     adjustPage.append(heading, row);
     this.build(adjustPage, STRENGTH);
+    // LUT（lutControls.ts が中身を作る）
+    const lut = document.createElement("div");
+    lut.id = "lut-extra";
+    adjustPage.append(lut);
     this.heading(adjustPage, "加工");
     // 今の写真から露出・コントラスト・色温度を求めてスライダーに入れる（旧版にはない。main.ts でつなぐ）
     const autoRow = document.createElement("div");
@@ -152,7 +156,7 @@ export class Panel {
     reset.type = "button";
     reset.className = "reset-adjustments";
     reset.textContent = "加工をリセット";
-    reset.title = "テイスト・色の調整（トーンカーブ・色ごとの調整を含む）・ディテールを既定値に戻します（切り抜き・サイズ・ジオラマはそのまま）";
+    reset.title = "テイスト・LUT・色の調整（トーンカーブ・色ごとの調整を含む）・ディテールを既定値に戻します（切り抜き・サイズ・ジオラマはそのまま）";
     reset.addEventListener("click", () => this.resetAdjustments());
     adjustPage.append(reset);
     this.heading(dioramaPage, "ジオラマ（ミニチュア風）");
@@ -235,6 +239,7 @@ export class Panel {
   /** テイスト・色の調整・ディテールを既定値に戻す（旧版 FR-UI-54。確認は出さない）。 */
   resetAdjustments() {
     this.settings.filter = "none";
+    this.settings.lut = defaultSettings().lut;
     for (const slider of [...STRENGTH, ...COLOR, ...DETAIL]) this.settings[slider.key] = slider.initial;
     this.settings.toneCurve = identityCurve();
     this.settings.hsl = neutralHsl();

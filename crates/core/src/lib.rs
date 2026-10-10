@@ -37,6 +37,7 @@ pub mod horizon;
 pub mod load;
 pub mod local;
 pub mod logo;
+pub mod lut;
 pub mod makernote;
 pub mod output;
 pub mod pillow;

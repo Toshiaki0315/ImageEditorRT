@@ -2,7 +2,7 @@
 //!
 //! 処理順（旧版 §5.1）: 回転・反転 →（水平の補正 → 投稿加工のぼかし・モザイク）→ トリミング → リサイズ → 露出 → 明るさ → コントラスト →
 //! 色温度 →（トーンカーブ → ハイライト／シャドウ）→ 彩度 →（色ごとの調整 → 部分補正） → ディテール（ノイズ除去 → ぼかし → シャープ） → ジオラマ →
-//! フィルター → 周辺減光 → 経年劣化 →（投稿加工のスタンプ）→ 文字（ロゴ・全体に繰り返す透かしも）。
+//! フィルター →（LUT）→ 周辺減光 → 経年劣化 →（投稿加工のスタンプ）→ 文字（ロゴ・全体に繰り返す透かしも）。
 //! 顔の枠・被写体のマスクが要る赤目・肌・背景は、ここより前に元の画像にかける（`prepare`）。
 //! フレーム・形（#13）は、トリミングの後の比への切り抜きと、経年劣化の後にここへ足す。
 
@@ -24,6 +24,7 @@ use crate::histogram::{compute_histogram, Histogram};
 use crate::local;
 use crate::logo;
 pub use crate::logo::LogoSettings;
+use crate::lut;
 use crate::privacy;
 use crate::shapes;
 pub use crate::shapes::ShapeType;
@@ -346,5 +347,7 @@ fn apply_diorama_and_filter(
     }
     // テイストのぼかしの半径は、旧版と同じく画像そのもの（プレビューでは表示している全体）の短辺に比例させる
     filters::apply_filter_with_strength(&mut image, settings.filter, settings.filter_strength);
+    // LUT はテイストの後（読めなければかけない）
+    lut::apply_settings(&mut image, &settings.lut);
     image
 }

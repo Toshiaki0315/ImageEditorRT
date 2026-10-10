@@ -28,6 +28,7 @@ export function settingsChanged() {
   // 出力の幅・高さは範囲・フレームなどで変わるので、先に合わせてからプレビューを描く
   parts.privacy?.show();
   parts.localPanel?.show();
+  parts.lutControls?.show();
   parts.photoControls?.show();
   parts.colorPanel?.show();
   void output.refresh().then(() => {

@@ -2,8 +2,10 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { dom, preview, state, tabs, zoomView } from "./app";
+import { straightenGrid } from "./guides";
 import { isCompareKey } from "./keys";
 import { MENU, setMenuChecked, updateMenus } from "./menus";
+import { svgElement } from "./overlay";
 import { readRawImage } from "./protocol";
 import { SPLIT_DEFAULT, splitClip, splitFraction } from "./split";
 import { showError } from "./status";
@@ -267,4 +269,39 @@ function drawGuide(guide: SVGSVGElement, result: DioramaGuide, target: HTMLCanva
     }
   }
   guide.toggleAttribute("hidden", false);
+}
+
+// --- 水平の補正の格子 ---------------------------------------------------------------
+
+/** スライダーを離してから格子を消すまでの時間 (ms) */
+const GRID_HOLD_MS = 1200;
+let gridTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * 水平の補正を動かしている間、プレビューに格子を重ねる（pressed の間は出したまま、離したら少しして消す）。
+ * 100% 表示の間は出さない。
+ */
+export function showStraightenGrid(pressed: boolean) {
+  clearTimeout(gridTimer);
+  const grid = dom.straightenGrid;
+  if (!state.loaded || zoomed || dom.canvas.hidden) {
+    grid.toggleAttribute("hidden", true);
+    return;
+  }
+  drawStraightenGrid();
+  grid.toggleAttribute("hidden", false);
+  if (!pressed) gridTimer = setTimeout(() => grid.toggleAttribute("hidden", true), GRID_HOLD_MS);
+}
+
+/** 格子を今の表示の大きさで描き直す（出しているときだけ。ウィンドウの大きさが変わったときなど）。 */
+export function drawStraightenGrid() {
+  const grid = dom.straightenGrid;
+  const [width, height] = [dom.canvas.clientWidth, dom.canvas.clientHeight];
+  grid.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  grid.replaceChildren();
+  for (const className of ["grid-shadow", "grid-line"]) {
+    for (const [x1, y1, x2, y2] of straightenGrid(width, height)) {
+      grid.append(svgElement("line", className, { x1, y1, x2, y2 }));
+    }
+  }
 }

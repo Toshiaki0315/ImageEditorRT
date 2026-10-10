@@ -46,7 +46,9 @@ import {
   placeBadge,
   setupCompare,
   setupSplit,
+  drawStraightenGrid,
   showActualSize,
+  showStraightenGrid,
   toggleSplit,
   updateGuide,
 } from "./view";
@@ -110,6 +112,7 @@ async function createParts() {
     () => output.rotate(),
   );
   parts.photoControls = new PhotoControls(settings, () => state.loaded !== null, userChanged);
+  parts.photoControls.onStraightenAdjust = showStraightenGrid;
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
   parts.localPanel = new LocalPanel($("local-extra"), settings, dom.canvas, orientedSize, userChanged);
@@ -163,6 +166,7 @@ function connectControls() {
     parts.crop.draw();
     parts.privacy.draw();
     parts.localPanel.draw();
+    if (!dom.straightenGrid.hasAttribute("hidden")) drawStraightenGrid();
     void updateGuide();
     placeBadge();
   };

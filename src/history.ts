@@ -74,6 +74,18 @@ export class History<T> {
     return this.present;
   }
 
+  /** 古い順のすべての状態と、今の状態の番号（履歴の一覧）。 */
+  entries(): { states: T[]; current: number } {
+    return { states: [...this.undos, this.present, ...[...this.redos].reverse()], current: this.undos.length };
+  }
+
+  /** index 番目（entries の番号）の状態に移って返す（元に戻す・やり直すを続けたのと同じ）。範囲の外なら今の状態。 */
+  goto(index: number): T {
+    while (index < this.undos.length && this.canUndo()) this.undo();
+    while (index > this.undos.length && this.canRedo()) this.redo();
+    return this.present;
+  }
+
   /** 履歴を消して、initial を今の状態にする。 */
   reset(initial: T) {
     this.undos.length = 0;
@@ -173,6 +185,26 @@ export class HistoryRecorder<T> {
     this.commit(true);
     if (!this.history.canRedo()) return false;
     this.apply(this.history.redo());
+    return true;
+  }
+
+  /** 履歴の一覧（積んでいない変更があれば先に積む）。 */
+  entries(): { states: T[]; current: number } {
+    if (this.pending) this.commit(true);
+    return this.history.entries();
+  }
+
+  /** 積んだ分だけの履歴の一覧（積んでいない変更は積まない。一覧を出し直すたびに積むと、ドラッグの途中も積んでしまうため）。 */
+  committedEntries(): { states: T[]; current: number } {
+    return this.history.entries();
+  }
+
+  /** index 番目の状態に戻す・進める。移ったら true。 */
+  goto(index: number): boolean {
+    this.commit(true);
+    const { current, states } = this.history.entries();
+    if (index === current || index < 0 || index >= states.length) return false;
+    this.apply(this.history.goto(index));
     return true;
   }
 

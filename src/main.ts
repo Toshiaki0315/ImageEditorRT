@@ -42,6 +42,7 @@ import { LutControls } from "./lutControls";
 import { MaskedPanel } from "./maskedPanel";
 import { MonoPanel } from "./monoPanel";
 import { Versions } from "./versions";
+import { HistoryPanel } from "./historyPanel";
 import { ColorMatchControls } from "./colorMatchControls";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
@@ -93,6 +94,7 @@ const menuActions: Record<string, () => void> = {
   [MENU.pasteLook]: () => void pasteLook(),
   [MENU.keepVersion]: () => state.loaded && !state.saving && parts.versions.keep(),
   [MENU.versions]: () => state.loaded && parts.versions.open(),
+  [MENU.historyList]: () => state.loaded && parts.historyPanel.open(),
   [MENU.actualSize]: () => showActualSize(),
   [MENU.fit]: fitToWindow,
   [MENU.split]: toggleSplit,
@@ -113,6 +115,7 @@ async function createParts() {
   parts.panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, userChanged);
   parts.colorPanel = new ColorPanel($("color-extra"), settings, userChanged);
   parts.versions = new Versions(snapshot, applySnapshot, notify);
+  parts.historyPanel = new HistoryPanel(() => parts.recorder);
   parts.monoPanel = new MonoPanel($("mono-extra"), settings, () => state.loaded !== null, userChanged);
   parts.lutControls = new LutControls($("lut-extra"), settings, () => state.loaded !== null, userChanged);
   parts.lutControls.onError = (error) => void showError("LUT を読めません", error);

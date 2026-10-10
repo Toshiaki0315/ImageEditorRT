@@ -169,3 +169,16 @@ test("reset で積んでいない変更も含めて消す", () => {
   advance(1000);
   assert.equal(recorder.canUndo(), false);
 });
+
+test("履歴の一覧から選んだ時点に移る（積んでいない変更も一覧に入る）", () => {
+  const { state, recorder, change } = setup();
+  change(1);
+  change(2); // まだ積んでいない
+  assert.deepEqual(recorder.entries(), { states: [0, 2], current: 1 });
+  assert.equal(recorder.goto(0), true);
+  assert.equal(state.value, 0);
+  assert.equal(recorder.canRedo(), true);
+  assert.equal(recorder.goto(0), false, "今の時点なら何もしない");
+  assert.equal(recorder.goto(1), true);
+  assert.equal(state.value, 2);
+});

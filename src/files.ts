@@ -56,6 +56,7 @@ export function showLoaded(info: OpenInfo, openNotes: string[]) {
   dom.resumeButton.hidden = true;
   parts.localPanel.reset();
   parts.versions.reset();
+  parts.historyPanel.close();
   output.reset(true);
   parts.textDialog.show();
   parts.textButton.disabled = parts.tasteButton.disabled = parts.autoButton.disabled = false;
@@ -535,6 +536,7 @@ export async function resetImage() {
   dom.resumeButton.hidden = true;
   parts.localPanel.reset();
   parts.versions.reset();
+  parts.historyPanel.close();
   output.reset(false);
   parts.textDialog.close();
   parts.textDialog.show();

@@ -12,6 +12,8 @@ pub const TAG_ORIENTATION: u16 = 0x0112;
 pub const TAG_IMAGE_DESCRIPTION: u16 = 0x010E;
 pub const TAG_ARTIST: u16 = 0x013B;
 pub const TAG_COPYRIGHT: u16 = 0x8298;
+/// TIFF の画像の色のプロファイル（ICC）
+pub const TAG_ICC_PROFILE: u16 = 0x8773;
 pub const TAG_EXIF_IFD: u16 = 0x8769;
 pub const TAG_GPS_IFD: u16 = 0x8825;
 pub const TAG_INTEROP_IFD: u16 = 0xA005;
@@ -278,6 +280,11 @@ impl ExifBlock {
         let mut data = text.as_bytes().to_vec();
         data.push(0);
         self.ifd0.insert(tag, Value { kind: ASCII, count: data.len() as u32, data });
+    }
+
+    /// IFD0 にバイト列の値（UNDEFINED 型）を設定する。
+    pub fn set_bytes(&mut self, tag: u16, data: &[u8]) {
+        self.ifd0.insert(tag, Value { kind: 7, count: data.len() as u32, data: data.to_vec() });
     }
 
     pub fn set_long(&mut self, in_exif: bool, tag: u16, value: u32) {

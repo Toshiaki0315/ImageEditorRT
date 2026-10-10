@@ -121,6 +121,15 @@ pub(crate) fn cg_image(image: &RgbaImage) -> Option<CFRetained<CGImage>> {
 
 /// RGBA の画像を CGImage にする（sRGB）。alpha が false なら不透明な画像として作る（アルファを持たない）。
 pub(crate) fn cg_image_with_alpha(image: &RgbaImage, alpha: bool) -> Option<CFRetained<CGImage>> {
+    cg_image_in(image, alpha, crate::color_space::ColorSpace::Srgb)
+}
+
+/// cg_image_with_alpha と同じ。画素の色空間は space。
+pub(crate) fn cg_image_in(
+    image: &RgbaImage,
+    alpha: bool,
+    space: crate::color_space::ColorSpace,
+) -> Option<CFRetained<CGImage>> {
     let (width, height) = (image.width() as usize, image.height() as usize);
     // CoreGraphics は乗算済みのアルファで持つので、色にアルファを掛けて渡す
     let mut pixels: Vec<u8> = image
@@ -135,7 +144,11 @@ pub(crate) fn cg_image_with_alpha(image: &RgbaImage, alpha: bool) -> Option<CFRe
         })
         .collect();
     // SAFETY: 定数の名前から色空間を作るだけ
-    let srgb = CGColorSpace::with_name(Some(unsafe { kCGColorSpaceSRGB }))?;
+    let name = match space {
+        crate::color_space::ColorSpace::Srgb => unsafe { kCGColorSpaceSRGB },
+        crate::color_space::ColorSpace::DisplayP3 => unsafe { objc2_core_graphics::kCGColorSpaceDisplayP3 },
+    };
+    let srgb = CGColorSpace::with_name(Some(name))?;
     // SAFETY: pixels は width * height * 4 バイトあり、画像を作り終えるまで生きている（画像は複製を持つ）
     let context: CFRetained<CGContext> = unsafe {
         CGBitmapContextCreate(

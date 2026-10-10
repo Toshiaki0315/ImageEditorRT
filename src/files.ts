@@ -25,6 +25,7 @@ import { notify, showError, updateStatus } from "./status";
 import { defaultSettings, type EditSettings, type OpenInfo } from "./types";
 import { fitToWindow, setComparing, stopSplit, updateGuide } from "./view";
 import { readStored, writeStored } from "./storage";
+import { setImageColorSpace } from "./colorSpace";
 
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
 const LOAD_ERROR_TITLE = "画像を読み込めません";
@@ -40,6 +41,7 @@ export function showLoaded(info: OpenInfo, openNotes: string[]) {
   setComparing(false);
   fitToWindow();
   state.loaded = info;
+  setImageColorSpace(info.colorSpace);
   state.savedSettings = null;
   dom.beforeButton.disabled = dom.resetButton.disabled = dom.saveButton.disabled = false;
   Object.assign(state.settings, defaultSettings());

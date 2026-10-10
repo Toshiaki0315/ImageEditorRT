@@ -141,7 +141,7 @@ pub async fn save_image(
             let original = opened.prepared(&opened.original, &settings);
             let edited = pipeline::apply_edits(&original, &settings).map_err(SaveFailure::other)?;
             let is_tiff = source.format == Some(Format::Tiff);
-            save::save_edited(&edited, &path, options, source.exif.as_deref(), is_tiff)
+            save::save_edited(&edited, &path, source.save_options(options), source.exif.as_deref(), is_tiff)
                 .map_err(SaveFailure::other)
         })
     })
@@ -161,10 +161,14 @@ pub async fn copy_image(settings: EditSettings, state: State<'_, AppState>) -> R
         save_pool().install(|| {
             let original = opened.prepared(&opened.original, &settings);
             let edited = pipeline::apply_edits(&original, &settings).map_err(|e| e.to_string())?;
-            let png = save::encode(&edited, save::SaveFormat::Png, save::DEFAULT_JPEG_QUALITY, None)
-                .map_err(|e| e.to_string())?;
-            let tiff = save::encode(&edited, save::SaveFormat::Tiff, save::DEFAULT_JPEG_QUALITY, None)
-                .map_err(|e| e.to_string())?;
+            // Display P3 の写真は、色のプロファイルを付けてコピーする
+            let space = opened.source.color_space;
+            let png =
+                save::encode_in(&edited, save::SaveFormat::Png, save::DEFAULT_JPEG_QUALITY, None, space)
+                    .map_err(|e| e.to_string())?;
+            let tiff =
+                save::encode_in(&edited, save::SaveFormat::Tiff, save::DEFAULT_JPEG_QUALITY, None, space)
+                    .map_err(|e| e.to_string())?;
             clipboard::write_image(&png, &tiff)?;
             Ok(edited.dimensions())
         })
@@ -209,9 +213,14 @@ pub async fn save_sizes(
                 .map(|(path, long_side)| {
                     let sized = pipeline::long_side_settings(original.dimensions(), &settings, long_side);
                     let edited = pipeline::apply_edits(&original, &sized).map_err(SaveFailure::other)?;
-                    let saved =
-                        save::save_edited(&edited, &path, options.clone(), source.exif.as_deref(), is_tiff)
-                            .map_err(SaveFailure::other)?;
+                    let saved = save::save_edited(
+                        &edited,
+                        &path,
+                        source.save_options(options.clone()),
+                        source.exif.as_deref(),
+                        is_tiff,
+                    )
+                    .map_err(SaveFailure::other)?;
                     Ok(SizedSaved { path: path.to_string_lossy().into_owned(), long_side, saved })
                 })
                 .collect()

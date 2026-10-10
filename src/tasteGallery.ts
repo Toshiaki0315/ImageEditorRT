@@ -4,6 +4,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { readImages, type RawImage } from "./protocol";
 import type { EditSettings, FilterType } from "./types";
+import { context2d, imageData } from "./colorSpace";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -59,7 +60,7 @@ export class TasteGallery {
     const canvas = document.createElement("canvas");
     canvas.width = image.width;
     canvas.height = image.height;
-    canvas.getContext("2d")!.putImageData(new ImageData(image.pixels, image.width, image.height), 0, 0);
+    context2d(canvas).putImageData(imageData(image.pixels, image.width, image.height), 0, 0);
     const name = document.createElement("span");
     name.textContent = label;
     button.append(canvas, name);

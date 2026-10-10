@@ -243,6 +243,8 @@ export type OpenInfo = {
   decodeMs: number;
   resizeMs: number;
   exif: ExifInfo;
+  /** 画素の色空間（Display P3 の写真はそのまま扱う） */
+  colorSpace?: "srgb" | "display_p3";
 };
 
 /** Rust の pipeline::DioramaGuide（線の位置は表示している画像に対する割合、と実線かどうか）。 */

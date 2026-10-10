@@ -9,6 +9,7 @@ use image::codecs::png::PngEncoder;
 use image::{ExtendedColorType, Frame, ImageEncoder, RgbaImage};
 use serde::{Deserialize, Serialize};
 
+use crate::color_space::{self, ColorSpace};
 use crate::formats::has_transparency;
 use crate::tiff::{
     tiff_block, ExifBlock, Order, TAG_ARTIST, TAG_COPYRIGHT, TAG_IMAGE_DESCRIPTION, TAG_ORIENTATION,
@@ -45,6 +46,9 @@ pub struct SaveOptions {
     pub fill: [u8; 3],
     /// EXIF に書く権利の情報（著作権・作者・説明。空なら元のまま。JPEG・PNG・TIFF・HEIC。旧版にはない）
     pub rights: ExifRights,
+    /// 画素の色空間（Display P3 なら色のプロファイルを付ける）。画面からは渡さず、開いた画像に合わせてアプリが決める
+    #[serde(skip)]
+    pub color_space: ColorSpace,
 }
 
 /// EXIF に書く権利の情報（Copyright・Artist・ImageDescription）。空の項目は書かない（元の値を残す）。
@@ -80,6 +84,7 @@ impl Default for SaveOptions {
             max_kb: None,
             fill: [255, 255, 255],
             rights: ExifRights::default(),
+            color_space: ColorSpace::Srgb,
         }
     }
 }
@@ -374,6 +379,28 @@ pub fn encode(
     quality: u8,
     exif: Option<&[u8]>,
 ) -> Result<Vec<u8>, SaveError> {
+    encode_in(image, format, quality, exif, ColorSpace::Srgb)
+}
+
+/// encode と同じ。画素の色空間が space（Display P3 なら色のプロファイルを付ける。付けられない GIF・BMP は
+/// sRGB に直す）。
+pub fn encode_in(
+    image: &RgbaImage,
+    format: SaveFormat,
+    quality: u8,
+    exif: Option<&[u8]>,
+    space: ColorSpace,
+) -> Result<Vec<u8>, SaveError> {
+    let icc = color_space::icc_profile(space);
+    let converted;
+    let image = if icc.is_some() && matches!(format, SaveFormat::Gif | SaveFormat::Bmp) {
+        let mut copy = image.clone();
+        color_space::p3_to_srgb(&mut copy);
+        converted = copy;
+        &converted
+    } else {
+        image
+    };
     if !(JPEG_QUALITY_MIN..=JPEG_QUALITY_MAX).contains(&quality) {
         return Err(SaveError::Quality(quality));
     }
@@ -396,9 +423,15 @@ pub fn encode(
             if let Some(exif) = exif {
                 out = crate::tiff::insert_exif_into_jpeg(&out, exif).unwrap_or(out);
             }
+            if let Some(icc) = icc {
+                out = color_space::insert_icc_into_jpeg(&out, icc).unwrap_or(out);
+            }
         }
         SaveFormat::Png => {
             let mut encoder = PngEncoder::new(&mut out);
+            if let Some(icc) = icc {
+                encoder.set_icc_profile(icc.to_vec()).map_err(|e| write_error(&e))?;
+            }
             if let Some(tiff) = exif.and_then(tiff_block) {
                 // PNG の eXIf には先頭の "Exif\0\0" を付けない
                 encoder.set_exif_metadata(tiff.to_vec()).map_err(|e| write_error(&e))?;
@@ -423,13 +456,17 @@ pub fn encode(
         SaveFormat::Heic => {
             #[cfg(target_os = "macos")]
             {
-                out = crate::heic::encode_heic(image, quality, exif).map_err(|e| write_error(&e))?;
+                out = crate::heic::encode_heic(image, quality, exif, space).map_err(|e| write_error(&e))?;
             }
             #[cfg(not(target_os = "macos"))]
             return Err(SaveError::Write("HEIC は macOS でだけ保存できます".into()));
         }
         SaveFormat::Tiff => {
-            let block = exif.and_then(ExifBlock::parse).unwrap_or_else(|| ExifBlock::empty(Order::Little));
+            let mut block =
+                exif.and_then(ExifBlock::parse).unwrap_or_else(|| ExifBlock::empty(Order::Little));
+            if let Some(icc) = icc {
+                block.set_bytes(crate::tiff::TAG_ICC_PROFILE, icc);
+            }
             out = if alpha {
                 block.to_tiff_image(width, height, 4, image.as_raw())
             } else {
@@ -467,7 +504,7 @@ pub fn save_edited(
     let encode_at = |image: &RgbaImage, quality: u8| {
         let source = source_exif.filter(|_| options.keep_exif);
         let exif = saved_exif(source, image.dimensions(), &options, keep_maker_note, source_is_tiff);
-        encode(image, format, quality, exif.as_deref())
+        encode_in(image, format, quality, exif.as_deref(), options.color_space)
     };
     let limit = options.max_kb.filter(|_| format.is_lossy()).map(|kb| u64::from(kb) * 1024);
     let (bytes, quality, size) = match limit {

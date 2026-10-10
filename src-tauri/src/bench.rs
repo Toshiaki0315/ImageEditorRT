@@ -21,7 +21,8 @@ pub async fn open_sample(state: State<'_, AppState>, window: WebviewWindow) -> R
     let prepared = blocking(|| {
         let start = Instant::now();
         let image = sample::synthetic_photo(SAMPLE_SIZE.0, SAMPLE_SIZE.1);
-        let decoded = decode::Decoded { image, format: Format::Png, frame_count: 1 };
+        let decoded =
+            decode::Decoded { image, format: Format::Png, frame_count: 1, color_space: Default::default() };
         Ok(prepare("計測用の画像".into(), decoded, elapsed_ms(start), ExifInfo::default(), Source::default()))
     })
     .await?;

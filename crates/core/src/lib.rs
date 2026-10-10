@@ -11,6 +11,7 @@ pub mod batch;
 pub mod blur;
 pub mod collage;
 pub mod color_match;
+pub mod color_space;
 pub mod crop;
 pub mod curve;
 #[cfg(target_os = "macos")]

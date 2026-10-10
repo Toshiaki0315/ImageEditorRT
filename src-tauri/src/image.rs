@@ -35,6 +35,7 @@ pub async fn open_path(
             exif: loaded.raw_exif,
             path: Some(path),
             pasted: false,
+            color_space: loaded.decoded.color_space,
         };
         Ok(prepare(name, loaded.decoded, decode_ms, loaded.exif, source))
     })
@@ -321,7 +322,8 @@ pub async fn make_collage(
             images.push(loaded.decoded.image);
         }
         let image = collage::make_collage(&images, &options);
-        let decoded = decode::Decoded { image, format: Format::Png, frame_count: 1 };
+        let decoded =
+            decode::Decoded { image, format: Format::Png, frame_count: 1, color_space: Default::default() };
         let exif = ExifInfo { empty: true, ..ExifInfo::default() };
         let source = Source { format: Some(Format::Png), pasted: true, ..Source::default() };
         Ok(prepare(collage::COLLAGE_NAME.into(), decoded, elapsed_ms(start), exif, source))

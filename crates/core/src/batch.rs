@@ -391,7 +391,9 @@ pub fn process_image_at(
     );
     std::fs::create_dir_all(out_dir).map_err(|e| format!("保存先のフォルダを作れません（{e}）"))?;
     let is_tiff = decoded.format == Format::Tiff;
-    save::save_edited(&edited, &path, options.save_options(), loaded.raw_exif.as_deref(), is_tiff)
+    // Display P3 の写真は、色のプロファイルを付けて保存する
+    let save_options = save::SaveOptions { color_space: decoded.color_space, ..options.save_options() };
+    save::save_edited(&edited, &path, save_options, loaded.raw_exif.as_deref(), is_tiff)
         .map_err(|e| e.to_string())?;
     Ok(path)
 }

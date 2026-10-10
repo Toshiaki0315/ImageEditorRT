@@ -108,8 +108,14 @@ async fn write_edited(
             let original = opened.prepared(&opened.original, &settings);
             let edited = pipeline::apply_edits(&original, &settings).map_err(|e| e.to_string())?;
             let is_tiff = source.format == Some(imageeditorrt_core::formats::Format::Tiff);
-            save::save_edited(&edited, &written, options, source.exif.as_deref(), is_tiff)
-                .map_err(|e| e.to_string())?;
+            save::save_edited(
+                &edited,
+                &written,
+                source.save_options(options),
+                source.exif.as_deref(),
+                is_tiff,
+            )
+            .map_err(|e| e.to_string())?;
             Ok(())
         })
     })

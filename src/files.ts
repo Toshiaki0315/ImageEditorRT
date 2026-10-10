@@ -251,12 +251,18 @@ async function openClipboardImage() {
 
 type SaveFailure = { kind: "sameFile" | "extension" | "other"; message: string };
 
+/** 保存の名前の書き方と出力の大きさ（保存ダイアログの初期の名前に使う）。 */
+function naming() {
+  const [width, height] = output.size();
+  return { template: saveOptions.fileName(), width, height };
+}
+
 /** 保存: ダイアログで保存先を選び、原寸で処理して書き出す（処理は Rust の別のスレッド）。 */
 export async function saveDialog() {
   const { loaded } = state;
   if (!loaded || state.saving) return;
   const stamp = pasteStamp(new Date());
-  const defaultPath = (await invoke<string | null>("default_save_path", { stamp })) ?? `${loaded.name}_edited.png`;
+  const defaultPath = (await invoke<string | null>("default_save_path", { stamp, naming: naming() })) ?? `${loaded.name}_edited.png`;
   // 元の画像と同じファイルが選ばれたら、知らせてダイアログを開き直す（旧版 FR-IO-11）
   for (;;) {
     const path = await save({
@@ -284,7 +290,7 @@ export async function saveSizesDialog() {
     return;
   }
   const stamp = pasteStamp(new Date());
-  const defaultPath = (await invoke<string | null>("default_save_path", { stamp })) ?? `${loaded.name}_edited.jpg`;
+  const defaultPath = (await invoke<string | null>("default_save_path", { stamp, naming: naming() })) ?? `${loaded.name}_edited.jpg`;
   for (;;) {
     const path = await save({
       title: "複数の大きさで保存（名前の後ろに長辺を付けます）",

@@ -136,6 +136,7 @@ export const saveOptions = new SaveOptionsPanel({
     artist: $<HTMLInputElement>("rights-artist"),
     description: $<HTMLInputElement>("rights-description"),
   },
+  fileName: $<HTMLInputElement>("file-name-template"),
 });
 
 function extensionOf(path: string): string {

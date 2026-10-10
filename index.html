@@ -152,6 +152,9 @@
             <input id="limit-mb" type="number" min="0.05" max="100" step="0.1" /> MB 以下にする（JPEG・HEIC）</label
           >
           <label class="row">透過を塗る色 <input id="fill-color" type="color" title="透過を持てない JPEG・BMP で保存するとき、透明な部分をこの色で塗ります" /></label>
+          <h2>ファイル名</h2>
+          <label class="row text-row">ファイル名 <input id="file-name-template" type="text" placeholder="{名前}_edited" title="保存ダイアログの初期の名前と、まとめて処理の「ファイル名の書き方」に使います" /></label>
+          <p class="note">差し込み: {名前}（元のファイル名）・{撮影日}（20261011）・{撮影時刻}（1423）・{連番}（001）・{幅}・{高さ}（出力の大きさ）。撮影日がなければ空になります。同じ名前があれば _2 などを付けて上書きしません。</p>
           <h2>権利の情報</h2>
           <label class="row text-row">著作権 <input id="rights-copyright" type="text" placeholder="例: © 2026 名前" title="保存するとき EXIF の Copyright に書きます（空なら元のまま）" /></label>
           <label class="row text-row">作者 <input id="rights-artist" type="text" title="保存するとき EXIF の Artist に書きます（空なら元のまま）" /></label>
@@ -293,6 +296,7 @@
               <option value="original">元の名前</option>
               <option value="with_date">元の名前＋撮影日</option>
               <option value="sequence">連番</option>
+              <option value="template">ファイル名の書き方（「出力」タブ）</option>
             </select>
             <input type="text" id="batch-prefix" placeholder="写真" title="連番の前に付ける名前（写真_001 …）" disabled />
           </span>
@@ -418,7 +422,7 @@
             <dt>切り抜き</dt>
             <dd>比を選んでプレビューをドラッグ（三分割・黄金比・対角線のガイドも出せる）。「おまかせ」で目立つ被写体に合わせた範囲に。回転・反転・水平の補正（動かしている間は格子が出る。傾きの自動補正も）・遠近の補正（見上げた建物のすぼまった縦の線をまっすぐに）・背景を消す／ぼかす／画像に置き換える・フレーム・形（角丸・円）</dd>
             <dt>出力</dt>
-            <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限・JPEG で透過を塗る色・EXIF に書く著作権・作者・説明（空なら元のまま）</dd>
+            <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限・JPEG で透過を塗る色・EXIF に書く著作権・作者・説明（空なら元のまま）・ファイル名の書き方（{名前}_{撮影日} など。保存の初期の名前・まとめて処理に使う）</dd>
             <dt>ジオラマ</dt>
             <dd>ミニチュア風。ピントの帯のガイドがプレビューに出る</dd>
             <dt>投稿加工</dt>

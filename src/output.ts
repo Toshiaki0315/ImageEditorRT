@@ -80,6 +80,11 @@ export class OutputSize {
     return Math.max(this.state.width, this.state.height);
   }
 
+  /** 出力の幅・高さ（フレームは含まない。ファイル名の {幅}・{高さ}）。 */
+  size(): [number, number] {
+    return [this.state.width, this.state.height];
+  }
+
   /** 履歴に積む状態。手で変えていなければ幅・高さはトリミング後の大きさに従うので持たない。 */
   snapshot(): SizeState {
     return sizeSnapshot(this.state);

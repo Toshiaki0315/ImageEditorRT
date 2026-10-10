@@ -87,6 +87,8 @@ pub enum OutputNaming {
     WithDate,
     /// 連番（prefix_001、prefix_002 …。一覧の順）
     Sequence { prefix: String },
+    /// ファイル名の書き方（`naming::render`。「出力」タブの設定）
+    Template { template: String },
 }
 
 /// 連番の名前が空のときの名前。
@@ -101,10 +103,21 @@ pub fn named_output_path(
     format: OutputFormat,
     index: usize,
     date: Option<&crate::exif_info::CaptureDate>,
+    size: (u32, u32),
 ) -> PathBuf {
     let stem = source.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
     let base = match naming {
         OutputNaming::Original => return output_path_as(source, out_dir, &format.suffix(source)),
+        OutputNaming::Template { template } => {
+            let context = crate::naming::NameContext { stem: &stem, date, number: index + 1, size };
+            return crate::naming::template_path(
+                template,
+                &context,
+                out_dir,
+                &format.suffix(source),
+                Some(source),
+            );
+        }
         OutputNaming::WithDate => match date {
             Some(d) => format!("{stem}_{}{:02}{:02}", d.year, d.month, d.day),
             None => stem,
@@ -367,7 +380,15 @@ pub fn process_image_at(
         }
     }
     let edited = crate::pipeline::apply_edits(&image, &settings).map_err(|e| e.to_string())?;
-    let path = named_output_path(source, out_dir, &options.naming, options.format, index, date.as_ref());
+    let path = named_output_path(
+        source,
+        out_dir,
+        &options.naming,
+        options.format,
+        index,
+        date.as_ref(),
+        edited.dimensions(),
+    );
     std::fs::create_dir_all(out_dir).map_err(|e| format!("保存先のフォルダを作れません（{e}）"))?;
     let is_tiff = decoded.format == Format::Tiff;
     save::save_edited(&edited, &path, options.save_options(), loaded.raw_exif.as_deref(), is_tiff)

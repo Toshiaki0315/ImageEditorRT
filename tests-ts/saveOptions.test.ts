@@ -12,6 +12,7 @@ const DEFAULT = {
   limitMb: 1,
   fill: [255, 255, 255],
   rights: { copyright: "", artist: "", description: "" },
+  fileName: "{名前}_edited",
 };
 
 test("覚えておいた設定がなければ・壊れていれば既定値", () => {
@@ -50,6 +51,11 @@ test("透過を塗る色は 0〜255 の整数 3 つだけ読み、Rust にその
     description: "",
   });
   assert.deepEqual(parseStored({ rights: "x" }).rights, DEFAULT.rights);
+  // ファイル名の書き方は文字だけ。空なら既定。Rust に渡す保存の設定には入れない
+  assert.equal(parseStored({ fileName: "{撮影日}_{名前}" }).fileName, "{撮影日}_{名前}");
+  assert.equal(parseStored({ fileName: "  " }).fileName, "{名前}_edited");
+  assert.equal(parseStored({ fileName: 3 }).fileName, "{名前}_edited");
+  assert.ok(!("fileName" in toSaveOptions(parseStored({ fileName: "x" }))));
   assert.deepEqual(toSaveOptions(parseStored({ rights: { artist: "B" } })).rights.artist, "B");
   assert.equal(toHex([0, 128, 255]), "#0080ff");
   assert.deepEqual(fromHex("#0080ff"), [0, 128, 255]);

@@ -1721,6 +1721,7 @@ version = "0.9.8"
 dependencies = [
  "image",
  "imageeditorrt-core",
+ "objc2",
  "objc2-app-kit",
  "objc2-foundation",
  "rayon",

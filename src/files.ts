@@ -347,6 +347,25 @@ export async function copyImage() {
   }
 }
 
+/** 加工後の画像（原寸。保存の設定に従う）を、macOS の共有の一覧（AirDrop・メッセージ・メールなど）に渡す。 */
+export async function shareImage() {
+  if (!state.loaded || state.saving) return;
+  // 一覧はプレビューの上の真ん中に出す（ウィンドウの左上からの px）
+  const rect = dom.canvas.getBoundingClientRect();
+  const at = [rect.left + rect.width / 2, Math.max(rect.top, 0) + 8];
+  setSaving(true);
+  void updateStatus("共有の準備中…");
+  try {
+    await invoke("share_image", { settings: structuredClone(state.settings), options: saveOptions.value(), at });
+    void updateStatus();
+  } catch (error) {
+    void updateStatus();
+    await showError("共有できません", error);
+  } finally {
+    setSaving(false);
+  }
+}
+
 /** 最後に保存したファイルを Finder で表示する（ファイルを選んだ状態でフォルダを開く）。 */
 export async function revealSaved() {
   if (state.savedPaths.length === 0) return;

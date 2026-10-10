@@ -12,6 +12,7 @@ export const MENU = {
   batch: "batch",
   saveSizes: "save-sizes",
   revealSaved: "reveal-saved",
+  share: "share",
   collage: "collage",
   undo: "undo",
   redo: "redo",
@@ -49,6 +50,7 @@ export function updateMenus() {
   setMenuEnabled(MENU.redo, editable && (parts.recorder?.canRedo() ?? false));
   setMenuEnabled(MENU.copyLook, state.loaded !== null);
   setMenuEnabled(MENU.copyImage, state.loaded !== null && !state.saving);
+  setMenuEnabled(MENU.share, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.pasteLook, editable && state.copiedLook !== null);
   setMenuEnabled(MENU.actualSize, state.loaded !== null && !isZoomed());
   setMenuEnabled(MENU.fit, isZoomed());

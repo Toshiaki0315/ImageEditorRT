@@ -9,6 +9,7 @@ mod bench;
 #[cfg(target_os = "macos")]
 mod clipboard;
 mod diagnostics;
+mod edits;
 mod image;
 mod menu;
 mod open;
@@ -46,6 +47,7 @@ pub fn run() {
         .manage(presets::PresetStore::default())
         .manage(batch::BatchState::default())
         .manage(recent::RecentStore::default())
+        .manage(edits::EditsStore::default())
         .manage(open::Pending::from_args(std::env::args_os().skip(1)))
         .menu(menu::build)
         .on_menu_event(menu::on_event)
@@ -71,6 +73,8 @@ pub fn run() {
             image::auto_straighten,
             image::auto_crop,
             image::neighbor_image,
+            edits::remember_edits,
+            edits::recall_edits,
             image::auto_adjust,
             image::prepare_background,
             image::prepare_faces,

@@ -26,6 +26,7 @@ import {
   copyImage,
   openNeighbor,
   printImage,
+  resumeEdits,
   saveSizesDialog,
   shareImage,
   setupDrop,
@@ -162,6 +163,7 @@ function connectControls() {
   dom.resetButton.addEventListener("click", () => void resetImage());
   dom.saveButton.addEventListener("click", () => void saveDialog());
   dom.revealButton.addEventListener("click", () => void revealSaved());
+  dom.resumeButton.addEventListener("click", () => void resumeEdits());
   const presetButton = $<HTMLButtonElement>("preset-button");
   presetButton.addEventListener("click", () =>
     showPresetMenu(presetButton).catch((error) => showError("プリセットのメニューを出せません", error)),

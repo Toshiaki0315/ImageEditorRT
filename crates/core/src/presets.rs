@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::color_match::ColorMatch;
 use crate::curve::{self, HslAdjust, HSL_BANDS};
 use crate::diorama::DioramaDirection;
 use crate::filters::FilterType;
@@ -85,6 +86,9 @@ pub struct Preset {
     /// LUT（旧版にはない。ファイルの場所で覚える）。LUT がなければファイルに書かない
     #[serde(skip_serializing_if = "LutSettings::is_empty")]
     pub lut: LutSettings,
+    /// 参考の写真に色を合わせる（旧版にはない。参考の色の情報を数値で覚える）。参考がなければファイルに書かない
+    #[serde(skip_serializing_if = "no_color_match")]
+    pub color_match: ColorMatch,
     /// 肌をなめらかに（旧版にはない）。0 以外のときだけファイルに書く
     #[serde(skip_serializing_if = "is_zero_u32")]
     pub skin_smooth: u32,
@@ -99,6 +103,10 @@ fn is_false(value: &bool) -> bool {
 
 fn is_zero_u32(value: &u32) -> bool {
     *value == 0
+}
+
+fn no_color_match(value: &ColorMatch) -> bool {
+    value.reference.is_none()
 }
 
 fn is_identity_curve(points: &Vec<[u8; 2]>) -> bool {
@@ -141,6 +149,7 @@ impl Preset {
             hsl: s.hsl,
             logo: s.logo.clone(),
             lut: s.lut.clone(),
+            color_match: s.color_match,
             skin_smooth: s.skin_smooth,
             red_eye: s.red_eye,
         }
@@ -176,6 +185,7 @@ impl Preset {
             hsl: self.hsl,
             logo: self.logo.clone(),
             lut: self.lut.clone(),
+            color_match: self.color_match,
             skin_smooth: self.skin_smooth,
             red_eye: self.red_eye,
             ..settings.clone()
@@ -480,6 +490,10 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
                 p.lut = enum_value::<LutSettings>(raw)
                     .map(|l| LutSettings { strength: l.strength.min(100), ..l })?
             }
+            "color_match" => {
+                p.color_match = enum_value::<ColorMatch>(raw)
+                    .map(|m| ColorMatch { strength: m.strength.min(100), ..m })?
+            }
             "skin_smooth" => p.skin_smooth = int_value::<u32>(number()?)?.min(100),
             "red_eye" => p.red_eye = raw.as_bool()?,
             "exposure" => p.exposure = python_float(raw)?,
@@ -688,6 +702,21 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
         assert_eq!(set.apply(&EditSettings::default()).logo, set.logo);
+    }
+
+    #[test]
+    fn color_match_is_written_only_when_set() {
+        use crate::color_match::ColorStats;
+        let plain = Preset::from_settings("A", &EditSettings::default());
+        assert!(!presets_json(std::slice::from_ref(&plain)).contains("color_match"));
+        let reference = ColorStats { mean: [55.0, 4.0, 12.5], std: [21.0, 3.0, 7.0] };
+        let set = Preset { color_match: ColorMatch { reference: Some(reference), strength: 60 }, ..plain };
+        let text = presets_json(std::slice::from_ref(&set));
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
+        assert_eq!(set.apply(&EditSettings::default()).color_match, set.color_match);
+        let strong = serde_json::json!({"name": "B", "color_match": {"reference": null, "strength": 300}});
+        assert_eq!(preset_from_value(&strong).unwrap().color_match.strength, 100);
     }
 
     #[test]

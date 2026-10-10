@@ -29,6 +29,7 @@ export function settingsChanged() {
   parts.privacy?.show();
   parts.localPanel?.show();
   parts.lutControls?.show();
+  parts.colorMatchControls?.show();
   parts.textDrag?.draw();
   parts.photoControls?.show();
   parts.colorPanel?.show();

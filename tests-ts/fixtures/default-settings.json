@@ -115,6 +115,10 @@
     "path": "",
     "strength": 100
   },
+  "colorMatch": {
+    "reference": null,
+    "strength": 100
+  },
   "skinSmooth": 0,
   "redEye": false,
   "localAdjustments": []

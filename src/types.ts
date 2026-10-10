@@ -87,6 +87,8 @@ export type EditSettings = {
   logo: LogoSettings;
   /** LUT（.cube。path が空ならなし。テイストの後にかける） */
   lut: LutSettings;
+  /** 参考の写真に色を合わせる（参考の色の情報は数値で持つ。色の調整のはじめにかける） */
+  colorMatch: ColorMatch;
   /** 肌をなめらかに 0〜100（見つけた顔のまわりだけ） */
   skinSmooth: number;
   /** 赤目の補正（見つけた顔の目のあたりだけ） */
@@ -107,6 +109,12 @@ export type LocalAdjust = {
   saturation: number;
   feather: number;
 };
+
+/** 色の情報（Rust の color_match::ColorStats。Lab の平均と標準偏差）。 */
+export type ColorStats = { mean: [number, number, number]; std: [number, number, number] };
+
+/** 色を合わせる設定（Rust の color_match::ColorMatch）。reference がなければかけない。strength は %。 */
+export type ColorMatch = { reference: ColorStats | null; strength: number };
 
 /** LUT（Rust の lut::LutSettings）。strength は %。 */
 export type LutSettings = { path: string; strength: number };
@@ -191,6 +199,7 @@ export function defaultSettings(): EditSettings {
     hsl: neutralHsl(),
     logo: { path: "", position: "bottom_right", size: 15, opacity: 80 },
     lut: { path: "", strength: 100 },
+    colorMatch: { reference: null, strength: 100 },
     skinSmooth: 0,
     redEye: false,
     localAdjustments: [],

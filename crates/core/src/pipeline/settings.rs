@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::adjust;
 use crate::background::Background;
+use crate::color_match::ColorMatch;
 use crate::curve::{self, HslAdjust, HSL_BANDS};
 use crate::diorama::{DioramaDirection, DioramaSettings};
 use crate::filters::FilterType;
@@ -99,6 +100,8 @@ pub struct EditSettings {
     pub logo: LogoSettings,
     /// LUT（.cube。テイストの後にかける。ファイルの場所で覚える。旧版にはない）
     pub lut: LutSettings,
+    /// 参考の写真に色を合わせる（参考の色の情報は数値で持つ。色の調整のはじめにかける。旧版にはない）
+    pub color_match: ColorMatch,
     /// 肌をなめらかに 0〜100（顔の枠が要るので、背景と同じくアプリ本体が元の画像に前もってかける。旧版にはない）
     pub skin_smooth: u32,
     /// 赤目の補正（肌をなめらかにと同じく、顔の枠を使って元の画像に前もってかける。旧版にはない）
@@ -148,6 +151,7 @@ impl Default for EditSettings {
             hsl: [HslAdjust::default(); HSL_BANDS],
             logo: LogoSettings::default(),
             lut: LutSettings::default(),
+            color_match: ColorMatch::default(),
             skin_smooth: 0,
             red_eye: false,
             local_adjustments: Vec::new(),

@@ -289,9 +289,10 @@ fn apply_local_adjustments(
     })
 }
 
-/// フィルターの前にかける基本補正（露出 → 明るさ → コントラスト → 色温度 → トーンカーブ → ハイライト／シャドウ →
+/// フィルターの前にかける基本補正（参考の写真に色を合わせる → 露出 → 明るさ → コントラスト → 色温度 → トーンカーブ → ハイライト／シャドウ →
 /// 彩度 → 色ごとの調整）。露出〜トーンカーブは 1 つの変換表にまとめて 1 回でかける。
 fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> RgbaImage {
+    crate::color_match::apply_color_match(&mut image, &settings.color_match);
     let mut lut: Lut = adjust::identity_lut();
     if settings.exposure != 0.0 {
         lut = adjust::compose(&lut, &adjust::exposure_lut(settings.exposure));

@@ -100,6 +100,7 @@ pub fn run() {
             settings::frame_shape_types,
             settings::text_options,
             settings::check_lut,
+            settings::measure_reference,
             settings::aspect_ratios,
             settings::effective_crop,
             settings::crop_drag,

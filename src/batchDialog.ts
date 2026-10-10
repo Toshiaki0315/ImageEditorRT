@@ -44,6 +44,8 @@ export class BatchDialog {
   private readonly progressBar = $<HTMLProgressElement>("batch-progress-bar");
   private readonly cancel = $<HTMLButtonElement>("batch-cancel");
   private readonly sizePreset = $<HTMLSelectElement>("batch-size-preset");
+  /** 「出力」タブのファイル名の書き方（保存名を「ファイル名の書き方」にしたとき使う） */
+  fileName: () => string = () => "{名前}_edited";
   private readonly removeGps = $<HTMLInputElement>("batch-remove-gps");
   private readonly faces = $<HTMLInputElement>("batch-faces");
   private readonly text = $<HTMLInputElement>("batch-text");
@@ -143,7 +145,9 @@ export class BatchDialog {
         naming:
           this.naming.value === "sequence"
             ? { kind: "sequence", prefix: this.prefix.value }
-            : { kind: this.naming.value },
+            : this.naming.value === "template"
+              ? { kind: "template", template: this.fileName() }
+              : { kind: this.naming.value },
         format: this.format.value,
         autoCrop: parseAutoCrop(this.autoCrop.value),
       });

@@ -22,8 +22,11 @@ export type Rights = { copyright: string; artist: string; description: string };
 
 const RIGHTS_KEYS = ["copyright", "artist", "description"] as const;
 
-/** 画面で持つ設定（上限を外しても、入れた MB は覚えておく）。 */
-export type Stored = Omit<SaveOptions, "maxKb"> & { limit: boolean; limitMb: number };
+/** 画面で持つ設定（上限を外しても、入れた MB は覚えておく）。fileName は保存の名前の書き方（Rust には保存の設定として渡さない）。 */
+export type Stored = Omit<SaveOptions, "maxKb"> & { limit: boolean; limitMb: number; fileName: string };
+
+/** 保存の名前の既定の書き方（Rust の naming::DEFAULT_TEMPLATE と同じ） */
+export const DEFAULT_FILE_NAME = "{名前}_edited";
 
 const DEFAULT_OPTIONS: Stored = {
   quality: 90,
@@ -33,6 +36,7 @@ const DEFAULT_OPTIONS: Stored = {
   limitMb: 1,
   fill: [255, 255, 255],
   rights: { copyright: "", artist: "", description: "" },
+  fileName: DEFAULT_FILE_NAME,
 };
 
 /** 色を色の欄の値（#rrggbb）にする。 */
@@ -58,6 +62,8 @@ export type SaveOptionsFields = {
   fill: HTMLInputElement;
   /** 著作権・作者・説明の欄 */
   rights: Record<keyof Rights, HTMLInputElement>;
+  /** 保存の名前の書き方の欄 */
+  fileName: HTMLInputElement;
 };
 
 export class SaveOptionsPanel {
@@ -71,6 +77,7 @@ export class SaveOptionsPanel {
   private readonly limitMb: HTMLInputElement;
   private readonly fill: HTMLInputElement;
   private readonly rights: Record<keyof Rights, HTMLInputElement>;
+  private readonly fileNameInput: HTMLInputElement;
 
   constructor(fields: SaveOptionsFields) {
     ({
@@ -83,7 +90,11 @@ export class SaveOptionsPanel {
       limitMb: this.limitMb,
       fill: this.fill,
       rights: this.rights,
+      fileName: this.fileNameInput,
     } = fields);
+    this.fileNameInput.addEventListener("change", () =>
+      this.update({ fileName: this.fileNameInput.value.trim() || DEFAULT_FILE_NAME }),
+    );
     const { quality, keepExif, keepGps, removeGps, limit, limitMb } = fields;
     this.options = load();
     quality.addEventListener("input", () => this.update({ quality: Number(quality.value) }));
@@ -103,6 +114,11 @@ export class SaveOptionsPanel {
       else this.show();
     });
     this.show();
+  }
+
+  /** 保存の名前の書き方。 */
+  fileName(): string {
+    return this.options.fileName;
   }
 
   /** 今の保存の設定。 */
@@ -130,12 +146,13 @@ export class SaveOptionsPanel {
     this.limitMb.disabled = !this.options.limit;
     this.fill.value = toHex(this.options.fill);
     for (const key of RIGHTS_KEYS) this.rights[key].value = this.options.rights[key];
+    this.fileNameInput.value = this.options.fileName;
   }
 }
 
 /** 画面で持つ設定を、Rust に渡す保存の設定にする（上限は KB、外していれば null）。 */
 export function toSaveOptions(stored: Stored): SaveOptions {
-  const { limit, limitMb, ...rest } = stored;
+  const { limit, limitMb, fileName: _fileName, ...rest } = stored;
   return { ...rest, maxKb: limit ? Math.max(1, Math.round(limitMb * 1024)) : null };
 }
 
@@ -154,6 +171,7 @@ export function parseStored(saved: unknown): Stored {
     limitMb: limitMb >= LIMIT_MIN_MB && limitMb <= LIMIT_MAX_MB ? limitMb : DEFAULT_OPTIONS.limitMb,
     fill: isColor(s.fill) ? s.fill : DEFAULT_OPTIONS.fill,
     rights: parseRights(s.rights),
+    fileName: typeof s.fileName === "string" && s.fileName.trim() ? s.fileName : DEFAULT_FILE_NAME,
   };
 }
 

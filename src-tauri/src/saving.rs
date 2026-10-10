@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use imageeditorrt_core::formats::Format;
 use imageeditorrt_core::pipeline::{self, EditSettings};
 use imageeditorrt_core::save::{self, SaveError, SaveOptions, SAME_FILE_MESSAGE};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 #[cfg(target_os = "macos")]
@@ -17,22 +17,61 @@ use crate::state::{AppState, Source};
 ///
 /// 貼り付けた画像は `~/ピクチャ/クリップボード_<stamp>.png`（stamp は画面が渡す今の日時）。
 /// どちらでもなければ None（計測用の画像など）。
+/// 保存の名前の書き方と、保存する画像の大きさ（画面の「ファイル名」の設定）。
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NameRequest {
+    template: String,
+    width: u32,
+    height: u32,
+}
+
 #[tauri::command]
-pub fn default_save_path(stamp: String, state: State<'_, AppState>) -> Result<Option<String>, String> {
+pub fn default_save_path(
+    stamp: String,
+    naming: Option<NameRequest>,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
     let loaded = state.0.lock().map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
     let pictures = clipboard::pictures_or_home();
     #[cfg(not(target_os = "macos"))]
     let pictures = None;
-    let path = initial_save_path(&loaded.source, &stamp, pictures.as_deref());
+    let path = initial_save_path(&loaded.source, &stamp, pictures.as_deref(), naming.as_ref());
     Ok(path.map(|p| p.to_string_lossy().into_owned()))
 }
 
 /// 保存ダイアログの初期のパス: 元のファイルがあれば `<元の名前>_edited`、貼り付けた画像なら
 /// pictures（ピクチャ、なければホーム）の `クリップボード_<stamp>.png`、どちらでもなければ None。
-fn initial_save_path(source: &Source, stamp: &str, pictures: Option<&Path>) -> Option<PathBuf> {
+/// naming があれば、元のファイルの名前はその書き方で決める（撮影日は元の EXIF から）。
+fn initial_save_path(
+    source: &Source,
+    stamp: &str,
+    pictures: Option<&Path>,
+    naming: Option<&NameRequest>,
+) -> Option<PathBuf> {
     match (&source.path, source.pasted) {
-        (Some(path), _) => Some(save::default_save_path(path)),
+        (Some(path), _) => Some(match naming {
+            Some(request) => {
+                let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+                let date = source.exif.as_deref().and_then(imageeditorrt_core::exif_info::capture_date);
+                let context = imageeditorrt_core::naming::NameContext {
+                    stem: &stem,
+                    date: date.as_ref(),
+                    number: 1,
+                    size: (request.width, request.height),
+                };
+                let folder = path.parent().unwrap_or(Path::new("."));
+                imageeditorrt_core::naming::template_path(
+                    &request.template,
+                    &context,
+                    folder,
+                    &save::save_suffix(path),
+                    Some(path),
+                )
+            }
+            None => save::default_save_path(path),
+        }),
         (None, true) => pictures.map(|folder| save::pasted_save_path(stamp, folder)),
         (None, false) => None,
     }
@@ -210,20 +249,27 @@ mod tests {
         std::fs::write(&photo, b"x").unwrap();
         let from_file = Source { path: Some(photo.clone()), ..Source::default() };
         assert_eq!(
-            initial_save_path(&from_file, "20261004-120000", Some(&dir)),
+            initial_save_path(&from_file, "20261004-120000", Some(&dir), None),
             Some(dir.join("photo_edited.JPG"))
         );
         std::fs::write(dir.join("photo_edited.JPG"), b"x").unwrap();
-        assert_eq!(initial_save_path(&from_file, "s", None), Some(dir.join("photo_edited_2.JPG")));
+        assert_eq!(initial_save_path(&from_file, "s", None, None), Some(dir.join("photo_edited_2.JPG")));
         // 貼り付けた画像はピクチャ（なければホーム）の クリップボード_<日時>.png
         let pasted = Source { pasted: true, ..Source::default() };
         assert_eq!(
-            initial_save_path(&pasted, "20261004-120000", Some(&dir)),
+            initial_save_path(&pasted, "20261004-120000", Some(&dir), None),
             Some(dir.join("クリップボード_20261004-120000.png"))
         );
-        assert_eq!(initial_save_path(&pasted, "s", None), None);
+        assert_eq!(initial_save_path(&pasted, "s", None, None), None);
+        // 書き方があれば、それで名前を決める（大きさ・連番は 1）
+        let request =
+            NameRequest { template: "{名前}_{幅}x{高さ}_{連番}".into(), width: 1080, height: 720 };
+        assert_eq!(
+            initial_save_path(&from_file, "s", None, Some(&request)),
+            Some(dir.join("photo_1080x720_001.JPG"))
+        );
         // 計測用の画像など、どちらでもなければ None（画面が名前を決める）
-        assert_eq!(initial_save_path(&Source::default(), "s", Some(&dir)), None);
+        assert_eq!(initial_save_path(&Source::default(), "s", Some(&dir), None), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

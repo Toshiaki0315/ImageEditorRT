@@ -248,38 +248,52 @@ fn naming_with_date_and_sequence() {
     let date = CaptureDate { year: 2026, month: 10, day: 9, hour: 8, minute: 0 };
     let with_date = OutputNaming::WithDate;
     assert_eq!(
-        named_output_path(&source, &out, &with_date, OutputFormat::Original, 0, Some(&date)),
+        named_output_path(&source, &out, &with_date, OutputFormat::Original, 0, Some(&date), (10, 10)),
         out.join("IMG_0001_20261009.JPG")
     );
     // 撮影日がなければ元の名前。重なれば _2
     assert_eq!(
-        named_output_path(&source, &out, &with_date, OutputFormat::Original, 0, None),
+        named_output_path(&source, &out, &with_date, OutputFormat::Original, 0, None, (10, 10)),
         out.join("IMG_0001.JPG")
     );
     touch(&out.join("IMG_0001_20261009.JPG"));
     assert_eq!(
-        named_output_path(&source, &out, &with_date, OutputFormat::Original, 0, Some(&date)),
+        named_output_path(&source, &out, &with_date, OutputFormat::Original, 0, Some(&date), (10, 10)),
         out.join("IMG_0001_20261009_2.JPG")
     );
     // 連番（一覧の順に 001 から。空なら「写真」、/ と : は _）
     let trip = OutputNaming::Sequence { prefix: " 旅行/京都 ".into() };
     assert_eq!(
-        named_output_path(&source, &out, &trip, OutputFormat::Original, 0, None),
+        named_output_path(&source, &out, &trip, OutputFormat::Original, 0, None, (10, 10)),
         out.join("旅行_京都_001.JPG")
     );
     assert_eq!(
-        named_output_path(&source, &out, &trip, OutputFormat::Original, 11, None),
+        named_output_path(&source, &out, &trip, OutputFormat::Original, 11, None, (10, 10)),
         out.join("旅行_京都_012.JPG")
     );
     let empty = OutputNaming::Sequence { prefix: "".into() };
     assert_eq!(
-        named_output_path(&dir.join("in/a.heic"), &out, &empty, OutputFormat::Original, 2, None),
+        named_output_path(&dir.join("in/a.heic"), &out, &empty, OutputFormat::Original, 2, None, (10, 10)),
         out.join("写真_003.heic")
     );
     // 元の名前は今までどおり
     assert_eq!(
-        named_output_path(&source, &out, &OutputNaming::Original, OutputFormat::Original, 5, Some(&date)),
+        named_output_path(
+            &source,
+            &out,
+            &OutputNaming::Original,
+            OutputFormat::Original,
+            5,
+            Some(&date),
+            (10, 10)
+        ),
         output_path(&source, &out)
+    );
+    // ファイル名の書き方（撮影日・連番・大きさ）
+    let template = OutputNaming::Template { template: "{撮影日}_{連番}_{幅}".into() };
+    assert_eq!(
+        named_output_path(&source, &out, &template, OutputFormat::Heic, 1, Some(&date), (1080, 720)),
+        out.join("20261009_002_1080.heic")
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }
@@ -292,7 +306,7 @@ fn output_format_changes_the_suffix() {
     touch(&source);
     let out = dir.join("out");
     let original = OutputNaming::Original;
-    let path = |format| named_output_path(&source, &out, &original, format, 0, None);
+    let path = |format| named_output_path(&source, &out, &original, format, 0, None, (10, 10));
     assert_eq!(path(OutputFormat::Original), out.join("IMG_0001.JPG"));
     assert_eq!(path(OutputFormat::Heic), out.join("IMG_0001.heic"));
     // 同じ名前があれば _edited（形式を変えても上書きしない）
@@ -300,7 +314,7 @@ fn output_format_changes_the_suffix() {
     assert_eq!(path(OutputFormat::Heic), out.join("IMG_0001_edited.heic"));
     let trip = OutputNaming::Sequence { prefix: "旅行".into() };
     assert_eq!(
-        named_output_path(&dir.join("in/b.png"), &out, &trip, OutputFormat::Jpeg, 0, None),
+        named_output_path(&dir.join("in/b.png"), &out, &trip, OutputFormat::Jpeg, 0, None, (10, 10)),
         out.join("旅行_001.jpg")
     );
     std::fs::remove_dir_all(&dir).unwrap();

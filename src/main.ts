@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { $, dom, histogramView, hooks, output, parts, preview, state, tabs, zoomView } from "./app";
+import { $, dom, histogramView, hooks, output, parts, preview, saveOptions, state, tabs, zoomView } from "./app";
 import { BatchDialog } from "./batchDialog";
 import { CollageDialog } from "./collageDialog";
 import { bench, benchSave, verdict } from "./bench";
@@ -155,6 +155,7 @@ async function createParts() {
   parts.tasteButton = $<HTMLButtonElement>("taste-button");
   parts.autoButton = $<HTMLButtonElement>("auto-adjust");
   parts.batchDialog = new BatchDialog(state.extensions);
+  parts.batchDialog.fileName = () => saveOptions.fileName();
   parts.collageDialog = new CollageDialog(state.extensions);
   setupHistory();
   setupAssist();

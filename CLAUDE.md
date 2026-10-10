@@ -96,6 +96,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     logo.rs               # ロゴの透かし（画像ファイルを文字と同じ位置の決め方で重ねる）
     encode.rs             # JPEG への書き出し（プレビューの計測用）
     heic.rs               # HEIC での書き出し（ImageIO。EXIF は ImageIO のプロパティにして渡す。macOS のみ）
+    naming.rs             # 保存のファイル名の書き方（{名前}・{撮影日} などを差し込み、重ならない名前にする）
     save.rs               # 保存（形式・名前の決め方・元の画像への上書きの防止・EXIF を残す・著作権などを書く）
     exif_info.rs          # EXIF・GPS・MakerNote を表示用に読む
     exifread_note.rs      # 主なメーカーの MakerNote を exifread と同じに読む（表は exifread_tables.rs、自動生成）

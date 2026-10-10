@@ -70,6 +70,17 @@ pub fn open_map(latitude: f64, longitude: f64) -> Result<(), String> {
     Ok(())
 }
 
+/// 保存したファイルを Finder で表示する（ファイルを選んだ状態でフォルダを開く。ないファイルは飛ばす）。
+#[tauri::command]
+pub fn reveal_in_finder(paths: Vec<String>) -> Result<(), String> {
+    let existing: Vec<&String> = paths.iter().filter(|p| std::path::Path::new(p).exists()).collect();
+    if existing.is_empty() {
+        return Err("保存したファイルが見つかりません（移動・削除されたかもしれません）".into());
+    }
+    std::process::Command::new("/usr/bin/open").arg("-R").args(existing).status().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

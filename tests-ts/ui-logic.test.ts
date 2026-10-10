@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { histogramPeak } from "../src/histogram.ts";
-import { isCompareKey } from "../src/keys.ts";
+import { isCompareKey, isEscapeKey } from "../src/keys.ts";
 import { longSideState, SIZE_PRESETS, sizeSnapshot } from "../src/output.ts";
 import { readImages, readPreview, readRawImage } from "../src/protocol.ts";
 import { centeredOffset, clampOffset } from "../src/zoom.ts";
@@ -91,4 +91,11 @@ test("よく使う大きさ: 横長なら幅、縦長なら高さを長辺にし
   const portrait = { ...landscape, width: 2000, height: 3000 };
   assert.deepEqual(longSideState(portrait, 1600), { width: 2000, height: 1600, edited: true, last: "height", keepAspect: true });
   assert.ok(SIZE_PRESETS.every(([, px]) => Number.isInteger(px) && px > 0));
+});
+
+test("範囲の指定を解除する Esc キー（日本語の変換中の Esc は含めない）", () => {
+  assert.equal(isEscapeKey({ key: "Escape", isComposing: false }), true);
+  assert.equal(isEscapeKey({ key: "Escape", isComposing: true }), false);
+  assert.equal(isEscapeKey({ key: "Esc", isComposing: false }), false);
+  assert.equal(isEscapeKey({ key: "Enter", isComposing: false }), false);
 });

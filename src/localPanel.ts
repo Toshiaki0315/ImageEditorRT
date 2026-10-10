@@ -151,6 +151,22 @@ export class LocalPanel {
     this.show();
   }
 
+  /**
+   * Esc キー: 押している「円を足す」「帯を足す」をやめる。押していなければ、選んでいる（青い線の）範囲を取り消す
+   * （「範囲を削除」と同じ。元に戻せる。ほかの範囲はそのまま）。ドラッグの途中ならドラッグもやめる。どちらもなければ false。
+   */
+  cancel(): boolean {
+    this.drag = null;
+    if (this.tool !== null) {
+      this.tool = null;
+      this.show();
+      return true;
+    }
+    if (this.selected === null) return false;
+    this.remove();
+    return true;
+  }
+
   /** 画像を開いた・閉じたとき（選んでいる範囲・道具をなくす）。 */
   reset() {
     this.selected = null;

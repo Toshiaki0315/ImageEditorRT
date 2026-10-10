@@ -265,6 +265,18 @@
             </select>
             <input type="text" id="batch-prefix" placeholder="写真" title="連番の前に付ける名前（写真_001 …）" disabled />
           </span>
+          <span>切り抜き</span>
+          <span class="batch-resize">
+            <select id="batch-auto-crop" title="1 枚ごとに目立つ被写体を見つけて、選んだ比でその被写体が中央寄りに入るよう切り抜きます（処理はこの Mac の中だけ）">
+              <option value="">しない</option>
+              <option value="square">おまかせ 1:1</option>
+              <option value="ratio5x4:portrait">おまかせ 4:5（縦）</option>
+              <option value="ratio4x3">おまかせ 4:3</option>
+              <option value="ratio3x2">おまかせ 3:2</option>
+              <option value="ratio16x9">おまかせ 16:9</option>
+              <option value="ratio16x9:portrait">おまかせ 9:16（縦）</option>
+            </select>
+          </span>
           <span>形式</span>
           <span class="batch-resize">
             <select id="batch-format">
@@ -365,7 +377,7 @@
             <li>ウィンドウにドロップ・⌘O・⌘V（クリップボードの画像・Finder でコピーしたファイル）・「ファイル &gt; 最近使った項目」で開く。RAW も開ける</li>
             <li>⌘S で保存（元の画像には上書きしない）。保存した後はステータスバーの「Finder で表示」で保存先を開ける。保存していない変更があるまま閉じると確かめる</li>
             <li>「ファイル &gt; 複数の大きさで保存…」で Instagram・X などの大きさを続けて保存（名前に _1080 などを付ける）</li>
-            <li>「ファイル &gt; まとめて処理…」で複数の画像に同じ加工。「並べて 1 枚に…」で 2〜4 枚を並べる</li>
+            <li>「ファイル &gt; まとめて処理…」で複数の画像に同じ加工（おまかせ切り抜きで、1 枚ごとに被写体に合わせて同じ比に切り抜くことも）。「並べて 1 枚に…」で 2〜4 枚を並べる</li>
           </ul>
           <h3>タブ</h3>
           <dl>

@@ -2,7 +2,7 @@
 //!
 //! かける加工はプリセットと同じ組み合わせ（テイスト・色の調整・ディテール・ジオラマ・フレーム・形・
 //! 文字）と、選べば投稿加工（位置情報を消す・顔や文字を見つけて隠す）。トリミング範囲と回転・反転は画像ごとに違うのでかけない（フレーム・円のときは各画像の
-//! 中央をその比で切り抜く）。元の画像は変えない。
+//! 中央をその比で切り抜く）。選べば、1 枚ごとに目立つ被写体に合わせて切り抜く（おまかせ切り抜き）。元の画像は変えない。
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -14,7 +14,7 @@ use crate::pipeline::{effective_crop, EditSettings};
 use crate::presets::Preset;
 use crate::privacy::{Region, RegionKind};
 use crate::save::{self, SaveOptions};
-use crate::transform::{SizeError, MAX_SIZE, MIN_SIZE};
+use crate::transform::{AspectRatio, CropRect, SizeError, MAX_SIZE, MIN_SIZE};
 
 /// 一括処理の設定。long_side を指定すると、写真の長辺をその px にリサイズする（フレームはその外側に付く）。
 #[derive(Clone, Debug, PartialEq)]
@@ -28,6 +28,29 @@ pub struct BatchOptions {
     pub naming: OutputNaming,
     /// 保存する形式（旧版にはない）
     pub format: OutputFormat,
+    /// おまかせ切り抜き（1 枚ごとに目立つ被写体に合わせて、この比で切り抜く。None なら切り抜かない。旧版にはない）
+    pub auto_crop: Option<BatchAutoCrop>,
+}
+
+/// まとめて処理のおまかせ切り抜きの比。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchAutoCrop {
+    pub ratio: AspectRatio,
+    /// 縦向き（4:5・9:16 など）
+    pub portrait: bool,
+}
+
+impl BatchAutoCrop {
+    /// 範囲に保たせる比の指定（フレーム・円があればそちらの比を使う。画面のおまかせ切り抜きと同じ）。
+    pub fn choice(self, settings: &EditSettings) -> crate::crop::AspectChoice {
+        crate::crop::AspectChoice {
+            ratio: self.ratio,
+            portrait: self.portrait,
+            frame: settings.frame,
+            shape: settings.shape,
+        }
+    }
 }
 
 /// まとめて処理で保存する形式。
@@ -174,6 +197,19 @@ pub fn privacy_regions(image: &image::RgbaImage, privacy: &BatchPrivacy) -> Resu
         .collect())
 }
 
+/// おまかせ切り抜きの範囲: 縮めた画像で目立つ部分を探し、その比で被写体が中央寄りに入る範囲（画面と同じ計算）。
+/// 見つからなければ、画像の中央をその比で切り抜く（比が自由なら切り抜かない）。
+#[cfg(target_os = "macos")]
+pub fn auto_crop_rect(
+    image: &image::RgbaImage,
+    choice: crate::crop::AspectChoice,
+) -> Result<Option<CropRect>, String> {
+    let size = image.dimensions();
+    let (small, factor) = crate::pipeline::make_preview(image, crate::pipeline::PREVIEW_MAX_SIDE);
+    let found = crate::saliency::auto_crop(&small, factor, size, choice)?;
+    Ok(found.or_else(|| crate::crop::fit_to_aspect(Some(CropRect::whole(size)), choice, size)))
+}
+
 /// 1 枚分の結果。成功なら保存先、失敗なら理由。
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -185,13 +221,22 @@ pub struct BatchResult {
 
 /// image_size（回転・反転する前、向きは読み込み時に直してある）の画像にかける設定（加工と、長辺の指定からリサイズ）。
 pub fn batch_settings(options: &BatchOptions, image_size: (u32, u32)) -> Result<EditSettings, SizeError> {
-    let settings = options.look.apply(&EditSettings::default());
+    batch_settings_with_crop(options, image_size, None)
+}
+
+/// batch_settings と同じ。crop（おまかせ切り抜きの範囲）があれば、その範囲で切り抜き、長辺もその向きで決める。
+pub fn batch_settings_with_crop(
+    options: &BatchOptions,
+    image_size: (u32, u32),
+    crop: Option<CropRect>,
+) -> Result<EditSettings, SizeError> {
+    let settings = EditSettings { crop, ..options.look.apply(&EditSettings::default()) };
     let Some(long_side) = options.long_side else { return Ok(settings) };
     if !(MIN_SIZE..=MAX_SIZE).contains(&long_side) {
         return Err(SizeError { name: "長辺", value: long_side });
     }
-    // フレーム・円の比に合わせて切り抜いた後の写真の向きで、長辺を決める
-    let (width, height) = effective_crop(image_size, None, settings.frame, settings.shape)
+    // 切り抜いた後（フレーム・円の比に合わせた範囲を含む）の写真の向きで、長辺を決める
+    let (width, height) = effective_crop(image_size, crop, settings.frame, settings.shape)
         .map_or(image_size, |r| (r.width as u32, r.height as u32));
     Ok(if width >= height {
         EditSettings { width: Some(long_side), ..settings }
@@ -276,7 +321,15 @@ pub fn process_image_at(
 
     let loaded = crate::load::load_file(source).map_err(|e| e.to_string())?;
     let decoded = loaded.decoded;
-    let mut settings = batch_settings(options, decoded.image.dimensions()).map_err(|e| e.to_string())?;
+    let crop = match options.auto_crop {
+        Some(auto) => {
+            let look = options.look.apply(&EditSettings::default());
+            auto_crop_rect(&decoded.image, auto.choice(&look))?
+        }
+        None => None,
+    };
+    let mut settings =
+        batch_settings_with_crop(options, decoded.image.dimensions(), crop).map_err(|e| e.to_string())?;
     settings.regions = privacy_regions(&decoded.image, &options.privacy)?;
     // 文字の {日付}・{日時} は写真ごとの撮影日時にする
     let date = loaded.raw_exif.as_deref().and_then(crate::exif_info::capture_date);

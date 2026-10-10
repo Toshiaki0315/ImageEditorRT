@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use image::{Rgba, RgbaImage};
 use imageeditorrt_core::batch::{
-    batch_settings, collect_images, output_path, run_batch, summary, BatchOptions, BatchPrivacy,
-    OutputFormat, OutputNaming,
+    batch_settings, batch_settings_with_crop, collect_images, output_path, run_batch, summary, BatchOptions,
+    BatchPrivacy, OutputFormat, OutputNaming,
 };
 use imageeditorrt_core::frames::FrameType;
 use imageeditorrt_core::pipeline::EditSettings;
@@ -34,6 +34,7 @@ fn options(look: Preset, long_side: Option<u32>) -> BatchOptions {
         privacy: BatchPrivacy::default(),
         naming: OutputNaming::default(),
         format: OutputFormat::default(),
+        auto_crop: None,
     }
 }
 
@@ -326,5 +327,45 @@ fn batch_can_save_as_heic() {
     // EXIF（機種）は残る
     let info = read_exif_info(&bytes);
     assert!(info.entries.iter().any(|e| e.tag == "Make" && e.value == "Canon"), "{:?}", info.entries);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn long_side_follows_the_auto_crop() {
+    use imageeditorrt_core::transform::CropRect;
+    // 横長の写真を縦長（4:5）に切り抜けば、長辺は高さ
+    let crop = Some(CropRect::new(1000, 0, 2400, 3000));
+    let settings = batch_settings_with_crop(&options(plain(), Some(1350)), (4000, 3000), crop).unwrap();
+    assert_eq!((settings.crop, settings.width, settings.height), (crop, None, Some(1350)));
+    // 切り抜かなければ今までどおり
+    assert_eq!(
+        batch_settings_with_crop(&options(plain(), Some(800)), (4000, 3000), None).unwrap().width,
+        Some(800)
+    );
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn auto_crop_cuts_each_photo_to_the_ratio() {
+    use imageeditorrt_core::batch::{process_image, BatchAutoCrop};
+    use imageeditorrt_core::transform::AspectRatio;
+    let dir = temp_dir("autocrop");
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/face.jpg");
+    let square = BatchOptions {
+        auto_crop: Some(BatchAutoCrop { ratio: AspectRatio::Square, portrait: false }),
+        format: OutputFormat::default(),
+        ..options(plain(), None)
+    };
+    match process_image(&source, &dir.join("out"), &square) {
+        Ok(out) => {
+            let (w, h) = image::open(out).unwrap().to_rgba8().dimensions();
+            // 256×320 の写真から、いちばん大きい正方形（256×256）
+            assert_eq!((w, h), (256, 256));
+        }
+        Err(e) if e.contains("inference context") => {
+            eprintln!("この環境では目立つ部分を探せないので飛ばす: {e}")
+        }
+        Err(e) => panic!("{e}"),
+    }
     std::fs::remove_dir_all(&dir).unwrap();
 }

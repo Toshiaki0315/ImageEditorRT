@@ -59,6 +59,9 @@ pub struct Preset {
     pub highlights: i32,
     #[serde(skip_serializing_if = "is_zero")]
     pub shadows: i32,
+    /// かすみの除去（旧版にはない）。ファイルには 0 以外のときだけ書く
+    #[serde(skip_serializing_if = "is_zero")]
+    pub dehaze: i32,
     pub temperature: u32,
     pub saturation: i32,
     pub vignette: u32,
@@ -128,6 +131,7 @@ impl Preset {
             brightness: s.brightness,
             contrast: s.contrast,
             highlights: s.highlights,
+            dehaze: s.dehaze,
             shadows: s.shadows,
             temperature: s.temperature,
             saturation: s.saturation,
@@ -164,6 +168,7 @@ impl Preset {
             brightness: self.brightness,
             contrast: self.contrast,
             highlights: self.highlights,
+            dehaze: self.dehaze,
             shadows: self.shadows,
             temperature: self.temperature,
             saturation: self.saturation,
@@ -500,6 +505,7 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
             "brightness" => p.brightness = int_value(number()?)?,
             "contrast" => p.contrast = int_value(number()?)?,
             "highlights" => p.highlights = int_value::<i32>(number()?)?.clamp(-100, 100),
+            "dehaze" => p.dehaze = int_value::<i32>(number()?)?.clamp(-100, 100),
             "shadows" => p.shadows = int_value::<i32>(number()?)?.clamp(-100, 100),
             "temperature" => p.temperature = int_value(number()?)?,
             "saturation" => p.saturation = int_value(number()?)?,

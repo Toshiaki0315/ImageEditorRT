@@ -56,6 +56,8 @@ export type EditSettings = {
   /** ハイライト・シャドウ -100〜100（明部・暗部だけを明るく・暗くする） */
   highlights: number;
   shadows: number;
+  /** かすみの除去 -100〜100（負でかすみを足す） */
+  dehaze: number;
   exposure: number;
   sharpen: number;
   blur: number;
@@ -174,6 +176,7 @@ export function defaultSettings(): EditSettings {
     contrast: 0,
     highlights: 0,
     shadows: 0,
+    dehaze: 0,
     exposure: 0,
     sharpen: 0,
     blur: 0,

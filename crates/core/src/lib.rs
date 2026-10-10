@@ -15,6 +15,7 @@ pub mod crop;
 pub mod curve;
 #[cfg(target_os = "macos")]
 pub mod decode;
+pub mod dehaze;
 pub mod diorama;
 pub mod effects;
 pub mod encode;

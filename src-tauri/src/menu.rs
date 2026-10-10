@@ -68,8 +68,9 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let recent = SubmenuBuilder::with_id(app, crate::recent::MENU_ID, "最近使った項目").build()?;
     let save = MenuItemBuilder::with_id(SAVE, "保存…").accelerator("CmdOrCtrl+S").build(app)?;
     let save_sizes = MenuItemBuilder::with_id(SAVE_SIZES, "複数の大きさで保存…").build(app)?;
-    let reveal_saved =
-        MenuItemBuilder::with_id(REVEAL_SAVED, "保存したファイルを Finder で表示").enabled(false).build(app)?;
+    let reveal_saved = MenuItemBuilder::with_id(REVEAL_SAVED, "保存したファイルを Finder で表示")
+        .enabled(false)
+        .build(app)?;
     let batch = MenuItemBuilder::with_id(BATCH, "まとめて処理…").build(app)?;
     let collage = MenuItemBuilder::with_id(COLLAGE, "並べて 1 枚に…").build(app)?;
     let file = SubmenuBuilder::new(app, "ファイル")

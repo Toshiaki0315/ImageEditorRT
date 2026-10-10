@@ -77,7 +77,11 @@ pub fn reveal_in_finder(paths: Vec<String>) -> Result<(), String> {
     if existing.is_empty() {
         return Err("保存したファイルが見つかりません（移動・削除されたかもしれません）".into());
     }
-    std::process::Command::new("/usr/bin/open").arg("-R").args(existing).status().map_err(|e| e.to_string())?;
+    std::process::Command::new("/usr/bin/open")
+        .arg("-R")
+        .args(existing)
+        .status()
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 

@@ -14,6 +14,7 @@ import type { PhotoControls } from "./photoControls";
 import { Preview } from "./preview";
 import type { LocalPanel } from "./localPanel";
 import type { LutControls } from "./lutControls";
+import type { TextDrag } from "./textDrag";
 import type { PrivacyPanel } from "./privacy";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
@@ -93,6 +94,7 @@ export const parts = {} as {
   privacy: PrivacyPanel;
   localPanel: LocalPanel;
   lutControls: LutControls;
+  textDrag: TextDrag;
   batchDialog: BatchDialog;
   collageDialog: CollageDialog;
 };

@@ -28,11 +28,20 @@ pub struct LogoSettings {
     pub size: f32,
     /// 不透明度（%）
     pub opacity: u32,
+    /// 位置が「自由」のときの、ロゴの中心（写真の幅・高さに対する割合。旧版にはない）
+    #[serde(skip_serializing_if = "crate::text::is_default_point")]
+    pub point: [f32; 2],
 }
 
 impl Default for LogoSettings {
     fn default() -> Self {
-        Self { path: String::new(), position: TextPosition::BottomRight, size: 15.0, opacity: 80 }
+        Self {
+            path: String::new(),
+            position: TextPosition::BottomRight,
+            size: 15.0,
+            opacity: 80,
+            point: crate::text::FREE_POINT_DEFAULT,
+        }
     }
 }
 
@@ -98,7 +107,13 @@ pub fn draw_logo(
             p[3] = ((u32::from(p[3]) * opacity + 50) / 100) as u8;
         }
     }
-    let (ax, ay) = settings.position.anchor();
+    let (ax, ay) = if settings.position == TextPosition::Free {
+        let free =
+            |point, length, content: u32| crate::text::free_anchor(point, length, margin, f64::from(content));
+        (free(settings.point[0], width, size.0), free(settings.point[1], height, size.1))
+    } else {
+        settings.position.anchor()
+    };
     let x = left as f64 + margin + (width - 2.0 * margin - f64::from(size.0)) * ax;
     let y = top as f64 + margin + (height - 2.0 * margin - f64::from(size.1)) * ay;
     imageops::overlay(image, &scaled, x.round() as i64, y.round() as i64);
@@ -136,9 +151,32 @@ mod tests {
     }
 
     #[test]
+    fn free_position_puts_the_logo_center_on_the_point() {
+        let path = logo_file("free");
+        let mut image = RgbaImage::from_pixel(400, 200, Rgba([0, 0, 0, 255]));
+        let logo = LogoSettings {
+            path,
+            position: TextPosition::Free,
+            size: 20.0,
+            opacity: 100,
+            point: [0.75, 0.25],
+        };
+        draw_logo(&mut image, &logo, None, None);
+        // ロゴ（40×20 → 長辺 40px、赤い部分は真ん中の 20px）の中心が (300, 50)
+        let (l, t, r, b) = red_box(&image).unwrap();
+        assert!(((l + r) / 2).abs_diff(300) <= 2 && ((t + b) / 2).abs_diff(50) <= 2, "{:?}", (l, t, r, b));
+    }
+
+    #[test]
     fn logo_is_placed_by_position_and_size() {
         let path = logo_file("place");
-        let settings = LogoSettings { path, position: TextPosition::BottomRight, size: 20.0, opacity: 100 };
+        let settings = LogoSettings {
+            path,
+            position: TextPosition::BottomRight,
+            size: 20.0,
+            opacity: 100,
+            ..LogoSettings::default()
+        };
         let mut image = RgbaImage::from_pixel(400, 200, Rgba([0, 0, 255, 255]));
         draw_logo(&mut image, &settings, None, None);
         // 短辺 200 の 20% = 長辺 40px（40 × 20）、余白は 3% = 6px → 右下 (354, 174) から。赤い部分はその中央の 20px
@@ -165,7 +203,13 @@ mod tests {
         let mut image = RgbaImage::from_pixel(400, 200, Rgba([0, 0, 0, 255]));
         draw_logo(
             &mut image,
-            &LogoSettings { path, position: TextPosition::Center, size: 20.0, opacity: 50 },
+            &LogoSettings {
+                path,
+                position: TextPosition::Center,
+                size: 20.0,
+                opacity: 50,
+                ..LogoSettings::default()
+            },
             None,
             None,
         );

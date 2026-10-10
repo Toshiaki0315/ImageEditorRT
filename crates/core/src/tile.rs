@@ -257,6 +257,7 @@ mod tests {
             position: TextPosition::Tiled,
             size: 10.0,
             opacity: 100,
+            ..LogoSettings::default()
         };
         draw_tiled_logo(&mut image, &logo);
         let red = |x: u32, y: u32| {
@@ -346,6 +347,7 @@ mod tests {
                     position: TextPosition::Tiled,
                     size: logo_size,
                     opacity: 70,
+                    ..LogoSettings::default()
                 };
                 assert_eq!(logo_stamp(size, &logo), full_logo_stamp(size, &logo), "{size:?} {logo_size}");
             }

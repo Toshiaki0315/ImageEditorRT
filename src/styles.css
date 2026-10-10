@@ -191,6 +191,15 @@ button:disabled {
   stroke-width: 2;
 }
 
+/* 文字・ロゴの中心の印（ドラッグで動かす） */
+.text-overlay {
+  cursor: move;
+}
+
+.text-overlay circle {
+  fill: none;
+}
+
 /* 部分補正の帯の終わりの線（ここで効かなくなる） */
 .local-overlay .dashed {
   stroke-dasharray: 6 4;

@@ -152,6 +152,7 @@ src/                      # 画面（TypeScript）
   tasteGallery.ts         # テイストの一覧（見本を並べて選ぶ）
   collageDialog.ts        # 並べて 1 枚に のダイアログ
   textDialog.ts           # 「文字・透かし」のダイアログ（⌘T・「文字…」）
+  textDrag.ts / textPoint.ts # 文字・ロゴの「自由」な位置をプレビューの上でドラッグする（と、割合の計算）
   lutControls.ts          # 「加工」タブの LUT（ファイルを選ぶ・外す・強さ）
   output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）
   sizes.ts                # 複数の大きさで保存（選んだ大きさの覚え方・知らせの文。tests-ts/ で npm test）

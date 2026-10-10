@@ -415,7 +415,15 @@ fn text_from_value(item: &Value) -> Option<TextSettings> {
     };
     // 飾りは旧版にない。知らない値なら飾りなし
     let effect: TextEffect = item.get("effect").and_then(enum_value).unwrap_or_default();
-    Some(TextSettings { text, font, size, color, opacity, position, effect })
+    // 自由な位置（旧版にはない）。0〜1 の数 2 つでなければ既定の位置
+    let point = item
+        .get("point")
+        .and_then(Value::as_array)
+        .filter(|a| a.len() == 2)
+        .and_then(|a| Some([a[0].as_f64()? as f32, a[1].as_f64()? as f32]))
+        .filter(|p| p.iter().all(|v| (0.0..=1.0).contains(v)))
+        .unwrap_or(crate::text::FREE_POINT_DEFAULT);
+    Some(TextSettings { text, font, size, color, opacity, position, effect, point })
 }
 
 /// トーンカーブの点（[x, y] の並び。正しくなければ壊れた項目）。

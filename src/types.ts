@@ -105,7 +105,17 @@ export type LocalAdjust = {
 export type LutSettings = { path: string; strength: number };
 
 /** ロゴの透かし（Rust の logo::LogoSettings）。size は写真の短辺に対する %、opacity は %。 */
-export type LogoSettings = { path: string; position: TextPosition; size: number; opacity: number };
+export type LogoSettings = {
+  path: string;
+  position: TextPosition;
+  size: number;
+  opacity: number;
+  /** 位置が「自由」のときの中心（写真の幅・高さに対する割合。既定の位置ならないこともある） */
+  point?: [number, number];
+};
+
+/** 自由な位置の既定（Rust の text::FREE_POINT_DEFAULT）。 */
+export const FREE_POINT_DEFAULT: [number, number] = [0.5, 0.85];
 
 /** 色ごとの調整の 1 色分（Rust の curve::HslAdjust）。色相 -30〜30、彩度・明るさ -100〜100。 */
 export type HslAdjust = { hue: number; saturation: number; lightness: number };
@@ -225,7 +235,8 @@ export type TextPosition =
   | "bottom"
   | "bottom_right"
   | "frame_margin"
-  | "tiled";
+  | "tiled"
+  | "free";
 
 /** 文字・透かしの設定（Rust の text::TextSettings）。size は写真の短辺に対する %、opacity は %。 */
 export type TextSettings = {
@@ -237,6 +248,8 @@ export type TextSettings = {
   position: TextPosition;
   /** 飾り（なしのときは Rust が書かないので、ないこともある） */
   effect?: TextEffect;
+  /** 位置が「自由」のときの中心（写真の幅・高さに対する割合。既定の位置なら Rust が書かないので、ないこともある） */
+  point?: [number, number];
 };
 
 /** 文字の飾り（Rust の text::TextEffect）。 */

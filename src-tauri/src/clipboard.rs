@@ -1,11 +1,11 @@
-//! クリップボード（NSPasteboard）を読む（旧版 FR-UI-64 の貼り付け）。読むだけで、書き換えない。
+//! クリップボード（NSPasteboard）を読む（旧版 FR-UI-64 の貼り付け）。書き換えるのは「加工後の画像をコピー」のときだけ。
 
 use std::path::PathBuf;
 
 use objc2_app_kit::{
     NSPasteboard, NSPasteboardTypeFileURL, NSPasteboardTypePNG, NSPasteboardTypeString, NSPasteboardTypeTIFF,
 };
-use objc2_foundation::NSURL;
+use objc2_foundation::{NSData, NSURL};
 use serde::Serialize;
 
 /// クリップボードにあるもの。
@@ -59,6 +59,22 @@ pub fn image_data() -> Option<Vec<u8>> {
 pub fn text() -> Option<String> {
     // SAFETY: 定数の型名を渡して文字列を読むだけ
     unsafe { NSPasteboard::generalPasteboard().stringForType(NSPasteboardTypeString) }.map(|s| s.to_string())
+}
+
+/// クリップボードを、画像（PNG と TIFF。どちらも同じ画像）に置き換える（「加工後の画像をコピー」）。
+pub fn write_image(png: &[u8], tiff: &[u8]) -> Result<(), String> {
+    let board = NSPasteboard::generalPasteboard();
+    board.clearContents();
+    // SAFETY: 定数の型名と、作ったデータを渡すだけ（クリップボードが複製を持つ）
+    let written = unsafe {
+        board.setData_forType(Some(&NSData::with_bytes(png)), NSPasteboardTypePNG)
+            && board.setData_forType(Some(&NSData::with_bytes(tiff)), NSPasteboardTypeTIFF)
+    };
+    if written {
+        Ok(())
+    } else {
+        Err("クリップボードに書き込めません".into())
+    }
 }
 
 /// ピクチャフォルダ（なければホーム）。貼り付けた画像の保存ダイアログの初期の場所。

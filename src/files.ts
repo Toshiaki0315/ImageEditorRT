@@ -331,6 +331,22 @@ async function runSave(
   }
 }
 
+/** 加工後の画像（原寸）をクリップボードにコピーする（保存と同じく、処理の間は保存・開くなどを止める）。 */
+export async function copyImage() {
+  if (!state.loaded || state.saving) return;
+  setSaving(true);
+  void updateStatus("コピー中…");
+  try {
+    const [width, height] = await invoke<[number, number]>("copy_image", { settings: structuredClone(state.settings) });
+    notify(`加工後の画像をコピーしました（${width}×${height} px）。メッセージやメールに貼り付けられます`);
+  } catch (error) {
+    void updateStatus();
+    await showError("コピーできません", error);
+  } finally {
+    setSaving(false);
+  }
+}
+
 /** 最後に保存したファイルを Finder で表示する（ファイルを選んだ状態でフォルダを開く）。 */
 export async function revealSaved() {
   if (state.savedPaths.length === 0) return;

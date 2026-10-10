@@ -81,6 +81,8 @@ pub fn run() {
             image::open_clipboard_image,
             saving::save_image,
             saving::save_sizes,
+            #[cfg(target_os = "macos")]
+            saving::copy_image,
             saving::default_save_path,
             settings::supported_formats,
             settings::filter_types,

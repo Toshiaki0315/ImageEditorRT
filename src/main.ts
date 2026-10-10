@@ -22,6 +22,7 @@ import {
   requestQuit,
   resetImage,
   saveDialog,
+  revealSaved,
   saveSizesDialog,
   setupDrop,
   showLoaded,
@@ -62,6 +63,7 @@ const menuActions: Record<string, () => void> = {
   [MENU.open]: () => void openDialog(),
   [MENU.save]: () => void saveDialog(),
   [MENU.saveSizes]: () => void saveSizesDialog(),
+  [MENU.revealSaved]: () => void revealSaved(),
   [MENU.batch]: () => void startBatch(),
   [MENU.collage]: () => void makeCollage(),
   [MENU.paste]: () => void paste(),
@@ -140,6 +142,7 @@ function updateOverlays() {
 function connectControls() {
   dom.resetButton.addEventListener("click", () => void resetImage());
   dom.saveButton.addEventListener("click", () => void saveDialog());
+  dom.revealButton.addEventListener("click", () => void revealSaved());
   const presetButton = $<HTMLButtonElement>("preset-button");
   presetButton.addEventListener("click", () =>
     showPresetMenu(presetButton).catch((error) => showError("プリセットのメニューを出せません", error)),

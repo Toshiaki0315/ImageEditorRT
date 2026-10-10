@@ -100,6 +100,7 @@ pub fn run() {
             system::set_menu_enabled,
             system::set_menu_checked,
             system::open_map,
+            system::reveal_in_finder,
             system::quit_app,
             diagnostics::report_unexpected,
             open::take_pending_paths,

@@ -50,6 +50,7 @@ export function showLoaded(info: OpenInfo, openNotes: string[]) {
   preview.show(info.previewWidth, info.previewHeight, info.hasAlpha);
   parts.crop.reset([info.width, info.height]);
   parts.privacy.reset();
+  dom.revealButton.hidden = true;
   parts.localPanel.reset();
   output.reset(true);
   parts.textDialog.show();
@@ -265,7 +266,8 @@ function saveSizesTo(path: string, sizes: number[]): Promise<SaveResult> {
     });
     const fitted = results.filter((r) => r.saved.fitted).length;
     const note = fitted > 0 ? `（${fitted} つは大きさの上限に合わせて品質を下げた・縮めた）` : "";
-    return `${savedSummary(results.map((r) => r.path))}${note}`;
+    const paths = results.map((r) => r.path);
+    return { text: `${savedSummary(paths)}${note}`, paths };
   });
 }
 
@@ -284,7 +286,7 @@ function saveTo(path: string): Promise<SaveResult> {
   const name = path.split("/").pop() ?? path;
   return runSave(path, `保存中… ${name}`, async (settings) => {
     const result = await invoke<Saved>("save_image", { path, settings, options: saveOptions.value() });
-    return `保存しました: ${name}${fittedNote(result)}`;
+    return { text: `保存しました: ${name}${fittedNote(result)}`, paths: [path] };
   });
 }
 
@@ -292,9 +294,14 @@ type SaveResult = "done" | "sameFile" | "failed";
 
 /**
  * 保存を走らせて結果を知らせる（保存中は保存・開くなどを止める）。run は今の設定の写しで保存し、ステータスバーに
- * 出す文を返す。元の画像と同じファイルなら "sameFile"（呼んだ側が保存ダイアログを開き直す）。
+ * 出す文と保存したファイルを返す。元の画像と同じファイルなら "sameFile"（呼んだ側が保存ダイアログを開き直す）。
+ * 保存できたら「Finder で表示」を出す。
  */
-async function runSave(path: string, busy: string, run: (settings: EditSettings) => Promise<string>): Promise<SaveResult> {
+async function runSave(
+  path: string,
+  busy: string,
+  run: (settings: EditSettings) => Promise<{ text: string; paths: string[] }>,
+): Promise<SaveResult> {
   const name = path.split("/").pop() ?? path;
   setSaving(true);
   void updateStatus(busy);
@@ -302,7 +309,9 @@ async function runSave(path: string, busy: string, run: (settings: EditSettings)
     const saved = structuredClone(state.settings);
     const done = await run(saved);
     state.savedSettings = saved;
-    void updateStatus(done);
+    state.savedPaths = done.paths;
+    dom.revealButton.hidden = false;
+    void updateStatus(done.text);
     return "done";
   } catch (error) {
     void updateStatus();
@@ -319,6 +328,16 @@ async function runSave(path: string, busy: string, run: (settings: EditSettings)
     return "failed";
   } finally {
     setSaving(false);
+  }
+}
+
+/** 最後に保存したファイルを Finder で表示する（ファイルを選んだ状態でフォルダを開く）。 */
+export async function revealSaved() {
+  if (state.savedPaths.length === 0) return;
+  try {
+    await invoke("reveal_in_finder", { paths: state.savedPaths });
+  } catch (error) {
+    await showError("Finder で表示できません", error);
   }
 }
 
@@ -371,6 +390,7 @@ export async function resetImage() {
   preview.trimmed = false;
   parts.crop.reset(null);
   parts.privacy.reset();
+  dom.revealButton.hidden = true;
   parts.localPanel.reset();
   output.reset(false);
   parts.textDialog.close();

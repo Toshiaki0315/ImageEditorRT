@@ -39,6 +39,7 @@ export const dom = {
   /** 全体表示のプレビュー（canvas・範囲の選択・ガイド）。100% 表示の間は隠す */
   frame: document.querySelector<HTMLElement>(".frame")!,
   badge: $<HTMLElement>("badge"),
+  revealButton: $<HTMLButtonElement>("reveal-saved"),
   /** 左右に分けて比べる表示（加工前の canvas・境目） */
   split: $<HTMLElement>("split"),
   splitCanvas: $<HTMLCanvasElement>("split-canvas"),
@@ -61,6 +62,8 @@ export const state = {
   copiedLook: null as EditSettings | null,
   /** 最後に保存したときの設定（未保存の変更の判定に使う） */
   savedSettings: null as EditSettings | null,
+  /** 最後に保存したファイル（複数の大きさで保存なら全部。「Finder で表示」に使う） */
+  savedPaths: [] as string[],
   /** 読み込める拡張子・保存できる拡張子・対応形式の説明（起動時に Rust から読む） */
   extensions: [] as string[],
   savableExtensions: [] as string[],

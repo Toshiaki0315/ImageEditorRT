@@ -12,6 +12,8 @@ export const MENU = {
   batch: "batch",
   saveSizes: "save-sizes",
   revealSaved: "reveal-saved",
+  nextPhoto: "next-photo",
+  previousPhoto: "previous-photo",
   share: "share",
   collage: "collage",
   undo: "undo",
@@ -51,6 +53,8 @@ export function updateMenus() {
   setMenuEnabled(MENU.copyLook, state.loaded !== null);
   setMenuEnabled(MENU.copyImage, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.share, state.loaded !== null && !state.saving);
+  setMenuEnabled(MENU.nextPhoto, state.loaded !== null && !state.saving);
+  setMenuEnabled(MENU.previousPhoto, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.pasteLook, editable && state.copiedLook !== null);
   setMenuEnabled(MENU.actualSize, state.loaded !== null && !isZoomed());
   setMenuEnabled(MENU.fit, isZoomed());

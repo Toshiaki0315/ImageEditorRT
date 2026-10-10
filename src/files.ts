@@ -79,6 +79,29 @@ async function openPath(path: string, openNotes: string[] = []) {
   }
 }
 
+/** フォルダの中の前後の写真（Rust の batch::Neighbor）。number は何枚目か（1 から）。 */
+type Neighbor = { path: string; number: number; total: number };
+
+/** 同じフォルダの、次（step = 1）・前（step = -1）の写真を開く（未保存の変更があれば確かめる）。 */
+export async function openNeighbor(step: 1 | -1) {
+  if (!state.loaded || state.opening || state.saving) return;
+  let neighbor: Neighbor | null;
+  try {
+    neighbor = await invoke<Neighbor | null>("neighbor_image", { step });
+  } catch (error) {
+    await showError(LOAD_ERROR_TITLE, error);
+    return;
+  }
+  if (!neighbor) {
+    notify(step > 0 ? "このフォルダに、これより後の写真はありません" : "このフォルダに、これより前の写真はありません");
+    return;
+  }
+  await openPath(neighbor.path);
+  if (state.loaded?.name === neighbor.path.split("/").pop()) {
+    notify(`フォルダの ${neighbor.number} / ${neighbor.total} 枚目`);
+  }
+}
+
 /** ドロップ・Finder などから届いたファイル。複数なら先頭の 1 枚だけを開く（旧版 FR-UI-03）。 */
 export function openPaths(paths: string[]) {
   if (paths.length === 0) return;

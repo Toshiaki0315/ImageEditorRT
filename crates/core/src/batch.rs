@@ -303,6 +303,27 @@ pub fn collect_images(paths: &[PathBuf], existing: &[PathBuf]) -> Vec<PathBuf> {
     images
 }
 
+/// フォルダの中の前後の写真（「次の写真」「前の写真」）。
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Neighbor {
+    pub path: PathBuf,
+    /// フォルダの中で何枚目か（1 から）と、全部で何枚か
+    pub number: usize,
+    pub total: usize,
+}
+
+/// path と同じフォルダの、読める形式の写真（隠しファイルを除く、名前順）のうち、step 枚先（負なら前）の写真。
+/// 端を越えるとき・path がその一覧にないときは None。
+pub fn neighbor_image(path: &Path, step: isize) -> Option<Neighbor> {
+    let folder = path.parent()?;
+    let images = collect_images(&[folder.to_path_buf()], &[]);
+    let key = path_key(path);
+    let index = images.iter().position(|p| path_key(p) == key)?;
+    let next = index.checked_add_signed(step).filter(|&i| i < images.len())?;
+    Some(Neighbor { path: images[next].clone(), number: next + 1, total: images.len() })
+}
+
 /// 1 枚を読み込み、加工して out_dir に保存し、保存先を返す（元の画像は変えない）。
 #[cfg(target_os = "macos")]
 pub fn process_image(source: &Path, out_dir: &Path, options: &BatchOptions) -> Result<PathBuf, String> {

@@ -6,12 +6,34 @@
 import { readStored, writeStored } from "./storage.ts";
 
 /** Rust の save::SaveOptions。maxKb はファイルの大きさの上限（KB、JPEG・HEIC のとき。なければ null）。 */
-export type SaveOptions = { quality: number; keepExif: boolean; keepGps: boolean; maxKb: number | null };
+export type SaveOptions = {
+  quality: number;
+  keepExif: boolean;
+  keepGps: boolean;
+  maxKb: number | null;
+  /** JPEG・BMP で保存するとき透過を塗る色 */
+  fill: [number, number, number];
+};
 
 /** 画面で持つ設定（上限を外しても、入れた MB は覚えておく）。 */
 export type Stored = Omit<SaveOptions, "maxKb"> & { limit: boolean; limitMb: number };
 
-const DEFAULT_OPTIONS: Stored = { quality: 90, keepExif: true, keepGps: false, limit: false, limitMb: 1 };
+const DEFAULT_OPTIONS: Stored = {
+  quality: 90,
+  keepExif: true,
+  keepGps: false,
+  limit: false,
+  limitMb: 1,
+  fill: [255, 255, 255],
+};
+
+/** 色を色の欄の値（#rrggbb）にする。 */
+export const toHex = ([r, g, b]: [number, number, number]) =>
+  `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+
+/** 色の欄の値（#rrggbb）を色にする。 */
+export const fromHex = (hex: string): [number, number, number] =>
+  [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
 const LIMIT_MIN_MB = 0.05;
 const LIMIT_MAX_MB = 100;
 const STORAGE_KEY = "saveOptions";
@@ -25,6 +47,7 @@ export type SaveOptionsFields = {
   removeGps: HTMLInputElement;
   limit: HTMLInputElement;
   limitMb: HTMLInputElement;
+  fill: HTMLInputElement;
 };
 
 export class SaveOptionsPanel {
@@ -36,6 +59,7 @@ export class SaveOptionsPanel {
   private readonly removeGps: HTMLInputElement;
   private readonly limit: HTMLInputElement;
   private readonly limitMb: HTMLInputElement;
+  private readonly fill: HTMLInputElement;
 
   constructor(fields: SaveOptionsFields) {
     ({
@@ -46,6 +70,7 @@ export class SaveOptionsPanel {
       removeGps: this.removeGps,
       limit: this.limit,
       limitMb: this.limitMb,
+      fill: this.fill,
     } = fields);
     const { quality, keepExif, keepGps, removeGps, limit, limitMb } = fields;
     this.options = load();
@@ -55,6 +80,7 @@ export class SaveOptionsPanel {
     keepGps.addEventListener("change", () => this.update({ keepGps: keepGps.checked }));
     removeGps.addEventListener("change", () => this.update({ keepGps: !removeGps.checked }));
     limit.addEventListener("change", () => this.update({ limit: limit.checked }));
+    fields.fill.addEventListener("input", () => this.update({ fill: fromHex(fields.fill.value) }));
     limitMb.addEventListener("change", () => {
       const mb = Number(limitMb.value);
       if (mb >= LIMIT_MIN_MB && mb <= LIMIT_MAX_MB) this.update({ limitMb: mb });
@@ -86,6 +112,7 @@ export class SaveOptionsPanel {
     this.limit.checked = this.options.limit;
     this.limitMb.value = String(this.options.limitMb);
     this.limitMb.disabled = !this.options.limit;
+    this.fill.value = toHex(this.options.fill);
   }
 }
 
@@ -108,7 +135,13 @@ export function parseStored(saved: unknown): Stored {
     keepGps: bool(s.keepGps, DEFAULT_OPTIONS.keepGps),
     limit: bool(s.limit, DEFAULT_OPTIONS.limit),
     limitMb: limitMb >= LIMIT_MIN_MB && limitMb <= LIMIT_MAX_MB ? limitMb : DEFAULT_OPTIONS.limitMb,
+    fill: isColor(s.fill) ? s.fill : DEFAULT_OPTIONS.fill,
   };
+}
+
+/** 0〜255 の整数 3 つの色か。 */
+function isColor(value: unknown): value is [number, number, number] {
+  return Array.isArray(value) && value.length === 3 && value.every((v) => Number.isInteger(v) && v >= 0 && v <= 255);
 }
 
 function load(): Stored {

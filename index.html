@@ -69,7 +69,7 @@
             <select id="background">
               <option value="keep">そのまま</option>
               <option value="transparent">消して透明にする</option>
-              <option value="white">消して白にする</option>
+              <option value="white">消して色で塗る</option>
               <option value="blur">ぼかす</option>
             </select>
           </label>
@@ -78,7 +78,11 @@
             <input id="background-blur" type="range" min="1" max="100" step="1" title="ダブルクリックで 50 に戻す" />
             <output id="background-blur-value"></output>
           </label>
-          <p class="note">人・動物・ものなど目立つ被写体だけを残し、背景を消すか、ぼかします（macOS 14 以降。処理はこの Mac の中だけ）。透明にした部分は、PNG・TIFF などで保存すると透明のまま、JPEG では白になります。</p>
+          <label class="row">
+            背景の色
+            <input id="background-color" type="color" title="「消して色で塗る」のときの背景の色" />
+          </label>
+          <p class="note">人・動物・ものなど目立つ被写体だけを残し、背景を消すか、ぼかします（macOS 14 以降。処理はこの Mac の中だけ）。透明にした部分は、PNG・TIFF などで保存すると透明のまま、JPEG では「出力」タブの「透過を塗る色」（既定は白）になります。</p>
           <h2>回転・反転</h2>
           <div class="buttons">
             <button type="button" data-orient="rotate_left">左に回転</button>
@@ -141,6 +145,7 @@
             ><input id="limit-size" type="checkbox" /> ファイルの大きさを
             <input id="limit-mb" type="number" min="0.05" max="100" step="0.1" /> MB 以下にする（JPEG・HEIC）</label
           >
+          <label class="row">透過を塗る色 <input id="fill-color" type="color" title="透過を持てない JPEG・BMP で保存するとき、透明な部分をこの色で塗ります" /></label>
         </div>
         <div id="page-diorama" class="page" role="tabpanel" hidden></div>
         <div id="page-privacy" class="page" role="tabpanel" hidden>
@@ -399,7 +404,7 @@
             <dt>切り抜き</dt>
             <dd>比を選んでプレビューをドラッグ（三分割・黄金比・対角線のガイドも出せる）。「おまかせ」で目立つ被写体に合わせた範囲に。回転・反転・水平の補正（動かしている間は格子が出る。傾きの自動補正も）・遠近の補正（見上げた建物のすぼまった縦の線をまっすぐに）・背景を消す／ぼかす・フレーム・形（角丸・円）</dd>
             <dt>出力</dt>
-            <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限</dd>
+            <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限・JPEG で透過を塗る色</dd>
             <dt>ジオラマ</dt>
             <dd>ミニチュア風。ピントの帯のガイドがプレビューに出る</dd>
             <dt>投稿加工</dt>

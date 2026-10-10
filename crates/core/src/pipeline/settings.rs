@@ -87,6 +87,8 @@ pub struct EditSettings {
     pub background: Background,
     /// 背景のぼかしの強さ 1〜100（背景を「ぼかす」とき）
     pub background_blur: u32,
+    /// 背景を「色で塗る」ときの色（既定は白。旧版にはない）
+    pub background_color: [u8; 3],
     /// トーンカーブの点（x は 0〜255 で増えていく順、両端は x = 0・255。旧版にはない）
     pub tone_curve: Vec<[u8; 2]>,
     /// 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタ。旧版にはない）
@@ -138,6 +140,7 @@ impl Default for EditSettings {
             regions: Vec::new(),
             background: Background::Keep,
             background_blur: crate::background::BLUR_DEFAULT,
+            background_color: [255, 255, 255],
             tone_curve: curve::identity_curve(),
             hsl: [HslAdjust::default(); HSL_BANDS],
             logo: LogoSettings::default(),

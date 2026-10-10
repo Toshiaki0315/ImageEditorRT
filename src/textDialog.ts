@@ -2,12 +2,10 @@
 
 import { open } from "@tauri-apps/plugin-dialog";
 import type { EditSettings, LogoSettings, TextEffect, TextFont, TextPosition } from "./types";
+import { fromHex, toHex } from "./saveOptions";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const toHex = ([r, g, b]: [number, number, number]) =>
-  `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-const fromHex = (hex: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
 
 export class TextDialog {
   private readonly dialog = $<HTMLDialogElement>("text-dialog");

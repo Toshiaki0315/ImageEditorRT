@@ -75,6 +75,8 @@ export type EditSettings = {
   background: BackgroundMode;
   /** 背景のぼかしの強さ 1〜100（背景を「ぼかす」とき） */
   backgroundBlur: number;
+  /** 背景を「色で塗る」ときの色（既定は白） */
+  backgroundColor: [number, number, number];
   /** トーンカーブの点（[x, y]。x は 0〜255 で増えていく順、両端は x = 0・255） */
   toneCurve: [number, number][];
   /** 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタの 8 色） */
@@ -178,6 +180,7 @@ export function defaultSettings(): EditSettings {
     regions: [],
     background: "keep",
     backgroundBlur: 50,
+    backgroundColor: [255, 255, 255],
     toneCurve: [
       [0, 0],
       [255, 255],

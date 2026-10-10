@@ -52,7 +52,13 @@ pub fn prepare(image: &RgbaImage, settings: &EditSettings, sources: &Sources) ->
         }
     }
     if let Some(mask) = sources.mask.filter(|_| settings.background != Background::Keep) {
-        out = background::apply_background(&out, mask, settings.background, settings.background_blur);
+        out = background::apply_background_with(
+            &out,
+            mask,
+            settings.background,
+            settings.background_blur,
+            settings.background_color,
+        );
     }
     Some(out)
 }

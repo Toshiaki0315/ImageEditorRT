@@ -123,6 +123,7 @@ export const saveOptions = new SaveOptionsPanel({
   removeGps: $<HTMLInputElement>("remove-gps"),
   limit: $<HTMLInputElement>("limit-size"),
   limitMb: $<HTMLInputElement>("limit-mb"),
+  fill: $<HTMLInputElement>("fill-color"),
 });
 
 function extensionOf(path: string): string {

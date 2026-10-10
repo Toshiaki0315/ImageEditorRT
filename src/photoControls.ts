@@ -1,6 +1,7 @@
 // 「切り抜き」タブの「水平の補正」（自動を含む）と「背景」（消す・ぼかす）の欄（旧版にはない）。
 // 回転・反転・トリミングは crop.ts。傾きの求め方・被写体の準備（Vision）は assist.ts がつなぐ。
 
+import { fromHex, toHex } from "./saveOptions";
 import type { BackgroundMode, EditSettings } from "./types";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -30,6 +31,7 @@ export class PhotoControls {
   private readonly background = $<HTMLSelectElement>("background");
   private readonly backgroundBlur = $<HTMLInputElement>("background-blur");
   private readonly backgroundBlurValue = $<HTMLOutputElement>("background-blur-value");
+  private readonly backgroundColor = $<HTMLInputElement>("background-color");
   /** 傾きを求める（水平の補正の角度。分からなければ null、求められなければ undefined） */
   findTilt: () => Promise<number | null | undefined> = async () => null;
   /** 傾きの自動補正の結果を知らせる（直した角度。分からなければ null） */
@@ -74,6 +76,10 @@ export class PhotoControls {
     this.background.addEventListener("change", () => void this.setBackground(this.background.value as BackgroundMode));
     this.backgroundBlur.addEventListener("input", () => this.setBackgroundBlur(Number(this.backgroundBlur.value)));
     this.backgroundBlur.addEventListener("dblclick", () => this.setBackgroundBlur(BACKGROUND_BLUR_DEFAULT));
+    this.backgroundColor.addEventListener("input", () => {
+      this.settings.backgroundColor = fromHex(this.backgroundColor.value);
+      this.changed();
+    });
     this.show();
   }
 
@@ -93,6 +99,8 @@ export class PhotoControls {
     this.backgroundBlur.value = String(this.settings.backgroundBlur);
     this.backgroundBlurValue.textContent = String(this.settings.backgroundBlur);
     this.backgroundBlur.disabled = !loaded || this.settings.background !== "blur";
+    this.backgroundColor.value = toHex(this.settings.backgroundColor);
+    this.backgroundColor.disabled = !loaded || this.settings.background !== "white";
   }
 
   /** 水平の補正（0.1° 刻み。大きさは変わらないので、トリミング範囲はそのまま）。 */

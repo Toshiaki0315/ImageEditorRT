@@ -40,6 +40,7 @@ import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "
 import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
 import { TasteGallery } from "./tasteGallery";
 import { TextDialog } from "./textDialog";
+import { TextDrag } from "./textDrag";
 import type { AspectRatio, FilterType, FrameKind, OpenInfo, ShapeType, TextFont, TextPosition } from "./types";
 import {
   fitToWindow,
@@ -123,6 +124,8 @@ async function createParts() {
   parts.localPanel = new LocalPanel($("local-extra"), settings, dom.canvas, orientedSize, userChanged);
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
   parts.textDialog = new TextDialog(settings, fonts, positions, userChanged);
+  parts.textDrag = new TextDrag(settings, dom.canvas, orientedSize, () => parts.crop.photoArea(), userChanged);
+  parts.crop.onAreaChange = () => parts.textDrag.draw();
   parts.textDialog.logoExtensions = state.extensions;
   parts.textButton = $<HTMLButtonElement>("text-button");
   parts.tasteGallery = new TasteGallery(filters, settings, (filter) => parts.panel.selectFilter(filter));
@@ -146,6 +149,7 @@ function updateOverlays() {
   parts.privacy.setActive(tabs.selected() === "privacy" && !preview.trimmed);
   parts.crop.setGuideActive(tabs.selected() === "crop");
   parts.localPanel.setActive(tabs.selected() === "adjust" && !preview.trimmed);
+  parts.textDrag.setActive(!preview.trimmed);
 }
 
 /** ボタン・プレビューの操作をつなぐ。 */
@@ -171,6 +175,7 @@ function connectControls() {
     parts.crop.draw();
     parts.privacy.draw();
     parts.localPanel.draw();
+    parts.textDrag.draw();
     if (!dom.straightenGrid.hasAttribute("hidden")) drawStraightenGrid();
     void updateGuide();
     placeBadge();

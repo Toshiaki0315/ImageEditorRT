@@ -29,6 +29,7 @@ export function settingsChanged() {
   parts.privacy?.show();
   parts.localPanel?.show();
   parts.lutControls?.show();
+  parts.textDrag?.draw();
   parts.photoControls?.show();
   parts.colorPanel?.show();
   void output.refresh().then(() => {
@@ -71,6 +72,7 @@ export function setupHistory() {
       parts.crop.isDragging() ||
       parts.privacy.isDragging() ||
       parts.localPanel.isDragging() ||
+      parts.textDrag.isDragging() ||
       parts.colorPanel.isDragging(),
     onUpdate: updateMenus,
   });

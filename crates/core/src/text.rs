@@ -92,11 +92,31 @@ pub enum TextPosition {
     FrameMargin,
     /// 写真全体に斜めに繰り返して敷く（旧版にはない）
     Tiled,
+    /// 好きな位置（プレビューの上でドラッグして動かす。位置は point。旧版にはない）
+    Free,
+}
+
+/// 自由な位置の既定（写真の幅・高さに対する割合。中心の位置）。
+pub const FREE_POINT_DEFAULT: [f32; 2] = [0.5, 0.85];
+
+/// 自由な位置が既定のままか（設定のファイルには、動かしたときだけ書く）。
+pub fn is_default_point(point: &[f32; 2]) -> bool {
+    *point == FREE_POINT_DEFAULT
+}
+
+/// 自由な位置: 中心を、長さ length の場所の point（割合）に置いたときの、そろえ方の割合（0〜1）。
+/// 余白 margin の内側からはみ出さないよう収める（入りきらなければ真ん中）。content は文字・ロゴの長さ。
+pub(crate) fn free_anchor(point: f32, length: f64, margin: f64, content: f64) -> f64 {
+    let room = length - 2.0 * margin - content;
+    if room <= 0.0 {
+        return 0.5;
+    }
+    ((f64::from(point.clamp(0.0, 1.0)) * length - content / 2.0 - margin) / room).clamp(0.0, 1.0)
 }
 
 impl TextPosition {
     /// すべての位置（画面のプルダウンの順）。
-    pub const ALL: [TextPosition; 11] = [
+    pub const ALL: [TextPosition; 12] = [
         Self::TopLeft,
         Self::Top,
         Self::TopRight,
@@ -108,6 +128,7 @@ impl TextPosition {
         Self::BottomRight,
         Self::FrameMargin,
         Self::Tiled,
+        Self::Free,
     ];
 
     /// 画面に出す名前。
@@ -124,6 +145,7 @@ impl TextPosition {
             Self::BottomRight => "右下",
             Self::FrameMargin => "フレームの余白",
             Self::Tiled => "全体に繰り返す（斜め）",
+            Self::Free => "自由（ドラッグで動かす）",
         }
     }
 
@@ -134,7 +156,7 @@ impl TextPosition {
             Self::Top => (0.5, 0.0),
             Self::TopRight => (1.0, 0.0),
             Self::Left => (0.0, 0.5),
-            Self::Center | Self::FrameMargin | Self::Tiled => (0.5, 0.5),
+            Self::Center | Self::FrameMargin | Self::Tiled | Self::Free => (0.5, 0.5),
             Self::Right => (1.0, 0.5),
             Self::BottomLeft => (0.0, 1.0),
             Self::Bottom => (0.5, 1.0),
@@ -186,6 +208,9 @@ pub struct TextSettings {
     /// 飾り（旧版にはない）
     #[serde(skip_serializing_if = "TextEffect::is_none")]
     pub effect: TextEffect,
+    /// 位置が「自由」のときの、文字の中心（写真の幅・高さに対する割合。旧版にはない）
+    #[serde(skip_serializing_if = "is_default_point")]
+    pub point: [f32; 2],
 }
 
 impl Default for TextSettings {
@@ -198,6 +223,7 @@ impl Default for TextSettings {
             opacity: TEXT_OPACITY_DEFAULT,
             position: TextPosition::BottomRight,
             effect: TextEffect::None,
+            point: FREE_POINT_DEFAULT,
         }
     }
 }
@@ -370,6 +396,15 @@ pub fn draw_text(
     let lines: Vec<&str> = text.split('\n').collect();
     let layout = fit(font, &lines, text_size_px(settings, reference), available, ax);
     let b = layout.bounds;
+    // 自由な位置は、中心を point に置く（はみ出さないよう収める）
+    let (ax, ay) = if settings.position == TextPosition::Free {
+        (
+            free_anchor(settings.point[0], width, margin, f64::from(b.width())),
+            free_anchor(settings.point[1], height, margin, f64::from(b.height())),
+        )
+    } else {
+        (ax, ay)
+    };
     let x = left as f64 + margin + (available.0 - f64::from(b.width())) * ax - f64::from(b.min.x);
     let y = top as f64 + margin + (available.1 - f64::from(b.height())) * ay - f64::from(b.min.y);
     let alpha = round_half_even(255.0 * f64::from(settings.opacity.min(100)) / 100.0) as f32 / 255.0;
@@ -521,7 +556,8 @@ mod tests {
     #[test]
     #[cfg(target_os = "macos")]
     fn positions_follow_the_anchor() {
-        for position in TextPosition::ALL {
+        // 自由な位置は中心を point に置く（free_position_puts_the_center_on_the_point_inside_the_margin）
+        for position in TextPosition::ALL.into_iter().filter(|p| *p != TextPosition::Free) {
             let mut image = RgbaImage::from_pixel(400, 300, Rgba([0, 0, 0, 255]));
             let (l, t, r, b) = draw_text(&mut image, &settings("写真", position), None, None).unwrap();
             let (ax, ay) = position.anchor();
@@ -614,6 +650,39 @@ mod tests {
         assert!(!serde_json::to_string(&base).unwrap().contains("effect"));
         let shadowed = TextSettings { effect: TextEffect::Shadow, ..base };
         assert!(serde_json::to_string(&shadowed).unwrap().contains("\"effect\":\"shadow\""));
+    }
+
+    #[test]
+    fn free_position_puts_the_center_on_the_point_inside_the_margin() {
+        let center = |image: &RgbaImage| {
+            let lit: Vec<(u32, u32)> =
+                image.enumerate_pixels().filter(|(_, _, p)| p[0] > 128).map(|(x, y, _)| (x, y)).collect();
+            let (xs, ys): (Vec<u32>, Vec<u32>) = lit.into_iter().unzip();
+            (
+                (xs.iter().min().unwrap() + xs.iter().max().unwrap()) / 2,
+                (ys.iter().min().unwrap() + ys.iter().max().unwrap()) / 2,
+            )
+        };
+        let draw = |point: [f32; 2]| {
+            let mut image = RgbaImage::from_pixel(400, 200, Rgba([0, 0, 0, 255]));
+            let settings = TextSettings { point, ..settings("写真", TextPosition::Free) };
+            draw_text(&mut image, &settings, None, None).unwrap();
+            image
+        };
+        let (x, y) = center(&draw([0.25, 0.5]));
+        assert!(x.abs_diff(100) <= 3 && y.abs_diff(100) <= 3, "({x}, {y})");
+        // 端に置いても、余白（短辺の 3% = 6px）の内側に収める
+        let (left, _, _, _) = draw_text(
+            &mut RgbaImage::from_pixel(400, 200, Rgba([0, 0, 0, 255])),
+            &TextSettings { point: [0.0, 0.0], ..settings("写真", TextPosition::Free) },
+            None,
+            None,
+        )
+        .unwrap();
+        assert!((left - 6.0).abs() < 1.0, "{left}");
+        // 既定の位置は JSON に書かない
+        assert!(!serde_json::to_string(&settings("x", TextPosition::Free)).unwrap().contains("point"));
+        assert_eq!(free_anchor(0.5, 100.0, 0.0, 200.0), 0.5, "入りきらなければ真ん中");
     }
 
     #[test]

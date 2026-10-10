@@ -65,6 +65,8 @@ export class CropController {
   private readonly clear = $<HTMLButtonElement>("clear-crop");
   private readonly autoCrop = $<HTMLButtonElement>("auto-crop");
   /** おまかせ切り抜きの範囲を問い合わせる（見つからなければ null、失敗なら undefined。assist.ts が入れる） */
+  /** 写真の範囲（photoArea）が変わったとき（文字・ロゴのドラッグの印を描き直す） */
+  onAreaChange: () => void = () => {};
   findSubjectCrop: (aspect: AspectChoice) => Promise<CropRect | null | undefined> = async () => undefined;
   /** おまかせ切り抜きの結果を知らせる（範囲にしたか） */
   onAutoCrop: (found: boolean) => void = () => {};
@@ -187,6 +189,12 @@ export class CropController {
     return this.aspectChanged();
   }
 
+  /** 文字・ロゴを描く写真の範囲（実際に切り抜く範囲。なければ画像全体。回転・反転した後の原寸の座標）。画像がなければ null。 */
+  photoArea(): CropRect | null {
+    if (!this.size) return null;
+    return this.shapeArea ?? { x: 0, y: 0, width: this.size[0], height: this.size[1] };
+  }
+
   /** 範囲をドラッグしている間は true（ドラッグ全体を 1 回の操作として履歴に積む）。 */
   isDragging(): boolean {
     return this.drag !== null;
@@ -235,6 +243,7 @@ export class CropController {
     if (!this.size) return;
     this.shapeArea = await invoke<CropRect | null>("effective_crop", { settings: this.settings, size: this.size });
     this.draw();
+    this.onAreaChange();
   }
 
   private setCorner(value: number) {

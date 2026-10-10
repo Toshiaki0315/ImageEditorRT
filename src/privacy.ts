@@ -130,7 +130,7 @@ export class PrivacyPanel {
     this.strength.value = String(strength);
     this.strengthValue.textContent = String(strength);
     // 強さはぼかし・モザイクだけ、スタンプの絵はスタンプだけ
-    this.strength.disabled = !loaded || kind === "stamp";
+    this.strength.disabled = !loaded || kind === "stamp" || kind === "heal";
     const stamp = region?.kind === "stamp" ? region.stamp : this.nextStamp;
     for (const button of this.stampButtons) {
       button.setAttribute("aria-pressed", String(button.textContent === stamp));
@@ -138,7 +138,8 @@ export class PrivacyPanel {
     }
     this.deleteButton.disabled = region === null;
     this.clearButton.disabled = this.settings.regions.length === 0;
-    for (const button of Object.values(this.findButtons)) button.disabled = !loaded;
+    // 顔・文字を見つけて「修復」で消すことはしない（隠すための機能なので）
+    for (const button of Object.values(this.findButtons)) button.disabled = !loaded || kind === "heal";
     this.draw();
   }
 
@@ -174,6 +175,13 @@ export class PrivacyPanel {
       const selected = index === this.selected;
       for (const kind of ["edge-shadow", selected ? "edge selected" : "edge"]) {
         this.overlay.append(svgElement("rect", kind, r));
+      }
+      // 修復は内接する楕円の中を埋めるので、楕円も描く
+      if (region.kind === "heal") {
+        const { x, y, width, height } = r;
+        this.overlay.append(
+          svgElement("ellipse", "edge", { cx: x + width / 2, cy: y + height / 2, rx: width / 2, ry: height / 2 }),
+        );
       }
       if (!selected) return;
       for (const [cx, cy] of rectCorners(r)) this.overlay.append(handleElement(cx, cy));

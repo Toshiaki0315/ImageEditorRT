@@ -30,6 +30,7 @@ pub mod filters;
 pub mod foreground;
 pub mod formats;
 pub mod frames;
+pub mod heal;
 #[cfg(target_os = "macos")]
 pub mod heic;
 pub mod histogram;

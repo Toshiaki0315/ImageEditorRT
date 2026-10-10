@@ -1,4 +1,4 @@
-// 「出力」タブの「保存の設定」（JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限）と、「投稿加工」タブの「位置情報を消して保存する」
+// 「出力」タブの「保存の設定」（JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限・透過の色・権利の情報）と、「投稿加工」タブの「位置情報を消して保存する」
 // （位置情報を残すかの逆。どちらで変えても両方に反映する）。
 // 保存の好みなので画像を開いても戻さず、アプリを終了しても残す（旧版 FR-UI-56）。
 
@@ -13,7 +13,14 @@ export type SaveOptions = {
   maxKb: number | null;
   /** JPEG・BMP で保存するとき透過を塗る色 */
   fill: [number, number, number];
+  /** EXIF に書く権利の情報（空の項目は書かない） */
+  rights: Rights;
 };
+
+/** Rust の save::ExifRights（著作権・作者・説明）。 */
+export type Rights = { copyright: string; artist: string; description: string };
+
+const RIGHTS_KEYS = ["copyright", "artist", "description"] as const;
 
 /** 画面で持つ設定（上限を外しても、入れた MB は覚えておく）。 */
 export type Stored = Omit<SaveOptions, "maxKb"> & { limit: boolean; limitMb: number };
@@ -25,6 +32,7 @@ const DEFAULT_OPTIONS: Stored = {
   limit: false,
   limitMb: 1,
   fill: [255, 255, 255],
+  rights: { copyright: "", artist: "", description: "" },
 };
 
 /** 色を色の欄の値（#rrggbb）にする。 */
@@ -48,6 +56,8 @@ export type SaveOptionsFields = {
   limit: HTMLInputElement;
   limitMb: HTMLInputElement;
   fill: HTMLInputElement;
+  /** 著作権・作者・説明の欄 */
+  rights: Record<keyof Rights, HTMLInputElement>;
 };
 
 export class SaveOptionsPanel {
@@ -60,6 +70,7 @@ export class SaveOptionsPanel {
   private readonly limit: HTMLInputElement;
   private readonly limitMb: HTMLInputElement;
   private readonly fill: HTMLInputElement;
+  private readonly rights: Record<keyof Rights, HTMLInputElement>;
 
   constructor(fields: SaveOptionsFields) {
     ({
@@ -71,6 +82,7 @@ export class SaveOptionsPanel {
       limit: this.limit,
       limitMb: this.limitMb,
       fill: this.fill,
+      rights: this.rights,
     } = fields);
     const { quality, keepExif, keepGps, removeGps, limit, limitMb } = fields;
     this.options = load();
@@ -81,6 +93,10 @@ export class SaveOptionsPanel {
     removeGps.addEventListener("change", () => this.update({ keepGps: !removeGps.checked }));
     limit.addEventListener("change", () => this.update({ limit: limit.checked }));
     fields.fill.addEventListener("input", () => this.update({ fill: fromHex(fields.fill.value) }));
+    for (const key of RIGHTS_KEYS) {
+      const input = this.rights[key];
+      input.addEventListener("change", () => this.update({ rights: { ...this.options.rights, [key]: input.value.trim() } }));
+    }
     limitMb.addEventListener("change", () => {
       const mb = Number(limitMb.value);
       if (mb >= LIMIT_MIN_MB && mb <= LIMIT_MAX_MB) this.update({ limitMb: mb });
@@ -113,6 +129,7 @@ export class SaveOptionsPanel {
     this.limitMb.value = String(this.options.limitMb);
     this.limitMb.disabled = !this.options.limit;
     this.fill.value = toHex(this.options.fill);
+    for (const key of RIGHTS_KEYS) this.rights[key].value = this.options.rights[key];
   }
 }
 
@@ -136,7 +153,15 @@ export function parseStored(saved: unknown): Stored {
     limit: bool(s.limit, DEFAULT_OPTIONS.limit),
     limitMb: limitMb >= LIMIT_MIN_MB && limitMb <= LIMIT_MAX_MB ? limitMb : DEFAULT_OPTIONS.limitMb,
     fill: isColor(s.fill) ? s.fill : DEFAULT_OPTIONS.fill,
+    rights: parseRights(s.rights),
   };
+}
+
+/** 覚えておいた権利の情報（文字でない項目は空にする）。 */
+function parseRights(value: unknown): Rights {
+  const r = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const text = (v: unknown) => (typeof v === "string" ? v : "");
+  return { copyright: text(r.copyright), artist: text(r.artist), description: text(r.description) };
 }
 
 /** 0〜255 の整数 3 つの色か。 */

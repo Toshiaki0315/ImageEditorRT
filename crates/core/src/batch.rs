@@ -162,7 +162,7 @@ impl Default for BatchPrivacy {
 impl BatchOptions {
     /// 保存の設定（位置情報を消すなら、位置情報を残さない）。
     pub fn save_options(&self) -> SaveOptions {
-        SaveOptions { keep_gps: self.save.keep_gps && !self.privacy.remove_gps, ..self.save }
+        SaveOptions { keep_gps: self.save.keep_gps && !self.privacy.remove_gps, ..self.save.clone() }
     }
 }
 

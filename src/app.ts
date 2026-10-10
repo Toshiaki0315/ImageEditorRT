@@ -125,6 +125,11 @@ export const saveOptions = new SaveOptionsPanel({
   limit: $<HTMLInputElement>("limit-size"),
   limitMb: $<HTMLInputElement>("limit-mb"),
   fill: $<HTMLInputElement>("fill-color"),
+  rights: {
+    copyright: $<HTMLInputElement>("rights-copyright"),
+    artist: $<HTMLInputElement>("rights-artist"),
+    description: $<HTMLInputElement>("rights-description"),
+  },
 });
 
 function extensionOf(path: string): string {

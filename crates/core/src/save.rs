@@ -10,7 +10,10 @@ use image::{ExtendedColorType, Frame, ImageEncoder, RgbaImage};
 use serde::{Deserialize, Serialize};
 
 use crate::formats::has_transparency;
-use crate::tiff::{tiff_block, ExifBlock, Order, TAG_ORIENTATION, TAG_PIXEL_X, TAG_PIXEL_Y};
+use crate::tiff::{
+    tiff_block, ExifBlock, Order, TAG_ARTIST, TAG_COPYRIGHT, TAG_IMAGE_DESCRIPTION, TAG_ORIENTATION,
+    TAG_PIXEL_X, TAG_PIXEL_Y,
+};
 
 /// JPEG・HEIC の品質の既定値と範囲。
 pub const DEFAULT_JPEG_QUALITY: u8 = 90;
@@ -27,7 +30,7 @@ pub const SAME_FILE_MESSAGE: &str =
     "元の画像と同じファイルには保存できません。別のファイル名を指定してください。";
 
 /// 保存の設定（「出力」タブの「保存の設定」）。JSON では camelCase。
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SaveOptions {
     /// JPEG・HEIC の品質 1〜100
@@ -40,6 +43,32 @@ pub struct SaveOptions {
     pub max_kb: Option<u32>,
     /// 透過を持てない形式（JPEG・BMP）で保存するとき、透過を塗る色（既定は白。旧版にはない）
     pub fill: [u8; 3],
+    /// EXIF に書く権利の情報（著作権・作者・説明。空なら元のまま。JPEG・PNG・TIFF・HEIC。旧版にはない）
+    pub rights: ExifRights,
+}
+
+/// EXIF に書く権利の情報（Copyright・Artist・ImageDescription）。空の項目は書かない（元の値を残す）。
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ExifRights {
+    pub copyright: String,
+    pub artist: String,
+    pub description: String,
+}
+
+impl ExifRights {
+    /// 書く項目（タグと値。空白だけの項目は除く）。
+    fn entries(&self) -> Vec<(u16, &str)> {
+        [
+            (TAG_COPYRIGHT, &self.copyright),
+            (TAG_ARTIST, &self.artist),
+            (TAG_IMAGE_DESCRIPTION, &self.description),
+        ]
+        .into_iter()
+        .map(|(tag, text)| (tag, text.trim()))
+        .filter(|(_, text)| !text.is_empty())
+        .collect()
+    }
 }
 
 impl Default for SaveOptions {
@@ -50,6 +79,7 @@ impl Default for SaveOptions {
             keep_gps: false,
             max_kb: None,
             fill: [255, 255, 255],
+            rights: ExifRights::default(),
         }
     }
 }
@@ -262,17 +292,44 @@ pub fn is_same_file(a: &Path, b: &Path) -> bool {
 ///
 /// 元の EXIF の形を読めなければ None（EXIF なしで保存する）。
 pub fn prepare_exif(exif: &[u8], size: (u32, u32), keep_gps: bool, keep_maker_note: bool) -> Option<Vec<u8>> {
-    prepare(exif, size, keep_gps, keep_maker_note, false)
+    let block = prepare(exif, size, keep_gps, false)?;
+    Some(exif_bytes(&block, keep_maker_note))
 }
 
-/// prepare_exif と同じ。from_tiff なら、TIFF の画像の構造のタグも外す。
-fn prepare(
-    exif: &[u8],
-    (width, height): (u32, u32),
-    keep_gps: bool,
+/// 書き出す EXIF（"Exif\0\0" 付き）。MakerNote を残すと JPEG に入らないほど大きいときは残さない。
+fn exif_bytes(block: &ExifBlock, keep_maker_note: bool) -> Vec<u8> {
+    let data = block.to_bytes(keep_maker_note);
+    if keep_maker_note && data.len() > MAX_EXIF_BYTES {
+        block.to_bytes(false)
+    } else {
+        data
+    }
+}
+
+/// 保存する EXIF: 元の EXIF（source。残さないなら None）を prepare_exif と同じく整え、権利の情報を書く。
+/// 元の EXIF がなくても、権利の情報があればそれだけの EXIF にする。どちらもなければ None。
+fn saved_exif(
+    source: Option<&[u8]>,
+    size: (u32, u32),
+    options: &SaveOptions,
     keep_maker_note: bool,
     from_tiff: bool,
 ) -> Option<Vec<u8>> {
+    let prepared = source.and_then(|raw| prepare(raw, size, options.keep_gps, from_tiff));
+    let rights = options.rights.entries();
+    let mut block = match prepared {
+        Some(block) => block,
+        None if rights.is_empty() => return None,
+        None => ExifBlock::empty(Order::Big),
+    };
+    for (tag, text) in rights {
+        block.set_text(tag, text);
+    }
+    Some(exif_bytes(&block, keep_maker_note))
+}
+
+/// 元の EXIF を整えた ExifBlock（prepare_exif の中身）。from_tiff なら、TIFF の画像の構造のタグも外す。
+fn prepare(exif: &[u8], (width, height): (u32, u32), keep_gps: bool, from_tiff: bool) -> Option<ExifBlock> {
     let mut block = ExifBlock::parse(exif)?;
     if from_tiff {
         block.remove_image_structure();
@@ -286,8 +343,7 @@ fn prepare(
             block.set_long(true, tag, length);
         }
     }
-    let data = block.to_bytes(keep_maker_note);
-    Some(if keep_maker_note && data.len() > MAX_EXIF_BYTES { block.to_bytes(false) } else { data })
+    Some(block)
 }
 
 /// 透過を白い背景に合成した RGB の画素を返す。
@@ -409,9 +465,8 @@ pub fn save_edited(
     let keep_maker_note = format != SaveFormat::Tiff && !source_is_tiff;
     // EXIF の画像の大きさのタグは、保存する画像の大きさに合わせる（縮めたときも）
     let encode_at = |image: &RgbaImage, quality: u8| {
-        let exif = source_exif.filter(|_| options.keep_exif).and_then(|raw| {
-            prepare(raw, image.dimensions(), options.keep_gps, keep_maker_note, source_is_tiff)
-        });
+        let source = source_exif.filter(|_| options.keep_exif);
+        let exif = saved_exif(source, image.dimensions(), &options, keep_maker_note, source_is_tiff);
         encode(image, format, quality, exif.as_deref())
     };
     let limit = options.max_kb.filter(|_| format.is_lossy()).map(|kb| u64::from(kb) * 1024);
@@ -515,7 +570,7 @@ mod tests {
         });
         let black = SaveOptions { fill: [0, 0, 0], ..SaveOptions::default() };
         let path = dir.join("fill.jpg");
-        save_edited(&image, &path, black, None, false).unwrap();
+        save_edited(&image, &path, black.clone(), None, false).unwrap();
         let back = image::open(&path).unwrap().to_rgba8();
         assert!(
             back.get_pixel(13, 4).0[..3].iter().all(|&v| v < 12),
@@ -652,7 +707,7 @@ mod tests {
         assert!(saved.size != image.dimensions() || one_more.len() as u64 > u64::from(limit_kb) * 1024);
         // とても小さい上限: 縮めて収める
         let tiny = SaveOptions { max_kb: Some(20), ..SaveOptions::default() };
-        let saved = save_edited(&image, &path, tiny, None, false).unwrap();
+        let saved = save_edited(&image, &path, tiny.clone(), None, false).unwrap();
         assert!(saved.size.0 < 800 && saved.bytes <= 20 * 1024, "{saved:?}");
         // 収まっていれば何も変えない。PNG には効かない
         let roomy = SaveOptions { max_kb: Some(100_000), ..SaveOptions::default() };

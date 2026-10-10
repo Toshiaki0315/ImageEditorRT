@@ -33,6 +33,8 @@ pub const PASTE: &str = "paste";
 /// 「編集 > 加工をコピー」「加工をペースト」（プリセットと同じ加工を、保存せずに次の写真へ使い回す）
 pub const COPY_LOOK: &str = "copy-look";
 pub const PASTE_LOOK: &str = "paste-look";
+/// 「編集 > 加工後の画像をコピー」（原寸で加工した画像をクリップボードへ。画像がないときは使えない）
+pub const COPY_IMAGE: &str = "copy-image";
 /// 「編集 > 文字・透かし…」
 pub const TEXT: &str = "text";
 /// 「表示 > 100% で表示」（原寸で処理した保存結果を 1px = 1 画素で見る）
@@ -94,6 +96,10 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .enabled(false)
         .build(app)?;
     let paste = MenuItemBuilder::with_id(PASTE, "ペースト").accelerator("CmdOrCtrl+V").build(app)?;
+    let copy_image = MenuItemBuilder::with_id(COPY_IMAGE, "加工後の画像をコピー")
+        .accelerator("CmdOrCtrl+Shift+C")
+        .enabled(false)
+        .build(app)?;
     // 加工の使い回し（画像がない・コピーしていないときは使えない。画面が set_menu_enabled で合わせる）
     let copy_look = MenuItemBuilder::with_id(COPY_LOOK, "加工をコピー")
         .accelerator("Alt+CmdOrCtrl+C")
@@ -112,6 +118,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&paste)
         .select_all_with_text("すべてを選択")
         .separator()
+        .item(&copy_image)
         .item(&copy_look)
         .item(&paste_look)
         .separator()

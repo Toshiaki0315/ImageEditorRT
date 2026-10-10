@@ -17,6 +17,7 @@ export const MENU = {
   redo: "redo",
   paste: "paste",
   text: "text",
+  copyImage: "copy-image",
   copyLook: "copy-look",
   pasteLook: "paste-look",
   actualSize: "actual_size",
@@ -47,6 +48,7 @@ export function updateMenus() {
   setMenuEnabled(MENU.undo, editable && (parts.recorder?.canUndo() ?? false));
   setMenuEnabled(MENU.redo, editable && (parts.recorder?.canRedo() ?? false));
   setMenuEnabled(MENU.copyLook, state.loaded !== null);
+  setMenuEnabled(MENU.copyImage, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.pasteLook, editable && state.copiedLook !== null);
   setMenuEnabled(MENU.actualSize, state.loaded !== null && !isZoomed());
   setMenuEnabled(MENU.fit, isZoomed());

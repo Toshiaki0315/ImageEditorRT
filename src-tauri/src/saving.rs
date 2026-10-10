@@ -111,6 +111,29 @@ pub async fn save_image(
     Ok(saved)
 }
 
+/// 今の設定を原寸でかけた画像を、クリップボードにコピーする（PNG と TIFF。透過は残す。EXIF は付けない）。
+/// 処理はメインスレッドとは別のスレッドで行う。コピーした画像の大きさ（px）を返す。
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn copy_image(settings: EditSettings, state: State<'_, AppState>) -> Result<(u32, u32), String> {
+    let opened = state.opened()?;
+    let settings = opened.shown(settings, false);
+    tauri::async_runtime::spawn_blocking(move || {
+        save_pool().install(|| {
+            let original = opened.prepared(&opened.original, &settings);
+            let edited = pipeline::apply_edits(&original, &settings).map_err(|e| e.to_string())?;
+            let png = save::encode(&edited, save::SaveFormat::Png, save::DEFAULT_JPEG_QUALITY, None)
+                .map_err(|e| e.to_string())?;
+            let tiff = save::encode(&edited, save::SaveFormat::Tiff, save::DEFAULT_JPEG_QUALITY, None)
+                .map_err(|e| e.to_string())?;
+            clipboard::write_image(&png, &tiff)?;
+            Ok(edited.dimensions())
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// 複数の大きさで保存した 1 つ分（保存先と、保存した結果）。
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

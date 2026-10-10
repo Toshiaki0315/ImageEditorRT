@@ -47,6 +47,11 @@
   "regions": [],
   "background": "keep",
   "backgroundBlur": 50,
+  "backgroundColor": [
+    255,
+    255,
+    255
+  ],
   "toneCurve": [
     [
       0,

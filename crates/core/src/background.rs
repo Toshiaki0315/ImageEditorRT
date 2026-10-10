@@ -19,7 +19,7 @@ pub enum Background {
     Keep,
     /// 透明にする（PNG・TIFF などで保存すると透明のまま。JPEG では白になる）
     Transparent,
-    /// 白にする
+    /// 色で塗る（色は `background_color`。既定は白。JSON の名前は旧い「白にする」のまま）
     White,
     /// ぼかす（ポートレート風。強さは `background_blur`）
     Blur,
@@ -33,6 +33,17 @@ const BLUR_MAX_RATIO: f64 = 0.04;
 /// 画像に mask（画像と違う大きさなら合わせる）をかけて、背景を透明・白・ぼかした新しい画像を返す。
 /// blur はぼかすときの強さ（1〜100）。Keep なら複製を返す。
 pub fn apply_background(image: &RgbaImage, mask: &GrayImage, mode: Background, blur: u32) -> RgbaImage {
+    apply_background_with(image, mask, mode, blur, [255, 255, 255])
+}
+
+/// apply_background と同じ。「色で塗る」の色は color。
+pub fn apply_background_with(
+    image: &RgbaImage,
+    mask: &GrayImage,
+    mode: Background,
+    blur: u32,
+    color: [u8; 3],
+) -> RgbaImage {
     let mut out = image.clone();
     if mode == Background::Keep {
         return out;
@@ -53,9 +64,9 @@ pub fn apply_background(image: &RgbaImage, mask: &GrayImage, mode: Background, b
             match mode {
                 Background::Transparent => p[3] = ((keep + 127) / 255) as u8,
                 Background::White => {
-                    // 白の上に重ねる（被写体の度合いで、元の色と白を混ぜる）
-                    for c in &mut p[..3] {
-                        let mixed = u32::from(*c) * keep + 255 * (255 * 255 - keep);
+                    // 色の上に重ねる（被写体の度合いで、元の色と塗る色を混ぜる）
+                    for (c, fill) in p[..3].iter_mut().zip(color) {
+                        let mixed = u32::from(*c) * keep + u32::from(fill) * (255 * 255 - keep);
                         *c = ((mixed + 255 * 255 / 2) / (255 * 255)) as u8;
                     }
                     p[3] = 255;
@@ -126,6 +137,12 @@ mod tests {
         let white = apply_background(&image, &mask, Background::White, BLUR_DEFAULT);
         assert_eq!(white.get_pixel(1, 1).0, [10, 100, 200, 255]);
         assert_eq!(white.get_pixel(6, 1).0, [255, 255, 255, 255]);
+        // 色を選べば、背景はその色（被写体はそのまま）
+        let green = apply_background_with(&image, &mask, Background::White, BLUR_DEFAULT, [20, 180, 60]);
+        assert_eq!(
+            (green.get_pixel(1, 1).0, green.get_pixel(6, 1).0),
+            ([10, 100, 200, 255], [20, 180, 60, 255])
+        );
         assert_eq!(apply_background(&image, &mask, Background::Keep, BLUR_DEFAULT), image);
     }
 

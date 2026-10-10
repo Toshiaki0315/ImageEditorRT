@@ -38,12 +38,36 @@ pub struct SaveOptions {
     pub keep_gps: bool,
     /// ファイルの大きさの上限（KB。JPEG・HEIC のときだけ。None なら指定なし。旧版にはない）
     pub max_kb: Option<u32>,
+    /// 透過を持てない形式（JPEG・BMP）で保存するとき、透過を塗る色（既定は白。旧版にはない）
+    pub fill: [u8; 3],
 }
 
 impl Default for SaveOptions {
     fn default() -> Self {
-        Self { quality: DEFAULT_JPEG_QUALITY, keep_exif: true, keep_gps: false, max_kb: None }
+        Self {
+            quality: DEFAULT_JPEG_QUALITY,
+            keep_exif: true,
+            keep_gps: false,
+            max_kb: None,
+            fill: [255, 255, 255],
+        }
     }
+}
+
+/// 透過を color の上に重ねた、不透明な画像（白なら書き出すときに白に合成されるので、そのまま返す）。
+fn fill_transparency(image: &RgbaImage, color: [u8; 3]) -> std::borrow::Cow<'_, RgbaImage> {
+    if color == [255, 255, 255] || !has_transparency(image) {
+        return std::borrow::Cow::Borrowed(image);
+    }
+    let mut out = image.clone();
+    for p in out.pixels_mut() {
+        let a = u32::from(p[3]);
+        for c in 0..3 {
+            p[c] = ((u32::from(p[c]) * a + u32::from(color[c]) * (255 - a) + 127) / 255) as u8;
+        }
+        p[3] = 255;
+    }
+    std::borrow::Cow::Owned(out)
 }
 
 /// 保存した結果（大きさの上限に合わせて品質を下げた・縮めたかを知らせるため）。
@@ -372,6 +396,13 @@ pub fn save_edited(
     source_exif: Option<&[u8]>,
     source_is_tiff: bool,
 ) -> Result<Saved, SaveError> {
+    let format_for_fill = SaveFormat::from_path(path);
+    // JPEG・BMP は透過を持てないので、選んだ色で塗ってから書き出す
+    let filled = match format_for_fill {
+        Some(format) if format.is_opaque() => fill_transparency(image, options.fill),
+        _ => std::borrow::Cow::Borrowed(image),
+    };
+    let image = filled.as_ref();
     let format = SaveFormat::from_path(path)
         .ok_or_else(|| SaveError::UnsupportedExtension(extension(path).unwrap_or_default()))?;
     // TIFF で保存するとき・TIFF から読んだ EXIF は、MakerNote を残さない（旧版と同じ）
@@ -467,6 +498,37 @@ mod tests {
             sized_paths(&base, &[1080, 1080]),
             [dir.join("photo_edited_1080_2.jpg"), dir.join("photo_edited_1080_3.jpg")]
         );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn transparency_is_filled_with_the_chosen_color_in_jpeg() {
+        let dir = std::env::temp_dir().join(format!("imageeditorrt-fill-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // 左は不透明な赤、右は透明
+        let image = RgbaImage::from_fn(16, 8, |x, _| {
+            if x < 8 {
+                image::Rgba([220, 20, 20, 255])
+            } else {
+                image::Rgba([0, 0, 0, 0])
+            }
+        });
+        let black = SaveOptions { fill: [0, 0, 0], ..SaveOptions::default() };
+        let path = dir.join("fill.jpg");
+        save_edited(&image, &path, black, None, false).unwrap();
+        let back = image::open(&path).unwrap().to_rgba8();
+        assert!(
+            back.get_pixel(13, 4).0[..3].iter().all(|&v| v < 12),
+            "透過は黒: {:?}",
+            back.get_pixel(13, 4)
+        );
+        assert!(back.get_pixel(3, 4)[0] > 180, "不透明なところはそのまま");
+        // 既定は白。PNG は透過のまま（塗らない）
+        save_edited(&image, &path, SaveOptions::default(), None, false).unwrap();
+        assert!(image::open(&path).unwrap().to_rgba8().get_pixel(13, 4).0[..3].iter().all(|&v| v > 243));
+        let png = dir.join("fill.png");
+        save_edited(&image, &png, black, None, false).unwrap();
+        assert_eq!(image::open(&png).unwrap().to_rgba8().get_pixel(13, 4)[3], 0);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

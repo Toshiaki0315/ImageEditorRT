@@ -392,6 +392,22 @@
         </div>
       </form>
     </dialog>
+    <!-- 版の一覧: プレビューを見ながら選べるよう、モーダルにしないで出す -->
+    <dialog id="versions-dialog" class="versions-dialog" aria-labelledby="versions-title">
+      <h2 id="versions-title">版の一覧</h2>
+      <select id="versions-list" size="8" aria-label="残した版"></select>
+      <label class="field">名前:<input type="text" id="version-name" autocomplete="off" /></label>
+      <div class="buttons">
+        <button type="button" id="version-keep" title="今の加工（切り抜き・大きさを含む）を版として残します（⌥⌘K）">今の加工を残す</button>
+        <button type="button" id="version-apply">当てはめる</button>
+        <button type="button" id="version-rename">名前を変える</button>
+        <button type="button" id="version-delete">削除</button>
+      </div>
+      <p class="note">一覧で選ぶと、その版の加工を当てはめます（⌘Z で戻せます）。版は写真を開いている間だけ覚えます。</p>
+      <div class="buttons dialog-buttons">
+        <button type="button" id="versions-close">閉じる</button>
+      </div>
+    </dialog>
     <dialog id="preset-dialog" class="preset-dialog">
       <form method="dialog">
         <h2>プリセットを保存</h2>
@@ -429,6 +445,8 @@
             <dd>位置情報を消す・ぼかし／モザイク／スタンプで隠す（プレビューをドラッグ）。「修復」でゴミ・ほくろなどをまわりの色で埋めて消す。顔・文字を見つけてまとめて隠せる</dd>
             <dt>EXIF</dt>
             <dd>撮影情報（MakerNote も）。位置情報はマップで開ける</dd>
+            <dt>版</dt>
+            <dd>「編集 > 今の加工を版として残す」（⌥⌘K）で今の加工を残し、「編集 > 版の一覧…」で選ぶと当てはめて見比べられる（写真を開いている間だけ）</dd>
             <dt>色空間</dt>
             <dd>Display P3（iPhone などの広い色域）の写真は P3 のまま加工・保存する（ステータスバーに「Display P3」と出る。GIF・BMP で保存するときは sRGB に直す）</dd>
           </dl>

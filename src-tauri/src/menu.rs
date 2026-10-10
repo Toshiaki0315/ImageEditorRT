@@ -40,6 +40,8 @@ pub const PASTE: &str = "paste";
 /// 「編集 > 加工をコピー」「加工をペースト」（プリセットと同じ加工を、保存せずに次の写真へ使い回す）
 pub const COPY_LOOK: &str = "copy-look";
 pub const PASTE_LOOK: &str = "paste-look";
+pub const KEEP_VERSION: &str = "keep-version";
+pub const VERSIONS: &str = "versions";
 /// 「編集 > 加工後の画像をコピー」（原寸で加工した画像をクリップボードへ。画像がないときは使えない）
 pub const COPY_IMAGE: &str = "copy-image";
 /// 「編集 > 文字・透かし…」
@@ -132,6 +134,12 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .accelerator("Alt+CmdOrCtrl+V")
         .enabled(false)
         .build(app)?;
+    // 加工の途中の版（画像がないときは使えない）
+    let keep_version = MenuItemBuilder::with_id(KEEP_VERSION, "今の加工を版として残す")
+        .accelerator("Alt+CmdOrCtrl+K")
+        .enabled(false)
+        .build(app)?;
+    let versions = MenuItemBuilder::with_id(VERSIONS, "版の一覧…").enabled(false).build(app)?;
     let edit = SubmenuBuilder::new(app, "編集")
         .item(&undo)
         .item(&redo)
@@ -144,6 +152,9 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&copy_image)
         .item(&copy_look)
         .item(&paste_look)
+        .separator()
+        .item(&keep_version)
+        .item(&versions)
         .separator()
         .item(&text)
         .build()?;

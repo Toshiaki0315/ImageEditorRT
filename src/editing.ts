@@ -45,7 +45,7 @@ export function settingsChanged() {
 }
 
 /** 今の設定パネルの状態。出力の幅・高さは出力の欄の状態から決まるので、設定の側には持たない。 */
-function snapshot(): Snapshot {
+export function snapshot(): Snapshot {
   return {
     settings: { ...structuredClone(state.settings), width: null, height: null },
     aspect: parts.crop.aspectState(),
@@ -63,6 +63,12 @@ function restore(snapshot: Snapshot) {
   parts.panel.show();
   parts.textDialog.show();
   settingsChanged();
+}
+
+/** 残しておいた状態（版）を当てはめる。1 回の操作として履歴に積む（元に戻せる）。 */
+export function applySnapshot(saved: Snapshot) {
+  restore(saved);
+  parts.recorder.changed();
 }
 
 /** 履歴を作る。スライダーをドラッグしている間は積まない（離したら 1 回の操作として積む）。 */

@@ -13,7 +13,7 @@ import { bench, benchSave, verdict } from "./bench";
 import { ColorPanel } from "./colorPanel";
 import { setupAssist } from "./assist";
 import { CropController } from "./crop";
-import { isEditingText, redo, settingsChanged, setupHistory, undo, userChanged } from "./editing";
+import { applySnapshot, isEditingText, redo, settingsChanged, setupHistory, snapshot, undo, userChanged } from "./editing";
 import { isEscapeKey } from "./keys";
 import {
   makeCollage,
@@ -41,10 +41,11 @@ import { LocalPanel } from "./localPanel";
 import { LutControls } from "./lutControls";
 import { MaskedPanel } from "./maskedPanel";
 import { MonoPanel } from "./monoPanel";
+import { Versions } from "./versions";
 import { ColorMatchControls } from "./colorMatchControls";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
-import { catchUnexpectedErrors, reportUnexpected, showError } from "./status";
+import { catchUnexpectedErrors, notify, reportUnexpected, showError } from "./status";
 import { TasteGallery } from "./tasteGallery";
 import { TextDialog } from "./textDialog";
 import { TextDrag } from "./textDrag";
@@ -90,6 +91,8 @@ const menuActions: Record<string, () => void> = {
   [MENU.text]: () => state.loaded && parts.textDialog.open(),
   [MENU.copyLook]: copyLook,
   [MENU.pasteLook]: () => void pasteLook(),
+  [MENU.keepVersion]: () => state.loaded && !state.saving && parts.versions.keep(),
+  [MENU.versions]: () => state.loaded && parts.versions.open(),
   [MENU.actualSize]: () => showActualSize(),
   [MENU.fit]: fitToWindow,
   [MENU.split]: toggleSplit,
@@ -109,6 +112,7 @@ async function createParts() {
   const filters = await invoke<[FilterType, string][]>("filter_types");
   parts.panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, userChanged);
   parts.colorPanel = new ColorPanel($("color-extra"), settings, userChanged);
+  parts.versions = new Versions(snapshot, applySnapshot, notify);
   parts.monoPanel = new MonoPanel($("mono-extra"), settings, () => state.loaded !== null, userChanged);
   parts.lutControls = new LutControls($("lut-extra"), settings, () => state.loaded !== null, userChanged);
   parts.lutControls.onError = (error) => void showError("LUT を読めません", error);

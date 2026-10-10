@@ -89,6 +89,8 @@ pub struct EditSettings {
     pub background_blur: u32,
     /// 背景を「色で塗る」ときの色（既定は白。旧版にはない）
     pub background_color: [u8; 3],
+    /// 背景を「画像に置き換える」ときの画像のパス（空ならなし。写真ごとの設定なのでプリセットには入れない。旧版にはない）
+    pub background_image: String,
     /// トーンカーブの点（x は 0〜255 で増えていく順、両端は x = 0・255。旧版にはない）
     pub tone_curve: Vec<[u8; 2]>,
     /// 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタ。旧版にはない）
@@ -141,6 +143,7 @@ impl Default for EditSettings {
             background: Background::Keep,
             background_blur: crate::background::BLUR_DEFAULT,
             background_color: [255, 255, 255],
+            background_image: String::new(),
             tone_curve: curve::identity_curve(),
             hsl: [HslAdjust::default(); HSL_BANDS],
             logo: LogoSettings::default(),

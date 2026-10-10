@@ -25,8 +25,17 @@ pub struct Sources<'a> {
 /// settings と材料で、かける処理があるか。
 pub fn needed(settings: &EditSettings, sources: &Sources) -> bool {
     let skin = uses_faces(settings) && sources.faces.is_some_and(|f| !f.is_empty());
-    let background = settings.background != Background::Keep && sources.mask.is_some();
+    let background = active_background(settings) && sources.mask.is_some();
     skin || background
+}
+
+/// 背景をかえるか（「画像に置き換える」で画像を選んでいなければかえない）。
+fn active_background(settings: &EditSettings) -> bool {
+    match settings.background {
+        Background::Keep => false,
+        Background::Image => !settings.background_image.trim().is_empty(),
+        _ => true,
+    }
 }
 
 /// 顔の枠を使う処理（肌をなめらかに・赤目の補正）があるか。
@@ -51,7 +60,14 @@ pub fn prepare(image: &RgbaImage, settings: &EditSettings, sources: &Sources) ->
             skin::smooth_skin(&mut out, &fitted, settings.skin_smooth);
         }
     }
-    if let Some(mask) = sources.mask.filter(|_| settings.background != Background::Keep) {
+    if let Some(mask) = sources.mask.filter(|_| active_background(settings)) {
+        if settings.background == Background::Image {
+            // 読めない画像なら置き換えない（ロゴと同じく、同じファイルは読み直さない）
+            if let Some(backdrop) = crate::logo::load_logo(&settings.background_image) {
+                out = background::replace_background(&out, mask, &backdrop);
+            }
+            return Some(out);
+        }
         out = background::apply_background_with(
             &out,
             mask,
@@ -73,6 +89,36 @@ mod tests {
             let noise = if (x * 7 + y * 13) % 5 < 2 { 10 } else { 0 };
             Rgba([200 - noise, 150 - noise, 130 - noise, 255])
         })
+    }
+
+    #[test]
+    fn background_image_needs_a_readable_file() {
+        let image = photo(40, 40);
+        let mask = GrayImage::from_fn(40, 40, |x, _| Luma([if x < 20 { 255 } else { 0 }]));
+        let sources = Sources { faces: None, mask: Some(&mask), preview_width: 40 };
+        // 画像を選んでいなければ何もしない
+        let none = EditSettings { background: Background::Image, ..EditSettings::default() };
+        assert!(prepare(&image, &none, &sources).is_none());
+        // 選んだ画像で背景を置き換える
+        let dir = std::env::temp_dir().join(format!("ier-backdrop-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("backdrop.png");
+        RgbaImage::from_pixel(10, 10, Rgba([0, 0, 255, 255])).save(&path).unwrap();
+        let settings = EditSettings {
+            background: Background::Image,
+            background_image: path.to_string_lossy().into_owned(),
+            ..EditSettings::default()
+        };
+        let out = prepare(&image, &settings, &sources).expect("置き換える");
+        assert_eq!(out.get_pixel(35, 5).0, [0, 0, 255, 255]);
+        assert_eq!(out.get_pixel(2, 5), image.get_pixel(2, 5));
+        // 読めない画像なら置き換えない
+        let missing = EditSettings {
+            background_image: dir.join("none.png").to_string_lossy().into_owned(),
+            ..settings
+        };
+        assert_eq!(prepare(&image, &missing, &sources), Some(image.clone()));
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

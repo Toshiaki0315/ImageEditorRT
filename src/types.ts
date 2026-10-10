@@ -77,6 +77,8 @@ export type EditSettings = {
   backgroundBlur: number;
   /** 背景を「色で塗る」ときの色（既定は白） */
   backgroundColor: [number, number, number];
+  /** 背景を「画像に置き換える」ときの画像のパス（空ならなし） */
+  backgroundImage: string;
   /** トーンカーブの点（[x, y]。x は 0〜255 で増えていく順、両端は x = 0・255） */
   toneCurve: [number, number][];
   /** 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタの 8 色） */
@@ -129,7 +131,7 @@ export type HslAdjust = { hue: number; saturation: number; lightness: number };
 export const neutralHsl = (): HslAdjust[] => Array.from({ length: 8 }, () => ({ hue: 0, saturation: 0, lightness: 0 }));
 
 /** 背景の扱い（Rust の background::Background）。 */
-export type BackgroundMode = "keep" | "transparent" | "white" | "blur";
+export type BackgroundMode = "keep" | "transparent" | "white" | "blur" | "image";
 
 /** 投稿加工の隠し方（Rust の privacy::RegionKind）。 */
 export type RegionKind = "blur" | "mosaic" | "stamp";
@@ -181,6 +183,7 @@ export function defaultSettings(): EditSettings {
     background: "keep",
     backgroundBlur: 50,
     backgroundColor: [255, 255, 255],
+    backgroundImage: "",
     toneCurve: [
       [0, 0],
       [255, 255],

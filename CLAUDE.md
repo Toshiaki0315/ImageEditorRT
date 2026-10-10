@@ -82,7 +82,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     histogram.rs          # ヒストグラム（R・G・B・輝度の分布）の計算
     shapes.rs             # 形（角丸・円）の切り抜き
     privacy.rs            # 投稿加工の範囲（ぼかし・モザイク・絵文字のスタンプ）
-    background.rs         # 背景を消す（透明・白）・ぼかす（被写体のマスクで）
+    background.rs         # 背景を消す（透明・色）・ぼかす・画像に置き換える（被写体のマスクで）
     collage.rs            # 並べて 1 枚に（並べ方・枠に合わせた切り抜き）
     sample.rs             # 計測用の画像
     pyrandom.rs           # Python の random.Random と同じ乱数（経年劣化の粒子を旧版とそろえる）
@@ -145,7 +145,7 @@ src/                      # 画面（TypeScript）
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）
   cropOverlay.ts / cropShape.ts # 「切り抜き」の線の描画（範囲・形・ガイド）と形の輪郭のパス
   guides.ts               # 切り抜きのガイド線（三分割・黄金比・対角線）の位置の計算
-  photoControls.ts        # 「切り抜き」タブの水平の補正（自動を含む）・遠近の補正と背景（消す・ぼかす）
+  photoControls.ts        # 「切り抜き」タブの水平の補正（自動を含む）・遠近の補正と背景（消す・ぼかす・置き換える）
   perspective.ts          # 遠近の補正の向きを回転・反転に合わせて直す（tests-ts/ で npm test）
   localPanel.ts / localShapes.ts # 「加工」タブの部分補正（範囲のドラッグ）と範囲の当たり判定・線の位置
   overlay.ts              # プレビューに重ねる SVG の部品（ハンドルなど。切り抜き・投稿加工・部分補正で共通）

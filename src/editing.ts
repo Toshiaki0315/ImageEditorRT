@@ -30,6 +30,7 @@ export function settingsChanged() {
   parts.localPanel?.show();
   parts.lutControls?.show();
   parts.maskedPanel?.show();
+  parts.monoPanel?.show();
   parts.colorMatchControls?.show();
   parts.textDrag?.draw();
   parts.photoControls?.show();

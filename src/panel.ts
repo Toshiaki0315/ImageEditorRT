@@ -140,6 +140,10 @@ export class Panel {
     const extra = document.createElement("div");
     extra.id = "color-extra";
     adjustPage.append(extra);
+    // 白黒（monoPanel.ts が中身を作る）
+    const mono = document.createElement("div");
+    mono.id = "mono-extra";
+    adjustPage.append(mono);
     // 部分補正（localPanel.ts が中身を作る）
     const local = document.createElement("div");
     local.id = "local-extra";
@@ -256,6 +260,7 @@ export class Panel {
     for (const slider of [...STRENGTH, ...COLOR, ...DETAIL]) this.settings[slider.key] = slider.initial;
     this.settings.toneCurve = identityCurve();
     this.settings.hsl = neutralHsl();
+    this.settings.mono = defaultSettings().mono;
     this.settings.redEye = false;
     this.show();
     this.onChange();

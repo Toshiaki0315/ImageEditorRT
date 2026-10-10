@@ -118,6 +118,19 @@
       "lightness": 0
     }
   ],
+  "mono": {
+    "enabled": false,
+    "mix": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
   "logo": {
     "path": "",
     "position": "bottom_right",

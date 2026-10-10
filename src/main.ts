@@ -40,6 +40,7 @@ import { PhotoControls } from "./photoControls";
 import { LocalPanel } from "./localPanel";
 import { LutControls } from "./lutControls";
 import { MaskedPanel } from "./maskedPanel";
+import { MonoPanel } from "./monoPanel";
 import { ColorMatchControls } from "./colorMatchControls";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
@@ -108,6 +109,7 @@ async function createParts() {
   const filters = await invoke<[FilterType, string][]>("filter_types");
   parts.panel = new Panel($("page-adjust"), $("page-diorama"), filters, settings, userChanged);
   parts.colorPanel = new ColorPanel($("color-extra"), settings, userChanged);
+  parts.monoPanel = new MonoPanel($("mono-extra"), settings, () => state.loaded !== null, userChanged);
   parts.lutControls = new LutControls($("lut-extra"), settings, () => state.loaded !== null, userChanged);
   parts.lutControls.onError = (error) => void showError("LUT を読めません", error);
   parts.colorMatchControls = new ColorMatchControls($("color-match-extra"), settings, () => state.loaded !== null, userChanged);

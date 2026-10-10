@@ -141,7 +141,7 @@ pub fn apply_hsl(image: &mut RgbaImage, bands: &[HslAdjust; HSL_BANDS]) {
 }
 
 /// 色相 h（度）が、となりあう 2 色のどちらにどれだけ近いか（(色の番号, 重み) を 2 つ。重みの合計は 1）。
-fn band_weights(h: f64) -> [(usize, f64); 2] {
+pub(crate) fn band_weights(h: f64) -> [(usize, f64); 2] {
     for (i, &start) in HSL_CENTERS.iter().enumerate() {
         let next = (i + 1) % HSL_BANDS;
         let mut end = HSL_CENTERS[next];
@@ -161,7 +161,7 @@ fn band_weights(h: f64) -> [(usize, f64); 2] {
 }
 
 /// RGB（0〜255）を、色相（度）・彩度・明るさ（0〜1）にする。
-fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (f64, f64, f64) {
+pub(crate) fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (f64, f64, f64) {
     let (r, g, b) = (f64::from(r) / 255.0, f64::from(g) / 255.0, f64::from(b) / 255.0);
     let (max, min) = (r.max(g).max(b), r.min(g).min(b));
     let l = (max + min) / 2.0;

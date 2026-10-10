@@ -290,7 +290,7 @@ fn apply_local_adjustments(
 }
 
 /// フィルターの前にかける基本補正（参考の写真に色を合わせる → かすみの除去 → 露出 → 明るさ → コントラスト → 色温度 → トーンカーブ → ハイライト／シャドウ →
-/// 彩度 → 色ごとの調整）。露出〜トーンカーブは 1 つの変換表にまとめて 1 回でかける。
+/// 彩度 → 色ごとの調整 → 白黒）。露出〜トーンカーブは 1 つの変換表にまとめて 1 回でかける。
 /// 基本補正（被写体・背景ごとの補正から使う）。
 pub(crate) fn basic_adjustments(image: RgbaImage, settings: &EditSettings) -> RgbaImage {
     apply_basic_adjustments(image, settings)
@@ -323,6 +323,7 @@ fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> Rgb
         adjust::saturation(&mut image, settings.saturation);
     }
     curve::apply_hsl(&mut image, &settings.hsl);
+    crate::mono::apply_mono(&mut image, &settings.mono);
     image
 }
 

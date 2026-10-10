@@ -16,6 +16,7 @@ use crate::filters::FilterType;
 use crate::frames::FrameType;
 use crate::logo::LogoSettings;
 use crate::lut::LutSettings;
+use crate::mono::MonoMix;
 use crate::pipeline::{EditSettings, FILTER_STRENGTH_FULL, FILTER_STRENGTH_MAX};
 use crate::shapes::ShapeType;
 use crate::text::{TextEffect, TextFont, TextPosition, TextSettings};
@@ -83,6 +84,9 @@ pub struct Preset {
     pub tone_curve: Vec<[u8; 2]>,
     #[serde(skip_serializing_if = "is_neutral_hsl")]
     pub hsl: [HslAdjust; HSL_BANDS],
+    /// 白黒（旧版にはない）。白黒にするときだけファイルに書く
+    #[serde(skip_serializing_if = "MonoMix::is_off")]
+    pub mono: MonoMix,
     /// ロゴの透かし（旧版にはない。ファイルの場所で覚える）。ロゴがなければファイルに書かない
     #[serde(skip_serializing_if = "LogoSettings::is_empty")]
     pub logo: LogoSettings,
@@ -151,6 +155,7 @@ impl Preset {
             text: s.text.clone(),
             tone_curve: s.tone_curve.clone(),
             hsl: s.hsl,
+            mono: s.mono,
             logo: s.logo.clone(),
             lut: s.lut.clone(),
             color_match: s.color_match,
@@ -188,6 +193,7 @@ impl Preset {
             text: self.text.clone(),
             tone_curve: self.tone_curve.clone(),
             hsl: self.hsl,
+            mono: self.mono,
             logo: self.logo.clone(),
             lut: self.lut.clone(),
             color_match: self.color_match,
@@ -490,6 +496,10 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
             "text" => p.text = text_from_value(raw)?,
             "tone_curve" => p.tone_curve = curve_from_value(raw)?,
             "hsl" => p.hsl = hsl_from_value(raw)?,
+            "mono" => {
+                p.mono = enum_value::<MonoMix>(raw)
+                    .map(|m| MonoMix { mix: m.mix.map(|v| v.clamp(-100, 100)), ..m })?
+            }
             "logo" => p.logo = enum_value(raw)?,
             "lut" => {
                 p.lut = enum_value::<LutSettings>(raw)

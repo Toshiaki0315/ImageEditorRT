@@ -62,6 +62,8 @@ pub struct EditSettings {
     /// ハイライト・シャドウ -100〜+100（0 = 変化なし。明部・暗部だけを明るく・暗くする。旧版にはない）
     pub highlights: i32,
     pub shadows: i32,
+    /// かすみの除去 -100〜+100（0 = 変化なし。負でかすみを足す。色の調整のはじめにかける。旧版にはない）
+    pub dehaze: i32,
     /// 露出 -5.0〜+5.0 EV（0 = 変化なし）
     pub exposure: f64,
     /// シャープ・ぼかし・ノイズ除去 0〜100（0 = なし）
@@ -129,6 +131,7 @@ impl Default for EditSettings {
             contrast: 0,
             highlights: 0,
             shadows: 0,
+            dehaze: 0,
             exposure: 0.0,
             sharpen: 0,
             blur: 0,

@@ -13,6 +13,7 @@ use crate::local::LocalAdjust;
 use crate::logo::LogoSettings;
 use crate::lut::LutSettings;
 use crate::masked::MaskedAdjust;
+use crate::mono::MonoMix;
 use crate::privacy::Region;
 use crate::shapes::{self, ShapeType};
 use crate::text::TextSettings;
@@ -103,6 +104,8 @@ pub struct EditSettings {
     pub tone_curve: Vec<[u8; 2]>,
     /// 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタ。旧版にはない）
     pub hsl: [HslAdjust; HSL_BANDS],
+    /// 白黒（色ごとにどれだけ明るく写すか。色ごとの調整の後にかける。旧版にはない）
+    pub mono: MonoMix,
     /// ロゴの透かし（文字と同じく写真の上・フレームの余白に描く。旧版にはない）
     pub logo: LogoSettings,
     /// LUT（.cube。テイストの後にかける。ファイルの場所で覚える。旧版にはない）
@@ -159,6 +162,7 @@ impl Default for EditSettings {
             background_adjust: MaskedAdjust::default(),
             tone_curve: curve::identity_curve(),
             hsl: [HslAdjust::default(); HSL_BANDS],
+            mono: MonoMix::default(),
             logo: LogoSettings::default(),
             lut: LutSettings::default(),
             color_match: ColorMatch::default(),

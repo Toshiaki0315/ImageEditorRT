@@ -15,6 +15,7 @@ import { Preview } from "./preview";
 import type { LocalPanel } from "./localPanel";
 import type { LutControls } from "./lutControls";
 import type { MaskedPanel } from "./maskedPanel";
+import type { MonoPanel } from "./monoPanel";
 import type { ColorMatchControls } from "./colorMatchControls";
 import type { TextDrag } from "./textDrag";
 import type { PrivacyPanel } from "./privacy";
@@ -98,6 +99,7 @@ export const parts = {} as {
   localPanel: LocalPanel;
   lutControls: LutControls;
   maskedPanel: MaskedPanel;
+  monoPanel: MonoPanel;
   colorMatchControls: ColorMatchControls;
   textDrag: TextDrag;
   batchDialog: BatchDialog;

@@ -43,6 +43,7 @@ pub mod logo;
 pub mod lut;
 pub mod makernote;
 pub mod masked;
+pub mod mono;
 pub mod output;
 pub mod perspective;
 pub mod pillow;

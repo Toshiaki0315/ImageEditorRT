@@ -88,6 +88,8 @@ export type EditSettings = {
   toneCurve: [number, number][];
   /** 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタの 8 色） */
   hsl: HslAdjust[];
+  /** 白黒（mix は色ごとにどれだけ明るく写すか -100〜100。HSL と同じ 8 色の順） */
+  mono: { enabled: boolean; mix: number[] };
   /** ロゴの透かし（path が空ならなし） */
   logo: LogoSettings;
   /** LUT（.cube。path が空ならなし。テイストの後にかける） */
@@ -208,6 +210,7 @@ export function defaultSettings(): EditSettings {
       [255, 255],
     ],
     hsl: neutralHsl(),
+    mono: { enabled: false, mix: [0, 0, 0, 0, 0, 0, 0, 0] },
     logo: { path: "", position: "bottom_right", size: 15, opacity: 80 },
     lut: { path: "", strength: 100 },
     colorMatch: { reference: null, strength: 100 },

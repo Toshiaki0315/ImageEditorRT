@@ -369,3 +369,22 @@ fn auto_crop_cuts_each_photo_to_the_ratio() {
     }
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn neighbors_follow_the_name_order_and_stop_at_the_ends() {
+    use imageeditorrt_core::batch::neighbor_image;
+    let dir = temp_dir("neighbor");
+    for name in ["b.jpg", "a.PNG", "c.heic", "notes.txt", ".hidden.jpg", "d.CR3"] {
+        touch(&dir.join(name));
+    }
+    std::fs::create_dir_all(dir.join("sub.jpg")).unwrap(); // フォルダは数えない
+    let next = neighbor_image(&dir.join("b.jpg"), 1).unwrap();
+    assert_eq!((next.path.file_name().unwrap().to_str(), next.number, next.total), (Some("c.heic"), 3, 4));
+    let previous = neighbor_image(&dir.join("b.jpg"), -1).unwrap();
+    assert_eq!(previous.path, dir.join("a.PNG"));
+    // 端では止まる。一覧にないファイルは None
+    assert_eq!(neighbor_image(&dir.join("a.PNG"), -1), None);
+    assert_eq!(neighbor_image(&dir.join("d.CR3"), 1), None);
+    assert_eq!(neighbor_image(&dir.join("notes.txt"), 1), None);
+    std::fs::remove_dir_all(&dir).unwrap();
+}

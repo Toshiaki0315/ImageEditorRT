@@ -126,6 +126,17 @@ pub async fn detect_text(
     find_regions(settings, state, text_regions::detect_text, transform::clamp_crop).await
 }
 
+/// 開いている写真と同じフォルダの、step 枚先（負なら前）の写真（「次の写真」「前の写真」）。元のファイルのない画像・
+/// 端を越えるときは None。
+#[tauri::command]
+pub fn neighbor_image(
+    step: isize,
+    state: State<'_, AppState>,
+) -> Result<Option<imageeditorrt_core::batch::Neighbor>, String> {
+    let loaded = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(loaded.source.path.as_deref().and_then(|path| imageeditorrt_core::batch::neighbor_image(path, step)))
+}
+
 /// おまかせ切り抜き: プレビュー用の画像を今の向きにして目立つ部分を探し、選んでいる比でその部分が中央寄りに入る
 /// 範囲を、回転・反転した後の原寸の座標で返す。目立つ部分が見つからなければ None。
 #[tauri::command]

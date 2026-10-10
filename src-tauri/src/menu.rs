@@ -14,6 +14,9 @@ pub const MENU_EVENT: &str = "menu";
 pub const QUIT: &str = "quit";
 /// 「ファイル > 開く…」
 pub const OPEN: &str = "open";
+/// 「ファイル > 次の写真」「前の写真」（同じフォルダの写真を名前順に。元のファイルのない画像では使えない）
+pub const NEXT_PHOTO: &str = "next-photo";
+pub const PREVIOUS_PHOTO: &str = "previous-photo";
 /// 「ファイル > 保存…」
 pub const SAVE: &str = "save";
 /// 「ファイル > まとめて処理…」
@@ -70,6 +73,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let open = MenuItemBuilder::with_id(OPEN, "開く…").accelerator("CmdOrCtrl+O").build(app)?;
     // 最近使った項目（中身は起動後に recent::refresh_menu が作る）
     let recent = SubmenuBuilder::with_id(app, crate::recent::MENU_ID, "最近使った項目").build()?;
+    let next_photo = MenuItemBuilder::with_id(NEXT_PHOTO, "次の写真")
+        .accelerator("CmdOrCtrl+]")
+        .enabled(false)
+        .build(app)?;
+    let previous_photo = MenuItemBuilder::with_id(PREVIOUS_PHOTO, "前の写真")
+        .accelerator("CmdOrCtrl+[")
+        .enabled(false)
+        .build(app)?;
     let save = MenuItemBuilder::with_id(SAVE, "保存…").accelerator("CmdOrCtrl+S").build(app)?;
     let save_sizes = MenuItemBuilder::with_id(SAVE_SIZES, "複数の大きさで保存…").build(app)?;
     let reveal_saved = MenuItemBuilder::with_id(REVEAL_SAVED, "保存したファイルを Finder で表示")
@@ -81,6 +92,9 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let file = SubmenuBuilder::new(app, "ファイル")
         .item(&open)
         .item(&recent)
+        .item(&next_photo)
+        .item(&previous_photo)
+        .separator()
         .item(&save)
         .item(&save_sizes)
         .item(&reveal_saved)

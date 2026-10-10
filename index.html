@@ -152,6 +152,11 @@
             <input id="limit-mb" type="number" min="0.05" max="100" step="0.1" /> MB 以下にする（JPEG・HEIC）</label
           >
           <label class="row">透過を塗る色 <input id="fill-color" type="color" title="透過を持てない JPEG・BMP で保存するとき、透明な部分をこの色で塗ります" /></label>
+          <h2>権利の情報</h2>
+          <label class="row text-row">著作権 <input id="rights-copyright" type="text" placeholder="例: © 2026 名前" title="保存するとき EXIF の Copyright に書きます（空なら元のまま）" /></label>
+          <label class="row text-row">作者 <input id="rights-artist" type="text" title="保存するとき EXIF の Artist に書きます（空なら元のまま）" /></label>
+          <label class="row text-row">説明 <input id="rights-description" type="text" title="保存するとき EXIF の ImageDescription に書きます（空なら元のまま）" /></label>
+          <p class="note">JPEG・PNG・TIFF・HEIC で保存するとき、EXIF に書きます（「撮影情報 (EXIF) を残す」を外していても書きます）。</p>
         </div>
         <div id="page-diorama" class="page" role="tabpanel" hidden></div>
         <div id="page-privacy" class="page" role="tabpanel" hidden>
@@ -412,7 +417,7 @@
             <dt>切り抜き</dt>
             <dd>比を選んでプレビューをドラッグ（三分割・黄金比・対角線のガイドも出せる）。「おまかせ」で目立つ被写体に合わせた範囲に。回転・反転・水平の補正（動かしている間は格子が出る。傾きの自動補正も）・遠近の補正（見上げた建物のすぼまった縦の線をまっすぐに）・背景を消す／ぼかす／画像に置き換える・フレーム・形（角丸・円）</dd>
             <dt>出力</dt>
-            <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限・JPEG で透過を塗る色</dd>
+            <dd>幅・高さ・よく使う大きさ（Instagram・X など）。JPEG・HEIC の品質・EXIF・位置情報・ファイルの大きさの上限・JPEG で透過を塗る色・EXIF に書く著作権・作者・説明（空なら元のまま）</dd>
             <dt>ジオラマ</dt>
             <dd>ミニチュア風。ピントの帯のガイドがプレビューに出る</dd>
             <dt>投稿加工</dt>

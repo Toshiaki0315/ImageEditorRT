@@ -170,8 +170,9 @@ pub async fn save_sizes(
                 .map(|(path, long_side)| {
                     let sized = pipeline::long_side_settings(original.dimensions(), &settings, long_side);
                     let edited = pipeline::apply_edits(&original, &sized).map_err(SaveFailure::other)?;
-                    let saved = save::save_edited(&edited, &path, options, source.exif.as_deref(), is_tiff)
-                        .map_err(SaveFailure::other)?;
+                    let saved =
+                        save::save_edited(&edited, &path, options.clone(), source.exif.as_deref(), is_tiff)
+                            .map_err(SaveFailure::other)?;
                     Ok(SizedSaved { path: path.to_string_lossy().into_owned(), long_side, saved })
                 })
                 .collect()

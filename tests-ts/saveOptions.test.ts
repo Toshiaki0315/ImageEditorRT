@@ -4,7 +4,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fromHex, parseStored, toHex, toSaveOptions } from "../src/saveOptions.ts";
 
-const DEFAULT = { quality: 90, keepExif: true, keepGps: false, limit: false, limitMb: 1, fill: [255, 255, 255] };
+const DEFAULT = {
+  quality: 90,
+  keepExif: true,
+  keepGps: false,
+  limit: false,
+  limitMb: 1,
+  fill: [255, 255, 255],
+  rights: { copyright: "", artist: "", description: "" },
+};
 
 test("覚えておいた設定がなければ・壊れていれば既定値", () => {
   assert.deepEqual(parseStored(null), DEFAULT);
@@ -35,6 +43,14 @@ test("透過を塗る色は 0〜255 の整数 3 つだけ読み、Rust にその
   assert.deepEqual(parseStored({ fill: [0, 300, 1] }).fill, [255, 255, 255]);
   assert.deepEqual(parseStored({ fill: "black" }).fill, [255, 255, 255]);
   assert.deepEqual(toSaveOptions(parseStored({ fill: [1, 2, 3] })).fill, [1, 2, 3]);
+  // 権利の情報は文字の項目だけ使う
+  assert.deepEqual(parseStored({ rights: { copyright: "© A", artist: 3 } }).rights, {
+    copyright: "© A",
+    artist: "",
+    description: "",
+  });
+  assert.deepEqual(parseStored({ rights: "x" }).rights, DEFAULT.rights);
+  assert.deepEqual(toSaveOptions(parseStored({ rights: { artist: "B" } })).rights.artist, "B");
   assert.equal(toHex([0, 128, 255]), "#0080ff");
   assert.deepEqual(fromHex("#0080ff"), [0, 128, 255]);
 });

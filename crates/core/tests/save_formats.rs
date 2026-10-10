@@ -7,8 +7,10 @@ use image::{Rgba, RgbaImage};
 use imageeditorrt_core::decode::decode_file;
 use imageeditorrt_core::exif_info::{raw_exif, read_exif_info, Group};
 use imageeditorrt_core::formats::Format;
-use imageeditorrt_core::save::{save_edited, SaveOptions};
-use imageeditorrt_core::tiff::{tiff_block, ExifBlock, TAG_MAKERNOTE};
+use imageeditorrt_core::save::{save_edited, ExifRights, SaveOptions};
+use imageeditorrt_core::tiff::{
+    tiff_block, ExifBlock, TAG_ARTIST, TAG_COPYRIGHT, TAG_IMAGE_DESCRIPTION, TAG_MAKERNOTE,
+};
 
 /// テストごとの作業用のフォルダ。
 struct TempDir(PathBuf);
@@ -241,4 +243,52 @@ fn heic_keeps_exif_and_fits_the_size_limit() {
     let options = SaveOptions { max_kb: Some(limit_kb), ..SaveOptions::default() };
     let saved = save_edited(&image, &path, options, Some(&source), false).unwrap();
     assert!(saved.fitted && saved.bytes <= u64::from(limit_kb) * 1024, "{saved:?}");
+}
+
+#[test]
+fn rights_are_written_and_maker_note_stays_intact() {
+    let dir = TempDir::new("rights");
+    let source = raw_exif(&fixture("canon.jpg")).unwrap();
+    let original = ExifBlock::parse(&source).unwrap();
+    let rights = ExifRights {
+        copyright: "© 2026 野村".into(),
+        artist: "Toshiaki".into(),
+        description: "  ".into(), // 空白だけは書かない（元のまま）
+    };
+    let options = SaveOptions { rights, ..SaveOptions::default() };
+    for name in ["r.jpg", "r.png", "r.tif", "r.heic"] {
+        let path = dir.join(name);
+        save_edited(&sample(), &path, options.clone(), Some(&source), false).unwrap();
+        let block = saved_block(&path);
+        let text = |tag: u16| {
+            block.ifd0.get(&tag).map(|v| String::from_utf8_lossy(&v.data).trim_end_matches('\0').to_string())
+        };
+        assert_eq!(text(TAG_COPYRIGHT).as_deref(), Some("© 2026 野村"), "{name}");
+        assert_eq!(text(TAG_ARTIST).as_deref(), Some("Toshiaki"), "{name}");
+        assert_eq!(
+            text(TAG_IMAGE_DESCRIPTION),
+            original
+                .ifd0
+                .get(&TAG_IMAGE_DESCRIPTION)
+                .map(|v| String::from_utf8_lossy(&v.data).trim_end_matches('\0').to_string()),
+            "{name}"
+        );
+        assert!(block.exif.contains_key(&0x9003), "撮影日時は残る（{name}）");
+    }
+    // JPEG の MakerNote は元の位置・中身のまま
+    let block = saved_block(&dir.join("r.jpg"));
+    assert_eq!(block.maker_note, original.maker_note);
+
+    // EXIF を残さない・元の EXIF がない画像でも、権利の情報だけは書く
+    let bare = SaveOptions { keep_exif: false, ..options.clone() };
+    let path = dir.join("bare.jpg");
+    save_edited(&sample(), &path, bare, Some(&source), false).unwrap();
+    let block = saved_block(&path);
+    assert!(block.ifd0.contains_key(&TAG_COPYRIGHT));
+    assert!(!block.ifd0.contains_key(&0x0110), "機種は書かない");
+    save_edited(&sample(), &path, options, None, false).unwrap();
+    assert!(saved_block(&path).ifd0.contains_key(&TAG_ARTIST));
+    // 権利の情報がなく EXIF も残さないなら、EXIF は書かない
+    save_edited(&sample(), &path, SaveOptions::default(), None, false).unwrap();
+    assert!(raw_exif(&std::fs::read(&path).unwrap()).is_none());
 }

@@ -408,6 +408,12 @@ button:disabled {
   width: 100%;
 }
 
+/* 文字の欄は、値の列まで広げる */
+.text-row input[type="text"] {
+  grid-column: 2 / 4;
+  min-width: 0;
+}
+
 /* プルダウンはスライダー・数値の欄と同じ幅にする（右の値の列には広げない） */
 .row select {
   grid-column: 2;

@@ -9,6 +9,9 @@ use std::collections::BTreeMap;
 pub const EXIF_HEADER: &[u8] = b"Exif\0\0";
 pub const MAX_IFD_ENTRIES: u16 = 1000;
 pub const TAG_ORIENTATION: u16 = 0x0112;
+pub const TAG_IMAGE_DESCRIPTION: u16 = 0x010E;
+pub const TAG_ARTIST: u16 = 0x013B;
+pub const TAG_COPYRIGHT: u16 = 0x8298;
 pub const TAG_EXIF_IFD: u16 = 0x8769;
 pub const TAG_GPS_IFD: u16 = 0x8825;
 pub const TAG_INTEROP_IFD: u16 = 0xA005;
@@ -23,6 +26,7 @@ const STRUCTURE_TAGS: [u16; 21] = [
     0x013D, 0x0142, 0x0143, 0x0144, 0x0145, 0x0152, 0x0153, 0x0201,
 ];
 const STRIP_OFFSETS: u16 = 0x0111;
+const ASCII: u16 = 2;
 const SHORT: u16 = 3;
 const LONG: u16 = 4;
 const UNDEFINED: u16 = 7;
@@ -267,6 +271,13 @@ impl ExifBlock {
         let data = self.order.put_u16(value).to_vec();
         let ifd = if in_exif { &mut self.exif } else { &mut self.ifd0 };
         ifd.insert(tag, Value { kind: SHORT, count: 1, data });
+    }
+
+    /// IFD0 に文字の値（ASCII 型。末尾に NUL を付ける。日本語は UTF-8 のまま入れる）を設定する。
+    pub fn set_text(&mut self, tag: u16, text: &str) {
+        let mut data = text.as_bytes().to_vec();
+        data.push(0);
+        self.ifd0.insert(tag, Value { kind: ASCII, count: data.len() as u32, data });
     }
 
     pub fn set_long(&mut self, in_exif: bool, tag: u16, value: u32) {

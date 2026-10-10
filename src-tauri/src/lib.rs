@@ -92,6 +92,7 @@ pub fn run() {
             settings::filter_types,
             settings::frame_shape_types,
             settings::text_options,
+            settings::check_lut,
             settings::aspect_ratios,
             settings::effective_crop,
             settings::crop_drag,

@@ -72,6 +72,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     blur.rs               # ガウスぼかし・アンシャープマスク（Pillow と画素まで同じ）
     pillow.rs             # 旧版が使っていた Pillow の処理（ImageEnhance・blend・screen など）を同じ丸め方で
     filters.rs            # テイスト（フィルター 23 種）
+    lut.rs                # LUT（.cube の 3D LUT を読み、3 次元の線形補間でかける）
     effects.rs            # ディテール（シャープ・ぼかし・ノイズ除去）
     skin.rs               # 肌をなめらかに（顔のまわりの楕円だけ、輪郭を残してなめらかに）
     redeye.rs             # 赤目の補正（顔の枠の目のあたりで、強い赤だけを暗い無彩色に）
@@ -151,6 +152,7 @@ src/                      # 画面（TypeScript）
   tasteGallery.ts         # テイストの一覧（見本を並べて選ぶ）
   collageDialog.ts        # 並べて 1 枚に のダイアログ
   textDialog.ts           # 「文字・透かし」のダイアログ（⌘T・「文字…」）
+  lutControls.ts          # 「加工」タブの LUT（ファイルを選ぶ・外す・強さ）
   output.ts               # 「出力」タブのサイズ変更（計算は core/output.rs）
   sizes.ts                # 複数の大きさで保存（選んだ大きさの覚え方・知らせの文。tests-ts/ で npm test）
   saveOptions.ts          # 保存の設定（JPEG・HEIC の品質・EXIF・GPS・ファイルの大きさの上限。localStorage に残す）

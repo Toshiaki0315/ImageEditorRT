@@ -13,6 +13,7 @@ import type { Panel } from "./panel";
 import type { PhotoControls } from "./photoControls";
 import { Preview } from "./preview";
 import type { LocalPanel } from "./localPanel";
+import type { LutControls } from "./lutControls";
 import type { PrivacyPanel } from "./privacy";
 import { SaveOptionsPanel } from "./saveOptions";
 import { Tabs } from "./tabs";
@@ -91,6 +92,7 @@ export const parts = {} as {
   recorder: HistoryRecorder<Snapshot>;
   privacy: PrivacyPanel;
   localPanel: LocalPanel;
+  lutControls: LutControls;
   batchDialog: BatchDialog;
   collageDialog: CollageDialog;
 };

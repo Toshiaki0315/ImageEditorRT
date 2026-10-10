@@ -14,6 +14,7 @@ use crate::diorama::DioramaDirection;
 use crate::filters::FilterType;
 use crate::frames::FrameType;
 use crate::logo::LogoSettings;
+use crate::lut::LutSettings;
 use crate::pipeline::{EditSettings, FILTER_STRENGTH_FULL, FILTER_STRENGTH_MAX};
 use crate::shapes::ShapeType;
 use crate::text::{TextEffect, TextFont, TextPosition, TextSettings};
@@ -81,6 +82,9 @@ pub struct Preset {
     /// ロゴの透かし（旧版にはない。ファイルの場所で覚える）。ロゴがなければファイルに書かない
     #[serde(skip_serializing_if = "LogoSettings::is_empty")]
     pub logo: LogoSettings,
+    /// LUT（旧版にはない。ファイルの場所で覚える）。LUT がなければファイルに書かない
+    #[serde(skip_serializing_if = "LutSettings::is_empty")]
+    pub lut: LutSettings,
     /// 肌をなめらかに（旧版にはない）。0 以外のときだけファイルに書く
     #[serde(skip_serializing_if = "is_zero_u32")]
     pub skin_smooth: u32,
@@ -136,6 +140,7 @@ impl Preset {
             tone_curve: s.tone_curve.clone(),
             hsl: s.hsl,
             logo: s.logo.clone(),
+            lut: s.lut.clone(),
             skin_smooth: s.skin_smooth,
             red_eye: s.red_eye,
         }
@@ -170,6 +175,7 @@ impl Preset {
             tone_curve: self.tone_curve.clone(),
             hsl: self.hsl,
             logo: self.logo.clone(),
+            lut: self.lut.clone(),
             skin_smooth: self.skin_smooth,
             red_eye: self.red_eye,
             ..settings.clone()
@@ -462,6 +468,10 @@ fn preset_from_value(item: &Value) -> Option<Preset> {
             "tone_curve" => p.tone_curve = curve_from_value(raw)?,
             "hsl" => p.hsl = hsl_from_value(raw)?,
             "logo" => p.logo = enum_value(raw)?,
+            "lut" => {
+                p.lut = enum_value::<LutSettings>(raw)
+                    .map(|l| LutSettings { strength: l.strength.min(100), ..l })?
+            }
             "skin_smooth" => p.skin_smooth = int_value::<u32>(number()?)?.min(100),
             "red_eye" => p.red_eye = raw.as_bool()?,
             "exposure" => p.exposure = python_float(raw)?,
@@ -670,6 +680,20 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
         assert_eq!(set.apply(&EditSettings::default()).logo, set.logo);
+    }
+
+    #[test]
+    fn lut_is_written_only_when_set() {
+        let plain = Preset::from_settings("A", &EditSettings::default());
+        assert!(!presets_json(std::slice::from_ref(&plain)).contains("lut"));
+        let set = Preset { lut: LutSettings { path: "/Users/me/film.cube".into(), strength: 70 }, ..plain };
+        let text = presets_json(std::slice::from_ref(&set));
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(preset_from_value(&value["presets"][0]), Some(set.clone()));
+        assert_eq!(set.apply(&EditSettings::default()).lut, set.lut);
+        // 強さは 100% まで
+        let strong = serde_json::json!({"name": "B", "lut": {"path": "/x.cube", "strength": 300}});
+        assert_eq!(preset_from_value(&strong).unwrap().lut.strength, 100);
     }
 
     #[test]

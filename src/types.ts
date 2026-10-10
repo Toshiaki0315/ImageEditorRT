@@ -78,6 +78,8 @@ export type EditSettings = {
   hsl: HslAdjust[];
   /** ロゴの透かし（path が空ならなし） */
   logo: LogoSettings;
+  /** LUT（.cube。path が空ならなし。テイストの後にかける） */
+  lut: LutSettings;
   /** 肌をなめらかに 0〜100（見つけた顔のまわりだけ） */
   skinSmooth: number;
   /** 赤目の補正（見つけた顔の目のあたりだけ） */
@@ -98,6 +100,9 @@ export type LocalAdjust = {
   saturation: number;
   feather: number;
 };
+
+/** LUT（Rust の lut::LutSettings）。strength は %。 */
+export type LutSettings = { path: string; strength: number };
 
 /** ロゴの透かし（Rust の logo::LogoSettings）。size は写真の短辺に対する %、opacity は %。 */
 export type LogoSettings = { path: string; position: TextPosition; size: number; opacity: number };
@@ -164,6 +169,7 @@ export function defaultSettings(): EditSettings {
     ],
     hsl: neutralHsl(),
     logo: { path: "", position: "bottom_right", size: 15, opacity: 80 },
+    lut: { path: "", strength: 100 },
     skinSmooth: 0,
     redEye: false,
     localAdjustments: [],

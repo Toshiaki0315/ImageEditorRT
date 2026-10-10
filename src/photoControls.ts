@@ -1,4 +1,4 @@
-// 「切り抜き」タブの「水平の補正」（自動を含む）と「背景」（消す・ぼかす）の欄（旧版にはない）。
+// 「切り抜き」タブの「水平の補正」（自動を含む）と「背景」（消す・ぼかす・置き換える）の欄（旧版にはない）。
 // 回転・反転・トリミングは crop.ts。傾きの求め方・被写体の準備（Vision）は assist.ts がつなぐ。
 
 import { fromHex, toHex } from "./saveOptions";
@@ -32,6 +32,10 @@ export class PhotoControls {
   private readonly backgroundBlur = $<HTMLInputElement>("background-blur");
   private readonly backgroundBlurValue = $<HTMLOutputElement>("background-blur-value");
   private readonly backgroundColor = $<HTMLInputElement>("background-color");
+  private readonly backgroundImageName = $<HTMLSpanElement>("background-image-name");
+  private readonly backgroundImageChoose = $<HTMLButtonElement>("background-image-choose");
+  /** 背景に敷く画像を選んでもらう（キャンセルなら null） */
+  chooseImage: () => Promise<string | null> = async () => null;
   /** 傾きを求める（水平の補正の角度。分からなければ null、求められなければ undefined） */
   findTilt: () => Promise<number | null | undefined> = async () => null;
   /** 傾きの自動補正の結果を知らせる（直した角度。分からなければ null） */
@@ -76,6 +80,7 @@ export class PhotoControls {
     this.background.addEventListener("change", () => void this.setBackground(this.background.value as BackgroundMode));
     this.backgroundBlur.addEventListener("input", () => this.setBackgroundBlur(Number(this.backgroundBlur.value)));
     this.backgroundBlur.addEventListener("dblclick", () => this.setBackgroundBlur(BACKGROUND_BLUR_DEFAULT));
+    this.backgroundImageChoose.addEventListener("click", () => void this.setBackground("image", true));
     this.backgroundColor.addEventListener("input", () => {
       this.settings.backgroundColor = fromHex(this.backgroundColor.value);
       this.changed();
@@ -101,6 +106,10 @@ export class PhotoControls {
     this.backgroundBlur.disabled = !loaded || this.settings.background !== "blur";
     this.backgroundColor.value = toHex(this.settings.backgroundColor);
     this.backgroundColor.disabled = !loaded || this.settings.background !== "white";
+    const image = this.settings.backgroundImage;
+    this.backgroundImageName.textContent = image ? (image.split("/").pop() ?? image) : "（なし）";
+    this.backgroundImageName.title = image;
+    this.backgroundImageChoose.disabled = !loaded;
   }
 
   /** 水平の補正（0.1° 刻み。大きさは変わらないので、トリミング範囲はそのまま）。 */
@@ -134,8 +143,20 @@ export class PhotoControls {
     }
   }
 
-  /** 背景の扱いを変える。消す・ぼかすときは先に被写体のマスクを作り、被写体がなければ「そのまま」に戻す。 */
-  private async setBackground(mode: BackgroundMode) {
+  /**
+   * 背景の扱いを変える。消す・ぼかす・置き換えるときは先に被写体のマスクを作り、被写体がなければ「そのまま」に戻す。
+   * 置き換えるときは、画像をまだ選んでいなければ（choose なら毎回）先に選んでもらい、キャンセルなら変えない。
+   */
+  private async setBackground(mode: BackgroundMode, choose = false) {
+    let image = this.settings.backgroundImage;
+    if (mode === "image" && (choose || !image)) {
+      const chosen = await this.chooseImage();
+      if (!chosen) {
+        this.show();
+        return;
+      }
+      image = chosen;
+    }
     if (mode !== "keep") {
       this.background.disabled = true;
       try {
@@ -149,6 +170,7 @@ export class PhotoControls {
       }
     }
     this.settings.background = mode;
+    if (mode === "image") this.settings.backgroundImage = image;
     this.changed();
   }
 

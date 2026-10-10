@@ -5,6 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { open } from "@tauri-apps/plugin-dialog";
 import { $, dom, histogramView, hooks, output, parts, preview, state, tabs, zoomView } from "./app";
 import { BatchDialog } from "./batchDialog";
 import { CollageDialog } from "./collageDialog";
@@ -125,6 +126,14 @@ async function createParts() {
   );
   parts.photoControls = new PhotoControls(settings, () => state.loaded !== null, userChanged);
   parts.photoControls.onStraightenAdjust = showStraightenGrid;
+  parts.photoControls.chooseImage = async () => {
+    const path = await open({
+      title: "背景の画像を選ぶ",
+      multiple: false,
+      filters: [{ name: "画像ファイル", extensions: state.extensions }],
+    });
+    return typeof path === "string" ? path : null;
+  };
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
   parts.localPanel = new LocalPanel($("local-extra"), settings, dom.canvas, orientedSize, userChanged);

@@ -8,6 +8,7 @@ import { drawCropOverlay } from "./cropOverlay";
 import { shapeOutline } from "./cropShape";
 import { GUIDE_KINDS, type GuideKind, parseGuide } from "./guides";
 import { HANDLE_HIT } from "./overlay";
+import { orientPerspective } from "./perspective";
 import { nearPoint, rectCorners, scaleRect, screenScale } from "./regions";
 import type {
   AspectRatio,
@@ -344,6 +345,12 @@ export class CropController {
     if ((op === "flip_horizontal" || op === "flip_vertical") && this.settings.straighten !== 0) {
       this.settings.straighten = -this.settings.straighten;
     }
+    // 遠近の補正は、同じ写真の辺を直し続けるよう縦横・符号を入れ替える
+    [this.settings.perspectiveVertical, this.settings.perspectiveHorizontal] = orientPerspective(
+      op,
+      this.settings.perspectiveVertical,
+      this.settings.perspectiveHorizontal,
+    );
     this.size = result.size;
     const swaps = op === "rotate_left" || op === "rotate_right";
     if (swaps && !this.portrait.disabled) this.portrait.checked = !this.portrait.checked;

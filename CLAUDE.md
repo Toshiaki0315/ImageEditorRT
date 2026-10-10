@@ -56,6 +56,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     foreground.rs         # 被写体のマスク（Vision。macOS 14 以降）
     saliency.rs           # 目立つ部分の枠（Vision の注目度。おまかせ切り抜き）
     resize.rs             # 縮小（プレビューは fast_image_resize、保存は Pillow と画素まで同じリサイズ）
+    perspective.rs        # 遠近（台形）の補正（台形を射影変換で長方形に写す。余白は出ない）
     transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
     output.rs             # 「出力」タブのサイズ変更（欄に出す値と、編集設定に渡す幅・高さ）
     crop.rs               # トリミング範囲の編集（ドラッグ・数値の欄・比・回転と反転）の計算
@@ -143,7 +144,8 @@ src/                      # 画面（TypeScript）
   crop.ts                 # 「切り抜き」タブと、プレビュー上のドラッグでの範囲の選択（計算は core/crop.rs）
   cropOverlay.ts / cropShape.ts # 「切り抜き」の線の描画（範囲・形・ガイド）と形の輪郭のパス
   guides.ts               # 切り抜きのガイド線（三分割・黄金比・対角線）の位置の計算
-  photoControls.ts        # 「切り抜き」タブの水平の補正（自動を含む）と背景（消す・ぼかす）
+  photoControls.ts        # 「切り抜き」タブの水平の補正（自動を含む）・遠近の補正と背景（消す・ぼかす）
+  perspective.ts          # 遠近の補正の向きを回転・反転に合わせて直す（tests-ts/ で npm test）
   localPanel.ts / localShapes.ts # 「加工」タブの部分補正（範囲のドラッグ）と範囲の当たり判定・線の位置
   overlay.ts              # プレビューに重ねる SVG の部品（ハンドルなど。切り抜き・投稿加工・部分補正で共通）
   storage.ts              # 画面の環境設定（localStorage）の読み書き（使えなくても既定の値で動く）

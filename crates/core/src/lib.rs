@@ -40,6 +40,7 @@ pub mod logo;
 pub mod lut;
 pub mod makernote;
 pub mod output;
+pub mod perspective;
 pub mod pillow;
 pub mod pipeline;
 pub mod prepare;

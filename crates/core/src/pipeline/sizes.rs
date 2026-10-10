@@ -44,6 +44,8 @@ pub fn before_settings(original_size: (u32, u32), settings: &EditSettings) -> Ed
     EditSettings {
         orientation: settings.orientation,
         straighten: settings.straighten,
+        perspective_vertical: settings.perspective_vertical,
+        perspective_horizontal: settings.perspective_horizontal,
         crop,
         ..EditSettings::default()
     }

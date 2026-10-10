@@ -1,6 +1,6 @@
 //! 編集設定 (EditSettings) と、それを画像にかける処理の流れ（旧版の core/pipeline.py を移したもの）。
 //!
-//! 処理順（旧版 §5.1）: 回転・反転 →（水平の補正 → 投稿加工のぼかし・モザイク）→ トリミング → リサイズ → 露出 → 明るさ → コントラスト →
+//! 処理順（旧版 §5.1）: 回転・反転 →（水平の補正 → 遠近の補正 → 投稿加工のぼかし・モザイク）→ トリミング → リサイズ → 露出 → 明るさ → コントラスト →
 //! 色温度 →（トーンカーブ → ハイライト／シャドウ）→ 彩度 →（色ごとの調整 → 部分補正） → ディテール（ノイズ除去 → ぼかし → シャープ） → ジオラマ →
 //! フィルター →（LUT）→ 周辺減光 → 経年劣化 →（投稿加工のスタンプ）→ 文字（ロゴ・全体に繰り返す透かしも）。
 //! 顔の枠・被写体のマスクが要る赤目・肌・背景は、ここより前に元の画像にかける（`prepare`）。
@@ -25,6 +25,7 @@ use crate::local;
 use crate::logo;
 pub use crate::logo::LogoSettings;
 use crate::lut;
+use crate::perspective;
 use crate::privacy;
 use crate::shapes;
 pub use crate::shapes::ShapeType;
@@ -67,13 +68,16 @@ pub fn photo_for_analysis(image: &RgbaImage, settings: &EditSettings, factor: f6
     }
 }
 
-/// 回転・反転し、水平の補正をかけた画像（投稿加工の範囲の座標と同じ向き。顔の認識に使う）。
+/// 回転・反転し、水平の補正・遠近の補正をかけた画像（投稿加工の範囲の座標と同じ向き。顔の認識に使う）。
 pub fn straightened(image: &RgbaImage, settings: &EditSettings) -> RgbaImage {
     let image = settings.orientation.transpose(image);
-    if settings.straighten == 0.0 {
+    let image =
+        if settings.straighten == 0.0 { image } else { transform::straighten(&image, settings.straighten) };
+    // 遠近の補正（大きさは変わらないので、範囲の座標はそのまま）
+    if settings.perspective_vertical == 0 && settings.perspective_horizontal == 0 {
         return image;
     }
-    transform::straighten(&image, settings.straighten)
+    perspective::correct(&image, settings.perspective_vertical, settings.perspective_horizontal)
 }
 
 /// 原画像に編集をかけた新しい画像を返す（原画像は変更しない）。保存に使う。

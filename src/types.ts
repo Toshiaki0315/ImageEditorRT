@@ -143,8 +143,8 @@ export const neutralHsl = (): HslAdjust[] => Array.from({ length: 8 }, () => ({ 
 /** 背景の扱い（Rust の background::Background）。 */
 export type BackgroundMode = "keep" | "transparent" | "white" | "blur" | "image";
 
-/** 投稿加工の隠し方（Rust の privacy::RegionKind）。 */
-export type RegionKind = "blur" | "mosaic" | "stamp";
+/** 投稿加工の隠し方（Rust の privacy::RegionKind）。heal はスポット修復（まわりから埋めて消す）。 */
+export type RegionKind = "blur" | "mosaic" | "stamp" | "heal";
 
 /** 投稿加工で隠す範囲 1 つ（Rust の privacy::Region）。強さは 1〜100（スタンプでは使わない）、stamp はスタンプの絵文字。 */
 export type Region = { kind: RegionKind; rect: CropRect; strength: number; stamp: string };

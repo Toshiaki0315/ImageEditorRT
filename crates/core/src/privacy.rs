@@ -30,6 +30,8 @@ pub enum RegionKind {
     Mosaic,
     /// 絵文字のスタンプ（範囲に収まる正方形で中央に置く）
     Stamp,
+    /// スポット修復（範囲に内接する楕円の中を、まわりから埋めて消す。強さは使わない）
+    Heal,
 }
 
 /// スタンプの既定の絵文字。
@@ -85,11 +87,16 @@ pub fn scale_rect(rect: CropRect, factor: f64) -> CropRect {
     CropRect::new(left, top, right - left, bottom - top)
 }
 
-/// 画像に範囲のぼかし・モザイクをかける。image は原寸を factor 倍にした画像（回転・反転した後のもの）。
+/// 画像に範囲のぼかし・モザイク・修復をかける。image は原寸を factor 倍にした画像（回転・反転した後のもの）。
 /// 範囲が重なっていれば、並んでいる順にかける。
 pub fn cover(image: &mut RgbaImage, regions: &[Region], factor: f64) {
     for region in regions {
         if region.kind == RegionKind::Stamp {
+            continue;
+        }
+        if region.kind == RegionKind::Heal {
+            // 修復は範囲のまわりの画素も使うので、画像のまま埋める
+            crate::heal::heal(image, scale_rect(region.rect, factor));
             continue;
         }
         let Some(rect) = clamp_crop(scale_rect(region.rect, factor), image.dimensions()) else { continue };
@@ -100,7 +107,7 @@ pub fn cover(image: &mut RgbaImage, regions: &[Region], factor: f64) {
         let covered = match region.kind {
             RegionKind::Blur => gaussian_blur(&area, size as f32),
             RegionKind::Mosaic => mosaic(&area, size.round().max(1.0) as u32),
-            RegionKind::Stamp => continue,
+            RegionKind::Stamp | RegionKind::Heal => continue,
         };
         imageops::replace(image, &covered, rect.x, rect.y);
     }
@@ -257,6 +264,27 @@ mod tests {
             image.pixels().map(|p| (i32::from(p[0]) - 128).abs()).sum::<i32>()
         };
         assert!(spread(80) < spread(5));
+    }
+
+    #[test]
+    fn heal_fills_the_spot_in_preview_and_full_size() {
+        let spotted = |side: u32| {
+            RgbaImage::from_fn(side, side, |x, y| {
+                let (cx, cy) = (x as i64 * 200 / side as i64, y as i64 * 200 / side as i64);
+                if (95..105).contains(&cx) && (95..105).contains(&cy) {
+                    Rgba([0, 0, 0, 255])
+                } else {
+                    Rgba([180, 160, 140, 255])
+                }
+            })
+        };
+        let regions = [region(RegionKind::Heal, CropRect::new(90, 90, 20, 20), 50)];
+        for (side, factor) in [(200, 1.0), (100, 0.5)] {
+            let mut image = spotted(side);
+            cover(&mut image, &regions, factor);
+            let p = image.get_pixel(side / 2, side / 2).0;
+            assert!(p[0].abs_diff(180) <= 3 && p[2].abs_diff(140) <= 3, "{side}: {p:?}");
+        }
     }
 
     #[test]

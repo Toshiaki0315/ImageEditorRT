@@ -11,7 +11,7 @@ import type { CropRect } from "./types";
 
 /** 顔・文字の問い合わせの名前と、画面に出す名前。 */
 const TARGETS = { faces: { command: "detect_faces", name: "顔" }, text: { command: "detect_text", name: "文字" } };
-const COVER_NAMES = { blur: "ぼかし", mosaic: "モザイク", stamp: "スタンプ" } as const;
+const COVER_NAMES = { blur: "ぼかし", mosaic: "モザイク", stamp: "スタンプ", heal: "修復" } as const;
 
 /** 部品に問い合わせ方と知らせ方を渡す（部品を作った後に 1 回呼ぶ）。 */
 export function setupAssist() {

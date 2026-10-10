@@ -83,7 +83,10 @@ export function setupHistory() {
       parts.localPanel.isDragging() ||
       parts.textDrag.isDragging() ||
       parts.colorPanel.isDragging(),
-    onUpdate: updateMenus,
+    onUpdate: () => {
+      updateMenus();
+      parts.historyPanel?.refresh();
+    },
   });
   document.addEventListener("pointerdown", (event) => {
     if (event.target instanceof HTMLInputElement && event.target.type === "range") sliderDragging = true;

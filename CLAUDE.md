@@ -165,6 +165,8 @@ src/                      # 画面（TypeScript）
   textDrag.ts / textPoint.ts # 文字・ロゴの「自由」な位置をプレビューの上でドラッグする（と、割合の計算）
   lutControls.ts          # 「加工」タブの LUT（ファイルを選ぶ・外す・強さ）
   monoPanel.ts            # 「加工」タブの白黒（オン／オフと 8 色の明るさ）
+  historyLabels.ts        # 履歴の一覧の「何を変えたか」（前の状態との違いから作る）
+  historyPanel.ts         # 「編集 > 履歴…」の一覧（選んだ時点に戻る・進む）
   versions.ts             # 加工の途中の版（残す・一覧から当てはめる・名前を変える・削除。写真を開いている間だけ）
   colorSpace.ts           # プレビューの色空間（canvas は Display P3、画素には開いた画像の色空間を付けて描く）
   maskedPanel.ts          # 「加工」タブの被写体／背景の補正（対象を選んでスライダー。初めて動かすときマスクを作る）

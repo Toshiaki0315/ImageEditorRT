@@ -26,6 +26,7 @@ export const MENU = {
   pasteLook: "paste-look",
   keepVersion: "keep-version",
   versions: "versions",
+  historyList: "history-list",
   actualSize: "actual_size",
   fit: "fit",
   histogram: "histogram",
@@ -62,6 +63,7 @@ export function updateMenus() {
   setMenuEnabled(MENU.pasteLook, editable && state.copiedLook !== null);
   setMenuEnabled(MENU.keepVersion, editable);
   setMenuEnabled(MENU.versions, state.loaded !== null);
+  setMenuEnabled(MENU.historyList, state.loaded !== null);
   setMenuEnabled(MENU.actualSize, state.loaded !== null && !isZoomed());
   setMenuEnabled(MENU.fit, isZoomed());
   setMenuEnabled(MENU.revealSaved, state.savedPaths.length > 0);

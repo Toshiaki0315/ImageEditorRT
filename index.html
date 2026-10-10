@@ -408,6 +408,15 @@
         <button type="button" id="versions-close">閉じる</button>
       </div>
     </dialog>
+    <!-- 履歴の一覧: 版の一覧と同じく、モーダルにしないで出す -->
+    <dialog id="history-dialog" class="versions-dialog" aria-labelledby="history-title">
+      <h2 id="history-title">履歴</h2>
+      <select id="history-list" size="12" aria-label="操作の履歴（新しい順）"></select>
+      <p class="note">選ぶと、その時点に戻ります（元に戻す・やり直すと同じ履歴。⌘Z・⇧⌘Z でも動かせます）。新しい順に並べています。</p>
+      <div class="buttons dialog-buttons">
+        <button type="button" id="history-close">閉じる</button>
+      </div>
+    </dialog>
     <dialog id="preset-dialog" class="preset-dialog">
       <form method="dialog">
         <h2>プリセットを保存</h2>
@@ -445,6 +454,8 @@
             <dd>位置情報を消す・ぼかし／モザイク／スタンプで隠す（プレビューをドラッグ）。「修復」でゴミ・ほくろなどをまわりの色で埋めて消す。顔・文字を見つけてまとめて隠せる</dd>
             <dt>EXIF</dt>
             <dd>撮影情報（MakerNote も）。位置情報はマップで開ける</dd>
+            <dt>履歴</dt>
+            <dd>「編集 > 履歴…」（⌥⌘Z）で操作の一覧（何を変えたか）を出し、選んだ時点に戻る・進む（⌘Z・⇧⌘Z と同じ履歴）</dd>
             <dt>版</dt>
             <dd>「編集 > 今の加工を版として残す」（⌥⌘K）で今の加工を残し、「編集 > 版の一覧…」で選ぶと当てはめて見比べられる（写真を開いている間だけ）</dd>
             <dt>色空間</dt>

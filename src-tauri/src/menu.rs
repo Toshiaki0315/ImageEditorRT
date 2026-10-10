@@ -42,6 +42,7 @@ pub const COPY_LOOK: &str = "copy-look";
 pub const PASTE_LOOK: &str = "paste-look";
 pub const KEEP_VERSION: &str = "keep-version";
 pub const VERSIONS: &str = "versions";
+pub const HISTORY_LIST: &str = "history-list";
 /// 「編集 > 加工後の画像をコピー」（原寸で加工した画像をクリップボードへ。画像がないときは使えない）
 pub const COPY_IMAGE: &str = "copy-image";
 /// 「編集 > 文字・透かし…」
@@ -140,9 +141,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .enabled(false)
         .build(app)?;
     let versions = MenuItemBuilder::with_id(VERSIONS, "版の一覧…").enabled(false).build(app)?;
+    let history_list = MenuItemBuilder::with_id(HISTORY_LIST, "履歴…")
+        .accelerator("Alt+CmdOrCtrl+Z")
+        .enabled(false)
+        .build(app)?;
     let edit = SubmenuBuilder::new(app, "編集")
         .item(&undo)
         .item(&redo)
+        .item(&history_list)
         .separator()
         .cut_with_text("カット")
         .copy_with_text("コピー")

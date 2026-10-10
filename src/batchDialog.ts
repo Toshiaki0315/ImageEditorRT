@@ -52,6 +52,7 @@ export class BatchDialog {
   private readonly strengthValue = $<HTMLOutputElement>("batch-strength-value");
   private readonly naming = $<HTMLSelectElement>("batch-naming");
   private readonly format = $<HTMLSelectElement>("batch-format");
+  private readonly autoCrop = $<HTMLSelectElement>("batch-auto-crop");
   private readonly prefix = $<HTMLInputElement>("batch-prefix");
   private outDir: string | null = null;
 
@@ -144,6 +145,7 @@ export class BatchDialog {
             ? { kind: "sequence", prefix: this.prefix.value }
             : { kind: this.naming.value },
         format: this.format.value,
+        autoCrop: parseAutoCrop(this.autoCrop.value),
       });
     } finally {
       unlisten();
@@ -204,4 +206,11 @@ export class BatchDialog {
   private updateStart() {
     this.start.disabled = this.files.options.length === 0 || this.outDir === null || !this.validSide();
   }
+}
+
+/** おまかせ切り抜きの選択（"ratio5x4:portrait" など。空なら切り抜かない）を、Rust の BatchAutoCrop にする。 */
+function parseAutoCrop(value: string): { ratio: string; portrait: boolean } | null {
+  if (!value) return null;
+  const [ratio, orientation] = value.split(":");
+  return { ratio, portrait: orientation === "portrait" };
 }

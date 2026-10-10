@@ -12,6 +12,7 @@ use crate::frames::FrameType;
 use crate::local::LocalAdjust;
 use crate::logo::LogoSettings;
 use crate::lut::LutSettings;
+use crate::masked::MaskedAdjust;
 use crate::privacy::Region;
 use crate::shapes::{self, ShapeType};
 use crate::text::TextSettings;
@@ -94,6 +95,10 @@ pub struct EditSettings {
     pub background_color: [u8; 3],
     /// 背景を「画像に置き換える」ときの画像のパス（空ならなし。写真ごとの設定なのでプリセットには入れない。旧版にはない）
     pub background_image: String,
+    /// 被写体だけにかける補正（被写体のマスクが要るので、背景と同じく元の画像に前もってかける。旧版にはない）
+    pub subject_adjust: MaskedAdjust,
+    /// 背景だけにかける補正
+    pub background_adjust: MaskedAdjust,
     /// トーンカーブの点（x は 0〜255 で増えていく順、両端は x = 0・255。旧版にはない）
     pub tone_curve: Vec<[u8; 2]>,
     /// 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタ。旧版にはない）
@@ -150,6 +155,8 @@ impl Default for EditSettings {
             background_blur: crate::background::BLUR_DEFAULT,
             background_color: [255, 255, 255],
             background_image: String::new(),
+            subject_adjust: MaskedAdjust::default(),
+            background_adjust: MaskedAdjust::default(),
             tone_curve: curve::identity_curve(),
             hsl: [HslAdjust::default(); HSL_BANDS],
             logo: LogoSettings::default(),

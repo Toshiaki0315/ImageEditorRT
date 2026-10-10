@@ -1,4 +1,4 @@
-//! 元の画像に前もってかける処理（赤目の補正 → 肌をなめらかに → 背景を消す・ぼかす。旧版にはない）。
+//! 元の画像に前もってかける処理（赤目の補正 → 肌をなめらかに → 被写体・背景ごとの補正 → 背景を消す・ぼかす。旧版にはない）。
 //!
 //! どちらも Vision で見つけた顔の枠・被写体のマスクが要る。顔の枠・マスクは画像ごとに 1 回、プレビュー用の
 //! 画像（回転・反転する前）から作って覚えておき、ここでかける画像（プレビュー用の画像か原寸）の大きさに合わせる。
@@ -25,7 +25,7 @@ pub struct Sources<'a> {
 /// settings と材料で、かける処理があるか。
 pub fn needed(settings: &EditSettings, sources: &Sources) -> bool {
     let skin = uses_faces(settings) && sources.faces.is_some_and(|f| !f.is_empty());
-    let background = active_background(settings) && sources.mask.is_some();
+    let background = (active_background(settings) || uses_masked(settings)) && sources.mask.is_some();
     skin || background
 }
 
@@ -36,6 +36,11 @@ fn active_background(settings: &EditSettings) -> bool {
         Background::Image => !settings.background_image.trim().is_empty(),
         _ => true,
     }
+}
+
+/// 被写体・背景ごとの補正があるか。
+fn uses_masked(settings: &EditSettings) -> bool {
+    !settings.subject_adjust.is_neutral() || !settings.background_adjust.is_neutral()
 }
 
 /// 顔の枠を使う処理（肌をなめらかに・赤目の補正）があるか。
@@ -59,6 +64,9 @@ pub fn prepare(image: &RgbaImage, settings: &EditSettings, sources: &Sources) ->
         if settings.skin_smooth > 0 {
             skin::smooth_skin(&mut out, &fitted, settings.skin_smooth);
         }
+    }
+    if let Some(mask) = sources.mask.filter(|_| uses_masked(settings)) {
+        out = crate::masked::apply_masked(&out, mask, &settings.subject_adjust, &settings.background_adjust);
     }
     if let Some(mask) = sources.mask.filter(|_| active_background(settings)) {
         if settings.background == Background::Image {
@@ -119,6 +127,22 @@ mod tests {
         };
         assert_eq!(prepare(&image, &missing, &sources), Some(image.clone()));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn subject_and_background_adjustments_need_the_mask() {
+        let image = photo(40, 40);
+        let mask = GrayImage::from_fn(40, 40, |x, _| Luma([if x < 20 { 255 } else { 0 }]));
+        let settings = EditSettings {
+            background_adjust: crate::masked::MaskedAdjust { exposure: -1.0, ..Default::default() },
+            ..EditSettings::default()
+        };
+        let none = Sources { faces: None, mask: None, preview_width: 40 };
+        assert!(prepare(&image, &settings, &none).is_none(), "マスクがなければかけない");
+        let sources = Sources { faces: None, mask: Some(&mask), preview_width: 40 };
+        let out = prepare(&image, &settings, &sources).expect("かける");
+        assert_eq!(out.get_pixel(2, 5), image.get_pixel(2, 5), "被写体はそのまま");
+        assert!(out.get_pixel(35, 5)[0] < image.get_pixel(35, 5)[0], "背景は暗く");
     }
 
     #[test]

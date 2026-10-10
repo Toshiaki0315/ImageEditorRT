@@ -144,6 +144,10 @@ export class Panel {
     const local = document.createElement("div");
     local.id = "local-extra";
     adjustPage.append(local);
+    // 被写体／背景の補正（maskedPanel.ts が中身を作る）
+    const masked = document.createElement("div");
+    masked.id = "masked-extra";
+    adjustPage.append(masked);
     this.heading(adjustPage, "ディテール");
     this.build(adjustPage, DETAIL);
     // 赤目の補正（旧版にはない。肌をなめらかにと同じく、見つけた顔の目のあたりだけ）
@@ -247,6 +251,8 @@ export class Panel {
     this.settings.filter = "none";
     this.settings.lut = defaultSettings().lut;
     this.settings.colorMatch = defaultSettings().colorMatch;
+    this.settings.subjectAdjust = defaultSettings().subjectAdjust;
+    this.settings.backgroundAdjust = defaultSettings().backgroundAdjust;
     for (const slider of [...STRENGTH, ...COLOR, ...DETAIL]) this.settings[slider.key] = slider.initial;
     this.settings.toneCurve = identityCurve();
     this.settings.hsl = neutralHsl();

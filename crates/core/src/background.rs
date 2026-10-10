@@ -51,11 +51,7 @@ pub fn apply_background_with(
         return out;
     }
     let (width, height) = image.dimensions();
-    let fitted = if mask.dimensions() == (width, height) {
-        mask.as_raw().clone()
-    } else {
-        crate::resize::resize_gray_bilinear(mask.as_raw(), mask.dimensions(), (width, height))
-    };
+    let fitted = fit_mask(mask, (width, height));
     if mode == Background::Blur {
         return blur_background(image, &fitted, blur);
     }
@@ -84,11 +80,7 @@ pub fn apply_background_with(
 /// backdrop は縦横比を保って写真いっぱいに広げ（縮め）、はみ出す分は真ん中を残して切る。透明な部分は backdrop が透ける。
 pub fn replace_background(image: &RgbaImage, mask: &GrayImage, backdrop: &RgbaImage) -> RgbaImage {
     let (width, height) = image.dimensions();
-    let fitted = if mask.dimensions() == (width, height) {
-        mask.as_raw().clone()
-    } else {
-        crate::resize::resize_gray_bilinear(mask.as_raw(), mask.dimensions(), (width, height))
-    };
+    let fitted = fit_mask(mask, (width, height));
     let behind = cover(backdrop, (width, height));
     let mut out = image.clone();
     out.as_mut()
@@ -123,6 +115,15 @@ fn cover(image: &RgbaImage, (width, height): (u32, u32)) -> RgbaImage {
     let resized = crate::resize::resize(image, scaled.0, scaled.1);
     image::imageops::crop_imm(&resized, (scaled.0 - width) / 2, (scaled.1 - height) / 2, width, height)
         .to_image()
+}
+
+/// mask を size の大きさに合わせた画素の並び（同じ大きさならそのまま）。
+pub fn fit_mask(mask: &GrayImage, (width, height): (u32, u32)) -> Vec<u8> {
+    if mask.dimensions() == (width, height) {
+        mask.as_raw().clone()
+    } else {
+        crate::resize::resize_gray_bilinear(mask.as_raw(), mask.dimensions(), (width, height))
+    }
 }
 
 /// 背景だけをぼかす。被写体の色が背景ににじまないよう、背景の部分（1 − マスク）を重みにしてぼかし

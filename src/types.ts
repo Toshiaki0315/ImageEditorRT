@@ -81,6 +81,9 @@ export type EditSettings = {
   backgroundColor: [number, number, number];
   /** 背景を「画像に置き換える」ときの画像のパス（空ならなし） */
   backgroundImage: string;
+  /** 被写体だけ・背景だけにかける補正 */
+  subjectAdjust: MaskedAdjust;
+  backgroundAdjust: MaskedAdjust;
   /** トーンカーブの点（[x, y]。x は 0〜255 で増えていく順、両端は x = 0・255） */
   toneCurve: [number, number][];
   /** 色ごとの調整（赤・オレンジ・黄・緑・水色・青・紫・マゼンタの 8 色） */
@@ -111,6 +114,9 @@ export type LocalAdjust = {
   saturation: number;
   feather: number;
 };
+
+/** 被写体・背景の一方にかける補正（Rust の masked::MaskedAdjust）。 */
+export type MaskedAdjust = { exposure: number; contrast: number; temperature: number; saturation: number };
 
 /** 色の情報（Rust の color_match::ColorStats。Lab の平均と標準偏差）。 */
 export type ColorStats = { mean: [number, number, number]; std: [number, number, number] };
@@ -195,6 +201,8 @@ export function defaultSettings(): EditSettings {
     backgroundBlur: 50,
     backgroundColor: [255, 255, 255],
     backgroundImage: "",
+    subjectAdjust: { exposure: 0, contrast: 0, temperature: 6500, saturation: 0 },
+    backgroundAdjust: { exposure: 0, contrast: 0, temperature: 6500, saturation: 0 },
     toneCurve: [
       [0, 0],
       [255, 255],

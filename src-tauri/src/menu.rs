@@ -25,6 +25,8 @@ pub const BATCH: &str = "batch";
 pub const SAVE_SIZES: &str = "save-sizes";
 /// 「ファイル > 保存したファイルを Finder で表示」（最後に保存したファイル。保存するまでは使えない）
 pub const REVEAL_SAVED: &str = "reveal-saved";
+/// 「ファイル > プリント…」（加工後の画像を macOS の印刷ダイアログへ。画像がないときは使えない）
+pub const PRINT: &str = "print";
 /// 「ファイル > 共有…」（加工後の画像を macOS の共有の一覧へ。画像がないときは使えない）
 pub const SHARE: &str = "share";
 /// 「ファイル > 並べて 1 枚に…」（2〜4 枚の写真を並べた画像を作って開く）
@@ -87,6 +89,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .enabled(false)
         .build(app)?;
     let share = MenuItemBuilder::with_id(SHARE, "共有…").enabled(false).build(app)?;
+    let print =
+        MenuItemBuilder::with_id(PRINT, "プリント…").accelerator("CmdOrCtrl+P").enabled(false).build(app)?;
     let batch = MenuItemBuilder::with_id(BATCH, "まとめて処理…").build(app)?;
     let collage = MenuItemBuilder::with_id(COLLAGE, "並べて 1 枚に…").build(app)?;
     let file = SubmenuBuilder::new(app, "ファイル")
@@ -99,6 +103,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&save_sizes)
         .item(&reveal_saved)
         .item(&share)
+        .item(&print)
         .item(&batch)
         .item(&collage)
         .separator()

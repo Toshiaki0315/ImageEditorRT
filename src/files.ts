@@ -389,6 +389,22 @@ export async function shareImage() {
   }
 }
 
+/** 加工後の画像（原寸）を、macOS の印刷ダイアログで印刷する（用紙に収まるよう縮める）。 */
+export async function printImage() {
+  if (!state.loaded || state.saving) return;
+  setSaving(true);
+  void updateStatus("印刷の準備中…");
+  try {
+    await invoke("print_image", { settings: structuredClone(state.settings), options: saveOptions.value() });
+    void updateStatus();
+  } catch (error) {
+    void updateStatus();
+    await showError("印刷できません", error);
+  } finally {
+    setSaving(false);
+  }
+}
+
 /** 最後に保存したファイルを Finder で表示する（ファイルを選んだ状態でフォルダを開く）。 */
 export async function revealSaved() {
   if (state.savedPaths.length === 0) return;

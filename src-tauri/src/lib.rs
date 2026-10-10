@@ -87,6 +87,8 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             share::share_image,
             #[cfg(target_os = "macos")]
+            share::print_image,
+            #[cfg(target_os = "macos")]
             saving::copy_image,
             saving::default_save_path,
             settings::supported_formats,

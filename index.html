@@ -468,6 +468,20 @@
         </div>
       </form>
     </dialog>
+    <dialog id="shortcuts-dialog" class="help-dialog" aria-labelledby="shortcuts-title">
+      <h2 id="shortcuts-title">キーボードショートカット</h2>
+      <p class="note">「変える」を押してから、使いたいキーの組み合わせを押します（⌘・⌥・⌃・⇧ のどれかと組み合わせる。F1〜F12 はそのままでも使えます）。変えたものは太字で出ます。すでにメニューにあるショートカットは、そのメニューの項目を先に変えてください。</p>
+      <p id="shortcuts-message" class="note shortcuts-message" role="alert"></p>
+      <div class="shortcuts-table">
+        <table>
+          <tbody id="shortcuts-list"></tbody>
+        </table>
+      </div>
+      <div class="buttons dialog-buttons">
+        <button type="button" id="shortcuts-reset">すべて既定に戻す</button>
+        <button type="button" id="shortcuts-close">閉じる</button>
+      </div>
+    </dialog>
     <dialog id="preset-dialog" class="preset-dialog">
       <form method="dialog">
         <h2>プリセットを保存</h2>
@@ -507,6 +521,8 @@
             <dd>矢印・四角・楕円・手書き・吹き出しを選んでプレビューをドラッグ。「選ぶ」で動かす・色や太さ・文字を変える・消す（Esc で選んだ注釈を消す）</dd>
             <dt>EXIF</dt>
             <dd>撮影情報（MakerNote も）。位置情報はマップで開ける</dd>
+            <dt>ショートカット</dt>
+            <dd>「ImageEditorRT > キーボードショートカット…」で、メニューの項目ごとにショートカットを変える・外す・既定に戻す</dd>
             <dt>フォルダの見張り</dt>
             <dd>「ファイル > フォルダを見張る…」で見張るフォルダと、まとめて処理と同じ加工・保存先を選ぶと、新しく入った写真を自動で処理して保存する（「ファイル > フォルダの見張りをやめる」まで）</dd>
             <dt>証明写真</dt>

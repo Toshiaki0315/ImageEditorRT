@@ -1069,3 +1069,32 @@ input[type="range"]:disabled::-webkit-slider-thumb {
 .annotate-overlay.drawing {
   cursor: crosshair;
 }
+
+/* キーボードショートカットの一覧 */
+.shortcuts-table {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.shortcuts-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shortcuts-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.shortcut-key {
+  white-space: nowrap;
+}
+
+.shortcut-key.changed {
+  font-weight: bold;
+}
+
+.shortcuts-message {
+  color: var(--danger, #d33);
+  min-height: 1em;
+}

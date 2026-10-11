@@ -33,6 +33,7 @@ pub const SHARE: &str = "share";
 pub const COLLAGE: &str = "collage";
 pub const ID_PHOTO: &str = "id-photo";
 pub const WATCH_FOLDER: &str = "watch-folder";
+pub const SHORTCUTS: &str = "shortcuts";
 pub const STOP_WATCH: &str = "stop-watch";
 /// 「編集 > 元に戻す」（設定の変更。入力欄の文字は画面が入力欄に任せる）
 pub const UNDO: &str = "undo";
@@ -63,13 +64,39 @@ pub const SPLIT: &str = "split";
 pub const HELP: &str = "help";
 
 /// メニューバーを作る。
+/// 既定のショートカット（項目の ID → ショートカット。メニューを作るときに覚える）。
+static DEFAULT_SHORTCUTS: std::sync::Mutex<Vec<(&'static str, &'static str)>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// 既定のショートカットを覚えて、そのまま返す（メニューを作るときに使う）。
+fn default_shortcut(id: &'static str, accelerator: &'static str) -> &'static str {
+    if let Ok(mut list) = DEFAULT_SHORTCUTS.lock() {
+        if !list.iter().any(|(i, _)| *i == id) {
+            list.push((id, accelerator));
+        }
+    }
+    accelerator
+}
+
+/// 項目の既定のショートカット（なければ空）。
+pub fn default_shortcut_of(id: &str) -> String {
+    DEFAULT_SHORTCUTS
+        .lock()
+        .ok()
+        .and_then(|list| list.iter().find(|(i, _)| *i == id).map(|(_, a)| a.to_string()))
+        .unwrap_or_default()
+}
+
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let about = AboutMetadataBuilder::new().name(Some(super::APP_NAME)).build();
     let quit = MenuItemBuilder::with_id(QUIT, format!("{} を終了", super::APP_NAME))
-        .accelerator("CmdOrCtrl+Q")
+        .accelerator(default_shortcut(QUIT, "CmdOrCtrl+Q"))
         .build(app)?;
+    let shortcuts = MenuItemBuilder::with_id(SHORTCUTS, "キーボードショートカット…").build(app)?;
     let app_menu = SubmenuBuilder::new(app, super::APP_NAME)
         .about_with_text(format!("{} について", super::APP_NAME), Some(about))
+        .separator()
+        .item(&shortcuts)
         .separator()
         .services_with_text("サービス")
         .separator()
@@ -79,25 +106,31 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .item(&quit)
         .build()?;
-    let open = MenuItemBuilder::with_id(OPEN, "開く…").accelerator("CmdOrCtrl+O").build(app)?;
+    let open = MenuItemBuilder::with_id(OPEN, "開く…")
+        .accelerator(default_shortcut(OPEN, "CmdOrCtrl+O"))
+        .build(app)?;
     // 最近使った項目（中身は起動後に recent::refresh_menu が作る）
     let recent = SubmenuBuilder::with_id(app, crate::recent::MENU_ID, "最近使った項目").build()?;
     let next_photo = MenuItemBuilder::with_id(NEXT_PHOTO, "次の写真")
-        .accelerator("CmdOrCtrl+]")
+        .accelerator(default_shortcut(NEXT_PHOTO, "CmdOrCtrl+]"))
         .enabled(false)
         .build(app)?;
     let previous_photo = MenuItemBuilder::with_id(PREVIOUS_PHOTO, "前の写真")
-        .accelerator("CmdOrCtrl+[")
+        .accelerator(default_shortcut(PREVIOUS_PHOTO, "CmdOrCtrl+["))
         .enabled(false)
         .build(app)?;
-    let save = MenuItemBuilder::with_id(SAVE, "保存…").accelerator("CmdOrCtrl+S").build(app)?;
+    let save = MenuItemBuilder::with_id(SAVE, "保存…")
+        .accelerator(default_shortcut(SAVE, "CmdOrCtrl+S"))
+        .build(app)?;
     let save_sizes = MenuItemBuilder::with_id(SAVE_SIZES, "複数の大きさで保存…").build(app)?;
     let reveal_saved = MenuItemBuilder::with_id(REVEAL_SAVED, "保存したファイルを Finder で表示")
         .enabled(false)
         .build(app)?;
     let share = MenuItemBuilder::with_id(SHARE, "共有…").enabled(false).build(app)?;
-    let print =
-        MenuItemBuilder::with_id(PRINT, "プリント…").accelerator("CmdOrCtrl+P").enabled(false).build(app)?;
+    let print = MenuItemBuilder::with_id(PRINT, "プリント…")
+        .accelerator(default_shortcut(PRINT, "CmdOrCtrl+P"))
+        .enabled(false)
+        .build(app)?;
     let batch = MenuItemBuilder::with_id(BATCH, "まとめて処理…").build(app)?;
     let collage = MenuItemBuilder::with_id(COLLAGE, "並べて 1 枚に…").build(app)?;
     let id_photo = MenuItemBuilder::with_id(ID_PHOTO, "証明写真…").enabled(false).build(app)?;
@@ -124,36 +157,42 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .close_window_with_text("閉じる")
         .build()?;
     // 入力欄で使う標準の編集の項目（ペーストは画像を開くこともあるので独自の項目）
-    let text = MenuItemBuilder::with_id(TEXT, "文字・透かし…").accelerator("CmdOrCtrl+T").build(app)?;
+    let text = MenuItemBuilder::with_id(TEXT, "文字・透かし…")
+        .accelerator(default_shortcut(TEXT, "CmdOrCtrl+T"))
+        .build(app)?;
     // 設定の変更を戻す（旧版 FR-UI-43）。戻せないときは使えない状態にし、入力欄の ⌘Z は入力欄に届く
-    let undo =
-        MenuItemBuilder::with_id(UNDO, "元に戻す").accelerator("CmdOrCtrl+Z").enabled(false).build(app)?;
-    let redo = MenuItemBuilder::with_id(REDO, "やり直す")
-        .accelerator("CmdOrCtrl+Shift+Z")
+    let undo = MenuItemBuilder::with_id(UNDO, "元に戻す")
+        .accelerator(default_shortcut(UNDO, "CmdOrCtrl+Z"))
         .enabled(false)
         .build(app)?;
-    let paste = MenuItemBuilder::with_id(PASTE, "ペースト").accelerator("CmdOrCtrl+V").build(app)?;
+    let redo = MenuItemBuilder::with_id(REDO, "やり直す")
+        .accelerator(default_shortcut(REDO, "CmdOrCtrl+Shift+Z"))
+        .enabled(false)
+        .build(app)?;
+    let paste = MenuItemBuilder::with_id(PASTE, "ペースト")
+        .accelerator(default_shortcut(PASTE, "CmdOrCtrl+V"))
+        .build(app)?;
     let copy_image = MenuItemBuilder::with_id(COPY_IMAGE, "加工後の画像をコピー")
-        .accelerator("CmdOrCtrl+Shift+C")
+        .accelerator(default_shortcut(COPY_IMAGE, "CmdOrCtrl+Shift+C"))
         .enabled(false)
         .build(app)?;
     // 加工の使い回し（画像がない・コピーしていないときは使えない。画面が set_menu_enabled で合わせる）
     let copy_look = MenuItemBuilder::with_id(COPY_LOOK, "加工をコピー")
-        .accelerator("Alt+CmdOrCtrl+C")
+        .accelerator(default_shortcut(COPY_LOOK, "Alt+CmdOrCtrl+C"))
         .enabled(false)
         .build(app)?;
     let paste_look = MenuItemBuilder::with_id(PASTE_LOOK, "加工をペースト")
-        .accelerator("Alt+CmdOrCtrl+V")
+        .accelerator(default_shortcut(PASTE_LOOK, "Alt+CmdOrCtrl+V"))
         .enabled(false)
         .build(app)?;
     // 加工の途中の版（画像がないときは使えない）
     let keep_version = MenuItemBuilder::with_id(KEEP_VERSION, "今の加工を版として残す")
-        .accelerator("Alt+CmdOrCtrl+K")
+        .accelerator(default_shortcut(KEEP_VERSION, "Alt+CmdOrCtrl+K"))
         .enabled(false)
         .build(app)?;
     let versions = MenuItemBuilder::with_id(VERSIONS, "版の一覧…").enabled(false).build(app)?;
     let history_list = MenuItemBuilder::with_id(HISTORY_LIST, "履歴…")
-        .accelerator("Alt+CmdOrCtrl+Z")
+        .accelerator(default_shortcut(HISTORY_LIST, "Alt+CmdOrCtrl+Z"))
         .enabled(false)
         .build(app)?;
     let edit = SubmenuBuilder::new(app, "編集")
@@ -176,24 +215,24 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&text)
         .build()?;
     let clipping = CheckMenuItemBuilder::with_id(CLIPPING, "白飛び・黒つぶれを表示")
-        .accelerator("Alt+CmdOrCtrl+J")
+        .accelerator(default_shortcut(CLIPPING, "Alt+CmdOrCtrl+J"))
         .checked(false)
         .build(app)?;
     let histogram = CheckMenuItemBuilder::with_id(HISTOGRAM, "ヒストグラム")
-        .accelerator("CmdOrCtrl+Shift+H")
+        .accelerator(default_shortcut(HISTOGRAM, "CmdOrCtrl+Shift+H"))
         .checked(true)
         .build(app)?;
     // 画像を開くまで・100% 表示の間などは画面が使えない状態にする（set_menu_enabled）
     let actual_size = MenuItemBuilder::with_id(ACTUAL_SIZE, "100% で表示")
-        .accelerator("CmdOrCtrl+1")
+        .accelerator(default_shortcut(ACTUAL_SIZE, "CmdOrCtrl+1"))
         .enabled(false)
         .build(app)?;
     let fit = MenuItemBuilder::with_id(FIT, "画面に合わせる")
-        .accelerator("CmdOrCtrl+0")
+        .accelerator(default_shortcut(FIT, "CmdOrCtrl+0"))
         .enabled(false)
         .build(app)?;
     let split = CheckMenuItemBuilder::with_id(SPLIT, "左右に分けて比べる")
-        .accelerator("CmdOrCtrl+B")
+        .accelerator(default_shortcut(SPLIT, "CmdOrCtrl+B"))
         .checked(false)
         .enabled(false)
         .build(app)?;
@@ -213,7 +252,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()?;
     // ⌘?（? は Shift と / のキー。Tauri のメニューは物理キーで指定する）
     let usage = MenuItemBuilder::with_id(HELP, format!("{} の使い方", super::APP_NAME))
-        .accelerator("CmdOrCtrl+Shift+/")
+        .accelerator(default_shortcut(HELP, "CmdOrCtrl+Shift+/"))
         .build(app)?;
     let help = SubmenuBuilder::new(app, "ヘルプ").item(&usage).build()?;
     // macOS のヘルプメニューにする（メニューの項目を探す欄が付く）

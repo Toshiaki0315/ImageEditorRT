@@ -48,6 +48,7 @@ import { MaskedPanel } from "./maskedPanel";
 import { MonoPanel } from "./monoPanel";
 import { Versions } from "./versions";
 import { HistoryPanel } from "./historyPanel";
+import { ShortcutsDialog } from "./shortcutsDialog";
 import { AnnotatePanel } from "./annotatePanel";
 import { ColorMatchControls } from "./colorMatchControls";
 import { PrivacyPanel } from "./privacy";
@@ -79,6 +80,9 @@ zoomView.onMove = placeBadge;
 zoomView.onDoubleClick = fitToWindow;
 
 /** メニューの項目が選ばれたときにすること（プリセットの項目は onPresetMenu）。 */
+/** 「キーボードショートカット…」のダイアログ */
+const shortcutsDialog = new ShortcutsDialog();
+
 const menuActions: Record<string, () => void> = {
   [MENU.quit]: () => void requestQuit(),
   [MENU.open]: () => void openDialog(),
@@ -94,6 +98,7 @@ const menuActions: Record<string, () => void> = {
   [MENU.collage]: () => void makeCollage(),
   [MENU.idPhoto]: () => void makeIdPhoto(),
   [MENU.watchFolder]: () => void startWatch(),
+  [MENU.shortcuts]: () => void shortcutsDialog.open(),
   [MENU.stopWatch]: () => void stopWatch(),
   [MENU.paste]: () => void paste(),
   [MENU.undo]: undo,

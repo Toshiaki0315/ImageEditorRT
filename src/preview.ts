@@ -29,6 +29,8 @@ const nextFrame = () =>
 
 export class Preview {
   private readonly context: CanvasRenderingContext2D;
+  /** 最後に描いた画素（白飛び・黒つぶれを塗る前。スポイトで色を拾う） */
+  private lastPixels: { width: number; height: number; pixels: Uint8ClampedArray<ArrayBuffer> } | null = null;
   private busy = false;
   private pending: EditSettings | null = null;
   /** 切り抜いた範囲だけを表示する（「トリミング実行」） */
@@ -137,6 +139,7 @@ export class Preview {
       this.canvas.height = height;
       this.fit();
     }
+    this.lastPixels = { width, height, pixels };
     // 白飛び・黒つぶれを塗って見せる（加工後の表示のときだけ）
     const shown = clippingShown() && !this.comparing ? markClipping(pixels).pixels : pixels;
     this.context.putImageData(imageData(shown, width, height), 0, 0);
@@ -145,5 +148,30 @@ export class Preview {
     await nextFrame(); // 画面に出るところまで含める
     const end = performance.now();
     return { render, transfer: received - start - render, draw: end - received, total: end - start };
+  }
+
+  /**
+   * 画面の位置（clientX・clientY）のまわり（表示の 5 × 5 画素ほど）の色の平均（加工後の表示。比べている・画像がないときは null）。
+   */
+  sampleAt(clientX: number, clientY: number): [number, number, number] | null {
+    const last = this.lastPixels;
+    if (!last || this.comparing || this.canvas.hidden) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    const x = Math.floor(((clientX - rect.left) / rect.width) * last.width);
+    const y = Math.floor(((clientY - rect.top) / rect.height) * last.height);
+    if (x < 0 || y < 0 || x >= last.width || y >= last.height) return null;
+    const radius = Math.max(1, Math.round((2 * last.width) / rect.width));
+    const sum = [0, 0, 0];
+    let count = 0;
+    for (let yy = Math.max(0, y - radius); yy <= Math.min(last.height - 1, y + radius); yy++) {
+      for (let xx = Math.max(0, x - radius); xx <= Math.min(last.width - 1, x + radius); xx++) {
+        const i = (yy * last.width + xx) * 4;
+        if (last.pixels[i + 3] === 0) continue;
+        for (let c = 0; c < 3; c++) sum[c] += last.pixels[i + c];
+        count++;
+      }
+    }
+    return count ? (sum.map((v) => v / count) as [number, number, number]) : null;
   }
 }

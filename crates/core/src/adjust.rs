@@ -106,6 +106,55 @@ fn kelvin_to_rgb(kelvin: f64) -> [f64; 3] {
     [red, green, blue].map(|v| v.clamp(1.0, 255.0))
 }
 
+/// 色かぶり（-100〜100。負で緑に、正でマゼンタに寄せる）の強さ: 100 で緑の倍率を何割変えるか。
+const TINT_STRENGTH: f64 = 0.3;
+/// スポイトで合わせる色温度・色かぶりの範囲。
+pub const TEMPERATURE_MIN: u32 = 2000;
+pub const TEMPERATURE_MAX: u32 = 10000;
+pub const TINT_MIN: i32 = -100;
+pub const TINT_MAX: i32 = 100;
+
+/// 色かぶりに対する R / G / B の倍率（0 で 1、輝度は 1 に正規化）。
+pub fn tint_multipliers(tint: i32) -> [f64; 3] {
+    let green = 1.0 - f64::from(tint.clamp(TINT_MIN, TINT_MAX)) / 100.0 * TINT_STRENGTH;
+    let raw = [1.0, green, 1.0];
+    let luma: f64 = (0..3).map(|c| LUMA[c] * raw[c]).sum();
+    raw.map(|m| m / luma)
+}
+
+/// 色かぶりの表。
+pub fn tint_lut(tint: i32) -> Lut {
+    let multipliers = tint_multipliers(tint);
+    std::array::from_fn(|c| std::array::from_fn(|v| clip(v as f64 * multipliers[c])))
+}
+
+/// スポイト: 今の色温度・色かぶりで sample（0〜255 の RGB）に見えている色が灰色になる色温度・色かぶり。
+/// 今の倍率を外した元の色に、候補の倍率をかけて、いちばん灰色に近いものを選ぶ（色温度は 50K、色かぶりは 1 刻み）。
+pub fn neutral_white_balance(sample: [f64; 3], temperature: u32, tint: i32) -> (u32, i32) {
+    let current = gains(temperature, tint);
+    let base: [f64; 3] = std::array::from_fn(|c| sample[c].max(1.0) / current[c]);
+    let mut best = (temperature, tint, f64::INFINITY);
+    for kelvin in (TEMPERATURE_MIN..=TEMPERATURE_MAX).step_by(50) {
+        let warm = temperature_multipliers(kelvin);
+        for t in TINT_MIN..=TINT_MAX {
+            let g = tint_multipliers(t);
+            let [r, gg, b] = std::array::from_fn::<f64, 3, _>(|c| base[c] * warm[c] * g[c]);
+            let error = (r / gg - 1.0).powi(2) + (b / gg - 1.0).powi(2);
+            if error < best.2 {
+                best = (kelvin, t, error);
+            }
+        }
+    }
+    (best.0, best.1)
+}
+
+/// 色温度と色かぶりを合わせた倍率。
+fn gains(temperature: u32, tint: i32) -> [f64; 3] {
+    let warm = temperature_multipliers(temperature);
+    let g = tint_multipliers(tint);
+    std::array::from_fn(|c| warm[c] * g[c])
+}
+
 /// 表をかける（アルファはそのまま）。
 pub fn apply_lut(image: &mut RgbaImage, lut: &Lut) {
     image.as_mut().par_chunks_exact_mut(4).with_min_len(PIXELS_PER_TASK).for_each(|p| {
@@ -278,6 +327,40 @@ fn linear_to_srgb(v: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn tint_moves_green_and_magenta() {
+        assert_eq!(tint_lut(0), identity_lut());
+        let magenta = tint_lut(50);
+        assert!(magenta[1][128] < 128 && magenta[0][128] > 128, "正でマゼンタ（緑を減らす）");
+        let green = tint_lut(-50);
+        assert!(green[1][128] > 128 && green[0][128] < 128, "負で緑");
+    }
+
+    #[test]
+    fn picker_makes_the_sample_gray() {
+        // 灰色の見本はそのまま
+        assert_eq!(
+            neutral_white_balance([128.0, 128.0, 128.0], TEMPERATURE_NEUTRAL, 0),
+            (TEMPERATURE_NEUTRAL, 0)
+        );
+        // 青っぽい見本は暖かく（このアプリの色温度は小さいほど暖かい）、緑っぽい見本はマゼンタ寄りにする
+        let (warm, _) = neutral_white_balance([110.0, 128.0, 160.0], TEMPERATURE_NEUTRAL, 0);
+        assert!(warm < TEMPERATURE_NEUTRAL, "{warm}");
+        let (_, magenta) = neutral_white_balance([120.0, 150.0, 120.0], TEMPERATURE_NEUTRAL, 0);
+        assert!(magenta > 0, "{magenta}");
+        // 合わせた値で見本の色を直すと、ほぼ灰色になる
+        let sample = [140.0, 132.0, 118.0]; // 色温度の範囲で直せるくらいの黄ばみ
+        let (k, t) = neutral_white_balance(sample, TEMPERATURE_NEUTRAL, 0);
+        let g = gains(k, t);
+        let fixed: [f64; 3] = std::array::from_fn(|c| sample[c] * g[c]);
+        assert!(
+            (fixed[0] / fixed[1] - 1.0).abs() < 0.05 && (fixed[2] / fixed[1] - 1.0).abs() < 0.05,
+            "{fixed:?}"
+        );
+        // 今の値で直した後の見本なら、今の値のまま
+        assert_eq!(neutral_white_balance([128.0; 3], k, t), (k, t));
+    }
     use super::*;
     use image::Rgba;
 

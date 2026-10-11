@@ -1058,3 +1058,9 @@ input[type="range"]:disabled::-webkit-slider-thumb {
 .versions-dialog h2 {
   margin-top: 0;
 }
+
+/* スポイトで色を拾う間は、プレビューの上で十字のカーソル */
+.picking,
+.picking * {
+  cursor: crosshair !important;
+}

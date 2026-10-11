@@ -3,7 +3,7 @@
 // 部品（photoControls・privacy・panel）には問い合わせ方だけを渡し、ここで画面の文をまとめて持つ。
 
 import { invoke } from "@tauri-apps/api/core";
-import { hooks, parts, state } from "./app";
+import { dom, hooks, parts, preview, state } from "./app";
 import { evText, kelvinText, signedText } from "./panel";
 import { degreesText } from "./photoControls";
 import { notify, showError } from "./status";
@@ -55,7 +55,48 @@ export function setupAssist() {
   };
 
   parts.autoButton.addEventListener("click", () => void autoAdjust());
+  parts.pickerButton.addEventListener("click", () => setPicking(!picking));
+  // スポイトの間は、プレビューを押した所の色を拾う（範囲などの操作より先に受け取る）
+  dom.stage.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (!picking || event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void pickWhiteBalance(event.clientX, event.clientY);
+    },
+    { capture: true },
+  );
+  document.addEventListener("keydown", (event) => {
+    if (picking && event.key === "Escape") setPicking(false);
+  });
   hooks.prepareFaces = prepareFaces;
+}
+
+/** スポイトで色を拾う待ちか */
+let picking = false;
+
+/** スポイトの待ちを切り替える（待っている間はプレビューの上で十字のカーソル）。 */
+export function setPicking(value: boolean) {
+  picking = value && state.loaded !== null;
+  parts.pickerButton?.setAttribute("aria-pressed", String(picking));
+  dom.stage.classList.toggle("picking", picking);
+  if (picking) notify("プレビューで、白・灰色のはずの所をクリックしてください（Esc でやめる）");
+}
+
+/** スポイト: 押した所の色が灰色になるよう、色温度・色かぶりを合わせる（1 回の操作として元に戻せる）。 */
+async function pickWhiteBalance(clientX: number, clientY: number) {
+  const sample = preview.sampleAt(clientX, clientY);
+  setPicking(false);
+  if (!sample) return;
+  const { temperature, tint } = state.settings;
+  try {
+    const [kelvin, newTint] = await invoke<[number, number]>("pick_white_balance", { sample, temperature, tint });
+    parts.panel.setAuto({ temperature: kelvin, tint: newTint });
+    notify(`スポイト: 色温度 ${kelvinText(kelvin)}・色かぶり ${signedText(newTint)}`);
+  } catch (error) {
+    await showError("ホワイトバランスを合わせられません", error);
+  }
 }
 
 /** 自動補正: 今の写真から露出・コントラスト・色温度を求めてスライダーに入れる（1 回の操作として元に戻せる）。 */

@@ -101,6 +101,7 @@ pub fn run() {
             settings::text_options,
             settings::check_lut,
             settings::measure_reference,
+            settings::pick_white_balance,
             settings::aspect_ratios,
             settings::effective_crop,
             settings::crop_drag,

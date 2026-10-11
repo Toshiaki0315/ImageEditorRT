@@ -35,6 +35,8 @@ const COLOR: Slider[] = [
   { key: "highlights", label: "ハイライト", min: -100, max: 100, initial: 0, text: signedText },
   { key: "shadows", label: "シャドウ", min: -100, max: 100, initial: 0, text: signedText },
   { key: "temperature", label: "色温度", min: 2000, max: 10000, step: 100, initial: 6500, text: kelvinText },
+  // 緑〜マゼンタの色かぶり（旧版にはない。スポイトでも合わせる）
+  { key: "tint", label: "色かぶり", min: -100, max: 100, initial: 0, text: signedText },
   { key: "saturation", label: "彩度", min: -100, max: 100, initial: 0, text: signedText },
   { key: "vignette", label: "周辺減光", min: 0, max: 100, initial: 0 },
   { key: "aging", label: "経年劣化", min: 0, max: 100, initial: 0 },
@@ -133,7 +135,15 @@ export class Panel {
     autoButton.textContent = "自動補正";
     autoButton.title = "今の写真の明るさ・メリハリ・色かぶりから、露出・コントラスト・色温度を入れます（そのあと手で調整できます）";
     autoButton.disabled = true;
-    autoRow.append(autoButton);
+    // スポイト: プレビューで白・灰色のはずの所を押すと、色温度・色かぶりを合わせる（旧版にはない。assist.ts でつなぐ）
+    const picker = document.createElement("button");
+    picker.type = "button";
+    picker.id = "wb-picker";
+    picker.textContent = "スポイト";
+    picker.title = "押してから、プレビューで白・灰色のはずの所をクリックすると、色温度と色かぶりを合わせます（Esc でやめる）";
+    picker.setAttribute("aria-pressed", "false");
+    picker.disabled = true;
+    autoRow.append(autoButton, picker);
     adjustPage.append(autoRow);
     this.build(adjustPage, COLOR);
     // トーンカーブ・色ごとの調整（colorPanel.ts が中身を作る）
@@ -243,8 +253,8 @@ export class Panel {
     this.onChange();
   }
 
-  /** 自動補正の値をスライダーに入れる（ほかの項目はそのまま）。 */
-  setAuto(values: Pick<EditSettings, "exposure" | "contrast" | "temperature">) {
+  /** 自動補正・スポイトの値をスライダーに入れる（ほかの項目はそのまま）。 */
+  setAuto(values: Partial<Pick<EditSettings, "exposure" | "contrast" | "temperature" | "tint">>) {
     Object.assign(this.settings, values);
     this.show();
     this.onChange();

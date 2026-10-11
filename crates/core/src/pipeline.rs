@@ -312,6 +312,9 @@ fn apply_basic_adjustments(mut image: RgbaImage, settings: &EditSettings) -> Rgb
     if settings.temperature != adjust::TEMPERATURE_NEUTRAL {
         lut = adjust::compose(&lut, &adjust::temperature_lut(settings.temperature));
     }
+    if settings.tint != 0 {
+        lut = adjust::compose(&lut, &adjust::tint_lut(settings.tint));
+    }
     if settings.tone_curve != curve::identity_curve() {
         lut = adjust::compose(&lut, &curve::curve_lut(&settings.tone_curve));
     }

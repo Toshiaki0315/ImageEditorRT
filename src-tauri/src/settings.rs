@@ -63,6 +63,12 @@ pub async fn measure_reference(path: String) -> Result<imageeditorrt_core::color
     .map_err(|e| e.to_string())?
 }
 
+/// スポイト: プレビューで選んだ所の色（sample）が灰色になる色温度・色かぶり。
+#[tauri::command]
+pub fn pick_white_balance(sample: [f64; 3], temperature: u32, tint: i32) -> (u32, i32) {
+    imageeditorrt_core::adjust::neutral_white_balance(sample, temperature, tint)
+}
+
 /// 文字・透かしのフォントと位置の選択肢。
 #[tauri::command]
 pub fn text_options() -> (Choices<TextFont>, Choices<TextPosition>) {

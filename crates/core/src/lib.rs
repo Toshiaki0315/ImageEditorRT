@@ -64,6 +64,7 @@ pub mod saliency;
 pub mod sample;
 pub mod save;
 pub mod shapes;
+pub mod shortcuts;
 pub mod skin;
 pub mod text;
 #[cfg(target_os = "macos")]

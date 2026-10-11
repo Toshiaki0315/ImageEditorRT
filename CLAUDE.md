@@ -83,6 +83,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     diorama.rs            # ジオラマ風（ミニチュア風・ティルトシフト）
     frames.rs             # フレーム（ポラロイド・チェキ）
     histogram.rs          # ヒストグラム（R・G・B・輝度の分布）の計算
+    shortcuts.rs          # キーボードショートカットの書き方の確かめ・重なり・変えた分の読み書き（shortcuts.json）
     shapes.rs             # 形（角丸・円）の切り抜き
     privacy.rs            # 投稿加工の範囲（ぼかし・モザイク・絵文字のスタンプ・修復）
     id_photo.rs           # 証明写真（顔の枠から頭の大きさを見積もって規定の大きさに切り抜く・L 判に並べる）
@@ -125,6 +126,7 @@ src-tauri/                # Tauri のアプリ本体（コマンドで core を�
   src/batch.rs            # まとめて処理（進み具合のイベント・中止）
   src/clipboard.rs        # クリップボード（NSPasteboard）を読む（貼り付け）・加工後の画像を書く（⇧⌘C のときだけ）
   src/edits.rs            # 写真ごとの加工を覚える（edits.json。保存・別の写真へ移る・終了のとき覚え、開いたとき「前回の加工を続ける」で当てはめる）
+  src/shortcuts.rs        # キーボードショートカットの一覧・変える・既定に戻す（起動時に変えた分をメニューに当てる）
   src/watch.rs            # フォルダの見張り（別のスレッドで見て、まとめて処理と同じく 1 枚ずつ処理。止めるまで続ける）
   src/share.rs            # 共有・印刷（加工後の画像を一時ファイルにして、macOS の共有の一覧・印刷ダイアログを出す。一時ファイルは終了時に消す）
   src/diagnostics.rs      # 想定外のエラーのログ（~/Library/Logs/ImageEditorRT/）と起動確認（--smoke-test）
@@ -174,6 +176,8 @@ src/                      # 画面（TypeScript）
   versions.ts             # 加工の途中の版（残す・一覧から当てはめる・名前を変える・削除。写真を開いている間だけ）
   idPhoto.ts              # 「ファイル > 証明写真…」のダイアログ
   annotatePanel.ts        # 「注釈」タブ（プレビューのドラッグで描く・選んで動かす・色や太さ・文字）
+  shortcutKeys.ts         # ショートカットの書き方（押したキー → CmdOrCtrl+K、表示 → ⌘K）
+  shortcutsDialog.ts      # 「キーボードショートカット…」のダイアログ
   clipping.ts             # 白飛び・黒つぶれの表示（プレビューの画素を塗った写しを作る）
   colorSpace.ts           # プレビューの色空間（canvas は Display P3、画素には開いた画像の色空間を付けて描く）
   maskedPanel.ts          # 「加工」タブの被写体／背景の補正（対象を選んでスライダー。初めて動かすときマスクを作る）

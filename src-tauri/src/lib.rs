@@ -19,6 +19,7 @@ mod saving;
 mod settings;
 #[cfg(target_os = "macos")]
 mod share;
+mod shortcuts;
 mod state;
 mod system;
 mod watch;
@@ -58,6 +59,8 @@ pub fn run() {
             // 最近使った項目を読み、メニューに出す
             app.state::<recent::RecentStore>().load();
             recent::refresh_menu(app.handle());
+            // 変えたキーボードショートカットをメニューに当てる
+            shortcuts::apply_saved(app.handle());
             // 計測ではウィンドウが隠れていると描画が止まるので、前に出す
             if bench::bench_mode() {
                 if let Some(window) = app.get_webview_window("main") {
@@ -138,6 +141,9 @@ pub fn run() {
             batch::run_batch,
             batch::cancel_batch,
             watch::start_watch,
+            shortcuts::shortcut_list,
+            shortcuts::set_shortcut,
+            shortcuts::reset_shortcuts,
             watch::stop_watch,
             bench::open_sample,
             bench::bench_mode,

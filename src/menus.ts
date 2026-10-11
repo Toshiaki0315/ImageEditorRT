@@ -19,6 +19,7 @@ export const MENU = {
   collage: "collage",
   idPhoto: "id-photo",
   watchFolder: "watch-folder",
+  shortcuts: "shortcuts",
   stopWatch: "stop-watch",
   undo: "undo",
   redo: "redo",

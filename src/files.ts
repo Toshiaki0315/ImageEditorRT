@@ -26,6 +26,7 @@ import { defaultSettings, type EditSettings, type OpenInfo } from "./types";
 import { fitToWindow, setComparing, stopSplit, updateGuide } from "./view";
 import { readStored, writeStored } from "./storage";
 import { setImageColorSpace } from "./colorSpace";
+import { setPicking } from "./assist";
 
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
 const LOAD_ERROR_TITLE = "画像を読み込めません";
@@ -59,7 +60,7 @@ export function showLoaded(info: OpenInfo, openNotes: string[]) {
   parts.historyPanel.close();
   output.reset(true);
   parts.textDialog.show();
-  parts.textButton.disabled = parts.tasteButton.disabled = parts.autoButton.disabled = false;
+  parts.textButton.disabled = parts.tasteButton.disabled = parts.autoButton.disabled = parts.pickerButton.disabled = false;
   exifView.show(info.exif);
   tabs.setEnabled("exif", !info.exif.empty);
   state.notes = info.frameCount > 1 ? [...openNotes, MULTI_FRAME_NOTE] : openNotes;
@@ -540,7 +541,8 @@ export async function resetImage() {
   output.reset(false);
   parts.textDialog.close();
   parts.textDialog.show();
-  parts.textButton.disabled = parts.tasteButton.disabled = parts.autoButton.disabled = true;
+  parts.textButton.disabled = parts.tasteButton.disabled = parts.autoButton.disabled = parts.pickerButton.disabled = true;
+  setPicking(false);
   parts.tasteGallery.close();
   exifView.show(null);
   tabs.setEnabled("exif", false);

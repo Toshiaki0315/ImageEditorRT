@@ -309,6 +309,8 @@ fn output_format_changes_the_suffix() {
     let path = |format| named_output_path(&source, &out, &original, format, 0, None, (10, 10));
     assert_eq!(path(OutputFormat::Original), out.join("IMG_0001.JPG"));
     assert_eq!(path(OutputFormat::Heic), out.join("IMG_0001.heic"));
+    assert_eq!(path(OutputFormat::Avif), out.join("IMG_0001.avif"));
+    assert_eq!(path(OutputFormat::Webp), out.join("IMG_0001.webp"));
     // 同じ名前があれば _edited（形式を変えても上書きしない）
     touch(&out.join("IMG_0001.heic"));
     assert_eq!(path(OutputFormat::Heic), out.join("IMG_0001_edited.heic"));

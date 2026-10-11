@@ -43,7 +43,8 @@ Image.new("RGB", (W, H), (10, 20, 30)).save(HERE / "plain.bmp")
 Image.new("RGB", (W, H), (1, 2, 3)).save(HERE / "png_named.jpg", format="PNG")
 
 # ImageIO は読めるが、このアプリでは扱わない形式（WebP）
-Image.new("RGB", (W, H), (9, 9, 9)).save(HERE / "unsupported.webp")
+Image.new("RGB", (W, H), (9, 9, 9)).save(HERE / "small.webp")
+# unsupported.tga（このアプリでは扱わない形式）は macOS の sips で作る: sips -s format tga plain.bmp --out unsupported.tga
 
 # Display P3 の色の PNG（ICC プロファイル付き）: 全体が P3 の (200, 100, 50)
 p3 = Path("/System/Library/ColorSync/Profiles/Display P3.icc").read_bytes()

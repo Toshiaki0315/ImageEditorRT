@@ -333,3 +333,42 @@ fn display_p3_is_kept_through_save() {
     save_edited(&image, &plain, SaveOptions::default(), None, false).unwrap();
     assert_eq!(decode_file(&std::fs::read(&plain).unwrap()).unwrap().color_space, ColorSpace::Srgb);
 }
+
+#[test]
+fn webp_and_avif_round_trip() {
+    let dir = TempDir::new("webp-avif");
+    let source = raw_exif(&fixture("pentax.jpg")).unwrap();
+    // WebP は劣化なし: 画素も透過もそのまま。EXIF も残る
+    let path = dir.join("a.webp");
+    save_edited(&sample(), &path, SaveOptions::default(), Some(&source), false).unwrap();
+    let bytes = std::fs::read(&path).unwrap();
+    let d = decode_file(&bytes).unwrap();
+    assert_eq!(d.format, Format::Webp);
+    assert_eq!(d.image.get_pixel(2, 5).0, [220, 30, 30, 255]);
+    assert_eq!(d.image.get_pixel(15, 5)[3], 0, "透過のまま");
+    assert!(read_exif_info(&bytes).entries.iter().any(|e| e.tag == "Model" && e.value == "PENTAX K-1"));
+    // AVIF は品質で大きさが変わり、EXIF も残る
+    let photo = RgbaImage::from_fn(320, 240, |x, y| {
+        Rgba([((x * 7 + y * 3) % 256) as u8, ((x * x + y) % 256) as u8, ((y * 11) % 256) as u8, 255])
+    });
+    let high = dir.join("h.avif");
+    let low = dir.join("l.avif");
+    // AVIF の書き出しは、macOS の版・機械によってはできない（CI の仮想マシンでは失敗する）。そのときは確かめない
+    if let Err(e) = save_edited(
+        &photo,
+        &high,
+        SaveOptions { quality: 95, ..SaveOptions::default() },
+        Some(&source),
+        false,
+    ) {
+        eprintln!("AVIF を書き出せないので、AVIF の確認を飛ばす: {e}");
+        return;
+    }
+    save_edited(&photo, &low, SaveOptions { quality: 20, ..SaveOptions::default() }, Some(&source), false)
+        .unwrap();
+    let (hb, lb) = (std::fs::read(&high).unwrap(), std::fs::read(&low).unwrap());
+    assert!(lb.len() < hb.len(), "{} < {}", lb.len(), hb.len());
+    let d = decode_file(&hb).unwrap();
+    assert_eq!((d.format, d.image.dimensions()), (Format::Avif, (320, 240)));
+    assert!(read_exif_info(&hb).entries.iter().any(|e| e.tag == "Model"), "AVIF にも EXIF");
+}

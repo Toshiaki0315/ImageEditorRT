@@ -25,7 +25,7 @@ export class TextDialog {
   private readonly logoOpacityValue = $<HTMLOutputElement>("logo-opacity-value");
   private readonly logoPosition = $<HTMLSelectElement>("logo-position");
   /** ロゴに選べる画像の拡張子 */
-  logoExtensions: string[] = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic"];
+  logoExtensions: string[] = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic", "webp", "avif"];
 
   constructor(
     private readonly settings: EditSettings,

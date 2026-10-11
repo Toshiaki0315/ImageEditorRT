@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use image::codecs::bmp::BmpEncoder;
 use image::codecs::gif::GifEncoder;
 use image::codecs::png::PngEncoder;
+use image::codecs::webp::WebPEncoder;
 use image::{ExtendedColorType, Frame, ImageEncoder, RgbaImage};
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +28,8 @@ pub const FALLBACK_SAVE_SUFFIX: &str = "jpg";
 /// JPEG の APP1 に入る EXIF の大きさの上限（これを超えると MakerNote を外す）。
 pub const MAX_EXIF_BYTES: usize = 65533;
 /// 保存できる拡張子（小文字・ドットなし）。
-pub const SAVABLE_EXTENSIONS: [&str; 9] = ["png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic", "heif"];
+pub const SAVABLE_EXTENSIONS: [&str; 11] =
+    ["png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic", "heif", "webp", "avif"];
 /// 元の画像と同じファイルを選んだときの説明。
 pub const SAME_FILE_MESSAGE: &str =
     "元の画像と同じファイルには保存できません。別のファイル名を指定してください。";
@@ -185,6 +187,10 @@ pub enum SaveFormat {
     Bmp,
     /// HEIC（macOS の ImageIO で書き出す。旧版にはない）
     Heic,
+    /// WebP（劣化なし。旧版にはない）
+    Webp,
+    /// AVIF（macOS の ImageIO で書き出す。旧版にはない）
+    Avif,
 }
 
 impl SaveFormat {
@@ -197,6 +203,8 @@ impl SaveFormat {
             "tif" | "tiff" => Some(Self::Tiff),
             "bmp" => Some(Self::Bmp),
             "heic" | "heif" => Some(Self::Heic),
+            "webp" => Some(Self::Webp),
+            "avif" => Some(Self::Avif),
             _ => None,
         }
     }
@@ -208,12 +216,12 @@ impl SaveFormat {
 
     /// EXIF を書き込める形式か。
     fn has_exif(self) -> bool {
-        matches!(self, Self::Jpeg | Self::Png | Self::Tiff | Self::Heic)
+        matches!(self, Self::Jpeg | Self::Png | Self::Tiff | Self::Heic | Self::Webp | Self::Avif)
     }
 
     /// 品質で大きさが変わる形式か（ファイルの大きさの上限に合わせられる）。
     fn is_lossy(self) -> bool {
-        matches!(self, Self::Jpeg | Self::Heic)
+        matches!(self, Self::Jpeg | Self::Heic | Self::Avif)
     }
 }
 
@@ -510,6 +518,28 @@ pub fn encode_in(
             #[cfg(not(target_os = "macos"))]
             return Err(SaveError::Write("HEIC は macOS でだけ保存できます".into()));
         }
+        SaveFormat::Avif => {
+            #[cfg(target_os = "macos")]
+            {
+                out = crate::heic::encode_imageio(image, quality, exif, space, crate::heic::AVIF_UTI)
+                    .map_err(|e| write_error(&e))?;
+            }
+            #[cfg(not(target_os = "macos"))]
+            return Err(SaveError::Write("AVIF は macOS でだけ保存できます".into()));
+        }
+        SaveFormat::Webp => {
+            // 劣化なしで書き出す（image の WebP は劣化ありの書き出しを持たない）
+            let mut encoder = WebPEncoder::new_lossless(&mut out);
+            if let Some(tiff) = exif.and_then(tiff_block) {
+                encoder.set_exif_metadata(tiff.to_vec()).map_err(|e| write_error(&e))?;
+            }
+            if let Some(icc) = icc {
+                encoder.set_icc_profile(icc.to_vec()).map_err(|e| write_error(&e))?;
+            }
+            encoder
+                .write_image(image.as_raw(), width, height, ExtendedColorType::Rgba8)
+                .map_err(|e| write_error(&e))?;
+        }
         SaveFormat::Tiff => {
             let mut block =
                 exif.and_then(ExifBlock::parse).unwrap_or_else(|| ExifBlock::empty(Order::Little));
@@ -795,9 +825,9 @@ mod tests {
     #[test]
     fn unsupported_extension() {
         let err =
-            save_edited(&RgbaImage::new(1, 1), Path::new("/tmp/x.webp"), SaveOptions::default(), None, false)
+            save_edited(&RgbaImage::new(1, 1), Path::new("/tmp/x.tga"), SaveOptions::default(), None, false)
                 .unwrap_err();
-        assert_eq!(err.to_string(), "対応していない拡張子です: .webp");
+        assert_eq!(err.to_string(), "対応していない拡張子です: .tga");
     }
 
     #[test]

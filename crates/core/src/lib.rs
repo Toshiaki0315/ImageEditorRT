@@ -73,3 +73,4 @@ pub mod tile;
 pub mod transform;
 #[cfg(target_os = "macos")]
 mod vision;
+pub mod watch;

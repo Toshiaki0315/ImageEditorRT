@@ -58,6 +58,7 @@ crates/core/              # ★ Tauri に依存しない画像処理・EXIF（im
     saliency.rs           # 目立つ部分の枠（Vision の注目度。おまかせ切り抜き）
     resize.rs             # 縮小（プレビューは fast_image_resize、保存は Pillow と画素まで同じリサイズ）
     perspective.rs        # 遠近（台形）の補正（台形を射影変換で長方形に写す。余白は出ない）
+    watch.rs              # フォルダの見張り（新しく入って書き込みが終わった画像を 1 回だけ返す）
     transform.rs          # 回転・反転（8 通りの向き）・トリミング範囲の計算・リサイズの大きさ
     output.rs             # 「出力」タブのサイズ変更（欄に出す値と、編集設定に渡す幅・高さ）
     crop.rs               # トリミング範囲の編集（ドラッグ・数値の欄・比・回転と反転）の計算
@@ -124,6 +125,7 @@ src-tauri/                # Tauri のアプリ本体（コマンドで core を�
   src/batch.rs            # まとめて処理（進み具合のイベント・中止）
   src/clipboard.rs        # クリップボード（NSPasteboard）を読む（貼り付け）・加工後の画像を書く（⇧⌘C のときだけ）
   src/edits.rs            # 写真ごとの加工を覚える（edits.json。保存・別の写真へ移る・終了のとき覚え、開いたとき「前回の加工を続ける」で当てはめる）
+  src/watch.rs            # フォルダの見張り（別のスレッドで見て、まとめて処理と同じく 1 枚ずつ処理。止めるまで続ける）
   src/share.rs            # 共有・印刷（加工後の画像を一時ファイルにして、macOS の共有の一覧・印刷ダイアログを出す。一時ファイルは終了時に消す）
   src/diagnostics.rs      # 想定外のエラーのログ（~/Library/Logs/ImageEditorRT/）と起動確認（--smoke-test）
   src/presets.rs          # プリセットの一覧・保存・削除・当てはめと「プリセット ▾」のメニュー

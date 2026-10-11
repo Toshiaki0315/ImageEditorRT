@@ -535,6 +535,55 @@ export async function startBatch() {
   await message(result.message, { title: "まとめて処理", kind: "info" });
 }
 
+// --- フォルダの見張り ---------------------------------------------------------------
+
+/** フォルダを見張る: 見張るフォルダを選び、まとめて処理と同じダイアログで加工・保存先を決めて始める。 */
+export async function startWatch() {
+  if (state.saving || state.opening) return;
+  const folder = await open({ title: "見張るフォルダを選ぶ", directory: true, multiple: false });
+  if (typeof folder !== "string") return;
+  const { loaded, settings } = state;
+  try {
+    await parts.batchDialog.run({
+      presets: presetNames(),
+      longSide: loaded ? output.longSide() : DEFAULT_BATCH_LONG_SIDE,
+      resize: loaded !== null && (settings.width !== null || settings.height !== null),
+      settings: structuredClone(settings),
+      save: saveOptions.value(),
+      onBusy: setSaving,
+      watchFolder: folder,
+    });
+  } catch (error) {
+    await showError("フォルダを見張れません", error);
+    return;
+  }
+  // ダイアログをキャンセルしたら見張らない（始めたかは Rust に聞かず、閉じ方で決める）
+  if (!parts.batchDialog.watchStarted()) return;
+  state.watching = folder;
+  updateMenus();
+  notify(`フォルダを見張っています: ${folder.split("/").pop()}（新しく入った画像を処理して保存します）`);
+}
+
+/** フォルダの見張りをやめる。 */
+export async function stopWatch() {
+  if (!state.watching) return;
+  await invoke("stop_watch");
+  const name = state.watching.split("/").pop();
+  state.watching = null;
+  updateMenus();
+  notify(`フォルダの見張りをやめました: ${name}`);
+}
+
+/** 見張りで 1 枚処理したとき（Rust の "watch-processed" のイベント）。 */
+export function onWatchProcessed(result: { name: string; output: string | null; error: string | null; count: number }) {
+  if (!state.watching) return;
+  notify(
+    result.output
+      ? `見張り: ${result.name} を ${result.output} に保存しました（${result.count} 枚目）`
+      : `見張り: ${result.name} を処理できませんでした（${result.error ?? "不明なエラー"}）`,
+  );
+}
+
 // --- リセット・終了（旧版 FR-UI-42） ------------------------------------------------
 
 /** リセット: 画像と設定を未読込の状態に戻す（未保存の変更があれば確かめる）。 */

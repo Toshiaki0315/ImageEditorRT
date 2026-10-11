@@ -22,7 +22,7 @@ use crate::state::AppState;
 /// 進み具合のイベントの名前。
 const PROGRESS_EVENT: &str = "batch-progress";
 /// 「今の加工」の名前（プリセットの代わりに今の設定をかける）。
-const CURRENT_LOOK: &str = "今の加工";
+pub(crate) const CURRENT_LOOK: &str = "今の加工";
 
 /// 中止の印（実行中に「中止」が押されたら true）。
 #[derive(Default)]
@@ -46,7 +46,7 @@ pub struct Finished {
 
 /// 1 枚の処理で想定外のエラー（パニック）が起きても、その画像を「処理できなかった画像」にして残りを続ける
 /// （パニックの中身はパニックのフックがログに書く）。
-fn guarded(process: impl FnOnce() -> Result<PathBuf, String>) -> Result<PathBuf, String> {
+pub(crate) fn guarded(process: impl FnOnce() -> Result<PathBuf, String>) -> Result<PathBuf, String> {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(process))
         .unwrap_or_else(|_| Err("予期しないエラー（詳しくはログ）".to_string()))
 }

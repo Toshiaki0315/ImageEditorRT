@@ -37,6 +37,7 @@ pub mod heic;
 pub mod histogram;
 #[cfg(target_os = "macos")]
 pub mod horizon;
+pub mod id_photo;
 #[cfg(target_os = "macos")]
 pub mod load;
 pub mod local;

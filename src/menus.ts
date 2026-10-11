@@ -17,6 +17,7 @@ export const MENU = {
   share: "share",
   print: "print",
   collage: "collage",
+  idPhoto: "id-photo",
   undo: "undo",
   redo: "redo",
   paste: "paste",
@@ -59,6 +60,7 @@ export function updateMenus() {
   setMenuEnabled(MENU.copyImage, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.share, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.print, state.loaded !== null && !state.saving);
+  setMenuEnabled(MENU.idPhoto, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.nextPhoto, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.previousPhoto, state.loaded !== null && !state.saving);
   setMenuEnabled(MENU.pasteLook, editable && state.copiedLook !== null);

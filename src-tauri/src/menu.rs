@@ -31,6 +31,7 @@ pub const PRINT: &str = "print";
 pub const SHARE: &str = "share";
 /// 「ファイル > 並べて 1 枚に…」（2〜4 枚の写真を並べた画像を作って開く）
 pub const COLLAGE: &str = "collage";
+pub const ID_PHOTO: &str = "id-photo";
 /// 「編集 > 元に戻す」（設定の変更。入力欄の文字は画面が入力欄に任せる）
 pub const UNDO: &str = "undo";
 /// 「編集 > やり直す」
@@ -97,6 +98,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         MenuItemBuilder::with_id(PRINT, "プリント…").accelerator("CmdOrCtrl+P").enabled(false).build(app)?;
     let batch = MenuItemBuilder::with_id(BATCH, "まとめて処理…").build(app)?;
     let collage = MenuItemBuilder::with_id(COLLAGE, "並べて 1 枚に…").build(app)?;
+    let id_photo = MenuItemBuilder::with_id(ID_PHOTO, "証明写真…").enabled(false).build(app)?;
     let file = SubmenuBuilder::new(app, "ファイル")
         .item(&open)
         .item(&recent)
@@ -110,6 +112,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&print)
         .item(&batch)
         .item(&collage)
+        .item(&id_photo)
         .separator()
         .close_window_with_text("閉じる")
         .build()?;

@@ -18,6 +18,7 @@ import { applySnapshot, isEditingText, redo, settingsChanged, setupHistory, snap
 import { isEscapeKey } from "./keys";
 import {
   makeCollage,
+  makeIdPhoto,
   openDialog,
   openPaths,
   paste,
@@ -87,6 +88,7 @@ const menuActions: Record<string, () => void> = {
   [MENU.previousPhoto]: () => void openNeighbor(-1),
   [MENU.batch]: () => void startBatch(),
   [MENU.collage]: () => void makeCollage(),
+  [MENU.idPhoto]: () => void makeIdPhoto(),
   [MENU.paste]: () => void paste(),
   [MENU.undo]: undo,
   [MENU.redo]: redo,

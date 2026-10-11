@@ -27,6 +27,7 @@ import { fitToWindow, setComparing, stopSplit, updateGuide } from "./view";
 import { readStored, writeStored } from "./storage";
 import { setImageColorSpace } from "./colorSpace";
 import { setPicking } from "./assist";
+import { askIdPhoto } from "./idPhoto";
 
 const MULTI_FRAME_NOTE = "複数フレームの画像のため、先頭フレームのみ扱います";
 const LOAD_ERROR_TITLE = "画像を読み込めません";
@@ -234,6 +235,24 @@ export async function makeCollage() {
     showLoaded(await invoke<OpenInfo>("make_collage", request), []);
   } catch (error) {
     await showError("写真を並べられません", error);
+  } finally {
+    state.opening = false;
+  }
+}
+
+/** 証明写真: 大きさなどを選び、今の画像から作って、元のファイルのない画像として開く（未保存の変更があれば確かめる）。 */
+export async function makeIdPhoto() {
+  if (!state.loaded || state.saving || state.opening) return;
+  const request = await askIdPhoto();
+  if (!request) return;
+  const settings = structuredClone(state.settings);
+  state.opening = true;
+  try {
+    if (!(await confirmDiscard())) return;
+    notify("顔を探して証明写真を作っています…");
+    showLoaded(await invoke<OpenInfo>("make_id_photo", { settings, ...request }), []);
+  } catch (error) {
+    await showError("証明写真を作れません", error);
   } finally {
     state.opening = false;
   }

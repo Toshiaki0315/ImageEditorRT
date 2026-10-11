@@ -45,6 +45,7 @@ import { MaskedPanel } from "./maskedPanel";
 import { MonoPanel } from "./monoPanel";
 import { Versions } from "./versions";
 import { HistoryPanel } from "./historyPanel";
+import { AnnotatePanel } from "./annotatePanel";
 import { ColorMatchControls } from "./colorMatchControls";
 import { PrivacyPanel } from "./privacy";
 import { copyLook, loadPresets, onPresetMenu, pasteLook, showPresetMenu } from "./presetsUi";
@@ -158,6 +159,7 @@ async function createParts() {
   };
   const stamps = await invoke<string[]>("stamp_list");
   parts.privacy = new PrivacyPanel(settings, dom.canvas, orientedSize, stamps, userChanged);
+  parts.annotate = new AnnotatePanel(settings, dom.canvas, orientedSize, userChanged);
   parts.localPanel = new LocalPanel($("local-extra"), settings, dom.canvas, orientedSize, userChanged);
   parts.maskedPanel = new MaskedPanel($("masked-extra"), settings, () => state.loaded !== null, userChanged);
   const [fonts, positions] = await invoke<[[TextFont, string][], [TextPosition, string][]]>("text_options");
@@ -190,6 +192,7 @@ function updateOverlays() {
   parts.crop.setGuideActive(tabs.selected() === "crop");
   parts.localPanel.setActive(tabs.selected() === "adjust" && !preview.trimmed);
   parts.textDrag.setActive(!preview.trimmed);
+  parts.annotate.setActive(tabs.selected() === "annotate" && !preview.trimmed);
 }
 
 /** ボタン・プレビューの操作をつなぐ。 */
@@ -246,6 +249,7 @@ function setupEscape() {
     const tab = tabs.selected();
     const handled =
       (tab === "privacy" && parts.privacy.cancelSelected()) ||
+      (tab === "annotate" && parts.annotate.cancelSelected()) ||
       (tab === "adjust" && parts.localPanel.cancel()) ||
       parts.crop.cancelRange();
     if (handled) event.preventDefault();

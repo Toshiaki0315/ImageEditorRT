@@ -54,6 +54,7 @@ export function showLoaded(info: OpenInfo, openNotes: string[]) {
   preview.show(info.previewWidth, info.previewHeight, info.hasAlpha);
   parts.crop.reset([info.width, info.height]);
   parts.privacy.reset();
+  parts.annotate.reset();
   dom.revealButton.hidden = true;
   dom.resumeButton.hidden = true;
   parts.localPanel.reset();
@@ -552,6 +553,7 @@ export async function resetImage() {
   preview.trimmed = false;
   parts.crop.reset(null);
   parts.privacy.reset();
+  parts.annotate.reset();
   dom.revealButton.hidden = true;
   dom.resumeButton.hidden = true;
   parts.localPanel.reset();

@@ -2,7 +2,7 @@
 
 import { readStored, writeStored } from "./storage";
 
-export type TabName = "adjust" | "crop" | "output" | "diorama" | "privacy" | "exif";
+export type TabName = "adjust" | "crop" | "output" | "diorama" | "privacy" | "annotate" | "exif";
 
 const STORAGE_KEY = "lastTab";
 const DEFAULT_TAB: TabName = "adjust";

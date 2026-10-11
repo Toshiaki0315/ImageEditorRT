@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::adjust;
+use crate::annotate::Annotation;
 use crate::background::Background;
 use crate::color_match::ColorMatch;
 use crate::curve::{self, HslAdjust, HSL_BANDS};
@@ -89,6 +90,8 @@ pub struct EditSettings {
     pub regions: Vec<Region>,
     /// 部分補正（円・帯の範囲の中だけの調整。色の調整の直後にかける。写真ごとの範囲なのでプリセットには入れない。旧版にはない）
     pub local_adjustments: Vec<LocalAdjust>,
+    /// 注釈（矢印・四角・楕円・手書きの線・吹き出し。回転・反転した後の原寸の座標。スタンプの後に描く。旧版にはない）
+    pub annotations: Vec<Annotation>,
     /// 背景を消す（旧版にはない）。被写体のマスクが要るので、ここの処理ではかけず、アプリ本体が元の画像に
     /// 前もってかける（`background::apply_background`）
     pub background: Background,
@@ -172,6 +175,7 @@ impl Default for EditSettings {
             skin_smooth: 0,
             red_eye: false,
             local_adjustments: Vec::new(),
+            annotations: Vec::new(),
         }
     }
 }

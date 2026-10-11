@@ -104,6 +104,20 @@ export type EditSettings = {
   redEye: boolean;
   /** 部分補正（円・帯の範囲の中だけの調整。回転・反転した後の原寸の座標） */
   localAdjustments: LocalAdjust[];
+  /** 注釈（矢印・四角・楕円・手書きの線・吹き出し。回転・反転した後の原寸の座標） */
+  annotations: Annotation[];
+};
+
+/** 注釈の種類（Rust の annotate::AnnotationKind）。 */
+export type AnnotationKind = "arrow" | "rect" | "ellipse" | "pen" | "bubble";
+
+/** 注釈 1 つ（Rust の annotate::Annotation）。width は原寸の px。 */
+export type Annotation = {
+  kind: AnnotationKind;
+  points: [number, number][];
+  color: [number, number, number];
+  width: number;
+  text: string;
 };
 
 /** 部分補正の範囲の形（Rust の local::LocalShape）。 */
@@ -220,6 +234,7 @@ export function defaultSettings(): EditSettings {
     skinSmooth: 0,
     redEye: false,
     localAdjustments: [],
+    annotations: [],
   };
 }
 

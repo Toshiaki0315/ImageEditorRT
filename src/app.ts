@@ -18,6 +18,7 @@ import type { MaskedPanel } from "./maskedPanel";
 import type { MonoPanel } from "./monoPanel";
 import type { Versions } from "./versions";
 import type { HistoryPanel } from "./historyPanel";
+import type { AnnotatePanel } from "./annotatePanel";
 import type { ColorMatchControls } from "./colorMatchControls";
 import type { TextDrag } from "./textDrag";
 import type { PrivacyPanel } from "./privacy";
@@ -106,6 +107,7 @@ export const parts = {} as {
   monoPanel: MonoPanel;
   versions: Versions;
   historyPanel: HistoryPanel;
+  annotate: AnnotatePanel;
   colorMatchControls: ColorMatchControls;
   textDrag: TextDrag;
   batchDialog: BatchDialog;

@@ -1064,3 +1064,8 @@ input[type="range"]:disabled::-webkit-slider-thumb {
 .picking * {
   cursor: crosshair !important;
 }
+
+/* 注釈を描く道具の間は十字のカーソル（「選ぶ」の間はふつう） */
+.annotate-overlay.drawing {
+  cursor: crosshair;
+}

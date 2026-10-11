@@ -692,7 +692,7 @@
 ## WebP・AVIF で保存（#251）
 
 - 保存の形式に AVIF と WebP を足した（保存ダイアログの拡張子・まとめて処理の形式）。読み込みもできる（どちらも macOS の ImageIO で読む）。旧版にはない。
-- AVIF は macOS の ImageIO で書き出す（HEIC と同じ仕組み。品質・ファイルの大きさの上限・EXIF・Display P3 も同じ）。
+- AVIF は macOS の ImageIO で書き出す（HEIC と同じ仕組み。品質・ファイルの大きさの上限・EXIF・Display P3 も同じ）。macOS の版・機械によっては AVIF を書き出せない（CI の仮想マシンでは失敗した）ので、そのときは「この Mac では AVIF を書き出せないことがある」と知らせる。
 - WebP は macOS の ImageIO が書き出せない（読み込みのみ）ので、image の webp 機能（依存パッケージ image-webp を足した）で書き出す。image-webp は劣化なしの書き出しだけなので、WebP は劣化なし（品質・ファイルの大きさの上限は効かない。ファイルは JPEG より大きくなりやすい）。EXIF・色のプロファイル・透過は残る。
 - 「このアプリでは扱わない形式」を確かめるテストの見本は、WebP から TGA に変えた（WebP の見本は読み込みのテストに使う）。
 

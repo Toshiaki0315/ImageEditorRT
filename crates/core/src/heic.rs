@@ -38,7 +38,13 @@ pub fn encode_imageio(
     uti: &str,
 ) -> Result<Vec<u8>, String> {
     let name = if uti == AVIF_UTI { "AVIF" } else { "HEIC" };
-    let failed = || format!("{name} に書き出せません");
+    let failed = || {
+        if name == "AVIF" {
+            "AVIF に書き出せません（この Mac では AVIF を書き出せないことがあります。HEIC・JPEG で保存してください）".to_string()
+        } else {
+            format!("{name} に書き出せません")
+        }
+    };
     let cg = crate::vision::cg_image_in(image, has_transparency(image), space).ok_or_else(failed)?;
     let properties = properties(quality, exif).ok_or_else(failed)?;
     let data = CFMutableData::new(None, 0).ok_or_else(failed)?;

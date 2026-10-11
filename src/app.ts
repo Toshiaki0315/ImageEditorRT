@@ -96,6 +96,8 @@ export const parts = {} as {
   tasteButton: HTMLButtonElement;
   /** 「加工」タブの「自動補正」のボタン */
   autoButton: HTMLButtonElement;
+  /** 「加工」タブの「スポイト」 */
+  pickerButton: HTMLButtonElement;
   recorder: HistoryRecorder<Snapshot>;
   privacy: PrivacyPanel;
   localPanel: LocalPanel;

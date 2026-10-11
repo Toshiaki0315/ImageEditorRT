@@ -58,6 +58,8 @@ export type EditSettings = {
   shadows: number;
   /** かすみの除去 -100〜100（負でかすみを足す） */
   dehaze: number;
+  /** 色かぶり -100〜100（負で緑に、正でマゼンタに寄せる） */
+  tint: number;
   exposure: number;
   sharpen: number;
   blur: number;
@@ -185,6 +187,7 @@ export function defaultSettings(): EditSettings {
     highlights: 0,
     shadows: 0,
     dehaze: 0,
+    tint: 0,
     exposure: 0,
     sharpen: 0,
     blur: 0,

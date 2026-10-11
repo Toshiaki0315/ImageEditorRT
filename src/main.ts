@@ -167,6 +167,7 @@ async function createParts() {
   parts.tasteGallery = new TasteGallery(filters, settings, (filter) => parts.panel.selectFilter(filter));
   parts.tasteButton = $<HTMLButtonElement>("taste-button");
   parts.autoButton = $<HTMLButtonElement>("auto-adjust");
+  parts.pickerButton = $<HTMLButtonElement>("wb-picker");
   parts.batchDialog = new BatchDialog(state.extensions);
   parts.batchDialog.fileName = () => saveOptions.fileName();
   parts.collageDialog = new CollageDialog(state.extensions);

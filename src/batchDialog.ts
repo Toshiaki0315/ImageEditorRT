@@ -29,6 +29,8 @@ export type BatchStart = {
   save: unknown;
   /** 処理を始めたとき・終えたとき（実行中は保存・開く・まとめて処理を止める） */
   onBusy: (busy: boolean) => void;
+  /** フォルダを見張るとき、見張るフォルダ（処理する画像の一覧の代わり。「開始」で見張りを始める） */
+  watchFolder?: string;
 };
 
 export class BatchDialog {
@@ -46,6 +48,15 @@ export class BatchDialog {
   private readonly sizePreset = $<HTMLSelectElement>("batch-size-preset");
   /** 「出力」タブのファイル名の書き方（保存名を「ファイル名の書き方」にしたとき使う） */
   fileName: () => string = () => "{名前}_edited";
+  /** フォルダを見張るためにダイアログを開いているか */
+  private watching = false;
+  /** 最後のダイアログで見張りを始めたか */
+  private started = false;
+
+  /** 最後に開いたダイアログで、フォルダの見張りを始めたか。 */
+  watchStarted(): boolean {
+    return this.started;
+  }
   private readonly removeGps = $<HTMLInputElement>("batch-remove-gps");
   private readonly faces = $<HTMLInputElement>("batch-faces");
   private readonly text = $<HTMLInputElement>("batch-text");
@@ -93,6 +104,17 @@ export class BatchDialog {
 
   /** ダイアログを開き、「開始」なら処理して結果を返す（キャンセルなら null）。 */
   async run(start: BatchStart): Promise<BatchFinished | null> {
+    const watching = start.watchFolder !== undefined;
+    this.watching = watching;
+    this.started = false;
+    $<HTMLElement>("batch-title").textContent = watching ? "フォルダを見張る" : "まとめて処理";
+    $<HTMLElement>("batch-files-section").hidden = watching;
+    const note = $<HTMLElement>("batch-watch-note");
+    note.hidden = !watching;
+    note.textContent = watching
+      ? `見張るフォルダ: ${start.watchFolder}（新しく入った画像に、この加工をかけて保存先に保存します。「ファイル > フォルダの見張りをやめる」まで続けます）`
+      : "";
+    this.start.textContent = watching ? "見張りを始める" : "開始";
     this.files.replaceChildren();
     this.look.replaceChildren(new Option("今の加工", CURRENT));
     for (const name of start.presets) this.look.add(new Option(`プリセット: ${name}`, name));
@@ -102,7 +124,7 @@ export class BatchDialog {
     this.setOutDir(null);
     this.updatePrivacy();
     // 開いている画像があれば最初から一覧に入れておく（貼り付けた画像などファイルがなければ入れない）
-    const current = await invoke<string | null>("batch_current_source");
+    const current = watching ? null : await invoke<string | null>("batch_current_source");
     if (current) await this.addPaths([current]);
     this.updateStart();
     this.dialog.returnValue = "";
@@ -111,8 +133,39 @@ export class BatchDialog {
       this.dialog.addEventListener("close", () => resolve(this.dialog.returnValue), { once: true }),
     );
     const sources = [...this.files.options].map((o) => o.value);
-    if (answer !== "start" || !this.outDir || sources.length === 0 || !this.validSide()) return null;
+    if (answer !== "start" || !this.outDir || !this.validSide()) return null;
+    if (watching) {
+      await invoke("start_watch", { folder: start.watchFolder, outDir: this.outDir, ...this.request(start) });
+      this.started = true;
+      return null;
+    }
+    if (sources.length === 0) return null;
     return this.process(sources, this.outDir, start);
+  }
+
+  /** 加工・保存の選び方（まとめて処理・フォルダの見張りで同じ）。 */
+  private request(start: BatchStart) {
+    return {
+      preset: this.look.value === CURRENT ? null : this.look.value,
+      settings: start.settings,
+      longSide: this.resize.checked ? Number(this.longSide.value) : null,
+      save: start.save,
+      privacy: {
+        removeGps: this.removeGps.checked,
+        faces: this.faces.checked,
+        text: this.text.checked,
+        kind: this.cover.value,
+        strength: Number(this.strength.value),
+      },
+      naming:
+        this.naming.value === "sequence"
+          ? { kind: "sequence", prefix: this.prefix.value }
+          : this.naming.value === "template"
+            ? { kind: "template", template: this.fileName() }
+            : { kind: this.naming.value },
+      format: this.format.value,
+      autoCrop: parseAutoCrop(this.autoCrop.value),
+    };
   }
 
   private async process(sources: string[], outDir: string, start: BatchStart): Promise<BatchFinished> {
@@ -128,29 +181,7 @@ export class BatchDialog {
     });
     start.onBusy(true);
     try {
-      return await invoke<BatchFinished>("run_batch", {
-        sources,
-        outDir,
-        preset: this.look.value === CURRENT ? null : this.look.value,
-        settings: start.settings,
-        longSide: this.resize.checked ? Number(this.longSide.value) : null,
-        save: start.save,
-        privacy: {
-          removeGps: this.removeGps.checked,
-          faces: this.faces.checked,
-          text: this.text.checked,
-          kind: this.cover.value,
-          strength: Number(this.strength.value),
-        },
-        naming:
-          this.naming.value === "sequence"
-            ? { kind: "sequence", prefix: this.prefix.value }
-            : this.naming.value === "template"
-              ? { kind: "template", template: this.fileName() }
-              : { kind: this.naming.value },
-        format: this.format.value,
-        autoCrop: parseAutoCrop(this.autoCrop.value),
-      });
+      return await invoke<BatchFinished>("run_batch", { sources, outDir, ...this.request(start) });
     } finally {
       unlisten();
       this.progress.close();
@@ -208,7 +239,8 @@ export class BatchDialog {
 
   /** 画像と保存先がそろうまで「開始」は押せない。 */
   private updateStart() {
-    this.start.disabled = this.files.options.length === 0 || this.outDir === null || !this.validSide();
+    this.start.disabled =
+      (!this.watching && this.files.options.length === 0) || this.outDir === null || !this.validSide();
   }
 }
 

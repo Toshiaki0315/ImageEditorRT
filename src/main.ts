@@ -19,6 +19,9 @@ import { isEscapeKey } from "./keys";
 import {
   makeCollage,
   makeIdPhoto,
+  onWatchProcessed,
+  startWatch,
+  stopWatch,
   openDialog,
   openPaths,
   paste,
@@ -90,6 +93,8 @@ const menuActions: Record<string, () => void> = {
   [MENU.batch]: () => void startBatch(),
   [MENU.collage]: () => void makeCollage(),
   [MENU.idPhoto]: () => void makeIdPhoto(),
+  [MENU.watchFolder]: () => void startWatch(),
+  [MENU.stopWatch]: () => void stopWatch(),
   [MENU.paste]: () => void paste(),
   [MENU.undo]: undo,
   [MENU.redo]: redo,
@@ -267,6 +272,9 @@ async function listenEvents() {
   setMenuChecked(MENU.clipping, clippingShown());
   await listen<{ message: string; logPath: string }>("unexpected-error", (event) =>
     reportUnexpected(event.payload.message, event.payload.logPath),
+  );
+  await listen<{ name: string; output: string | null; error: string | null; count: number }>("watch-processed", (event) =>
+    onWatchProcessed(event.payload),
   );
   // Dock の「終了」など、メニュー以外からの終了の求めも同じく確かめる
   await listen("quit-requested", () => requestQuit());

@@ -21,6 +21,7 @@ mod settings;
 mod share;
 mod state;
 mod system;
+mod watch;
 
 use std::path::PathBuf;
 
@@ -43,6 +44,7 @@ pub fn run() {
     diagnostics::install_panic_hook();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(watch::WatchState::default())
         .manage(AppState::default())
         .manage(presets::PresetStore::default())
         .manage(batch::BatchState::default())
@@ -135,6 +137,8 @@ pub fn run() {
             batch::batch_collect,
             batch::run_batch,
             batch::cancel_batch,
+            watch::start_watch,
+            watch::stop_watch,
             bench::open_sample,
             bench::bench_mode,
             bench::bench_save_path,

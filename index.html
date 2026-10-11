@@ -288,15 +288,18 @@
     <!-- まとめて処理（ファイル > まとめて処理…） -->
     <dialog id="batch-dialog" class="batch-dialog">
       <form method="dialog">
-        <h2>まとめて処理</h2>
-        <label for="batch-files">処理する画像</label>
-        <select id="batch-files" class="batch-files" multiple size="8"></select>
-        <div class="buttons">
-          <button type="button" id="batch-add-files">ファイルを追加…</button>
-          <button type="button" id="batch-add-folder">フォルダを追加…</button>
-          <span class="spacer"></span>
-          <button type="button" id="batch-remove">取り除く</button>
+        <h2 id="batch-title">まとめて処理</h2>
+        <div id="batch-files-section">
+          <label for="batch-files">処理する画像</label>
+          <select id="batch-files" class="batch-files" multiple size="8"></select>
+          <div class="buttons">
+            <button type="button" id="batch-add-files">ファイルを追加…</button>
+            <button type="button" id="batch-add-folder">フォルダを追加…</button>
+            <span class="spacer"></span>
+            <button type="button" id="batch-remove">取り除く</button>
+          </div>
         </div>
+        <p id="batch-watch-note" class="note" hidden></p>
         <div class="batch-form">
           <span>かける加工</span>
           <select id="batch-look"></select>
@@ -504,6 +507,8 @@
             <dd>矢印・四角・楕円・手書き・吹き出しを選んでプレビューをドラッグ。「選ぶ」で動かす・色や太さ・文字を変える・消す（Esc で選んだ注釈を消す）</dd>
             <dt>EXIF</dt>
             <dd>撮影情報（MakerNote も）。位置情報はマップで開ける</dd>
+            <dt>フォルダの見張り</dt>
+            <dd>「ファイル > フォルダを見張る…」で見張るフォルダと、まとめて処理と同じ加工・保存先を選ぶと、新しく入った写真を自動で処理して保存する（「ファイル > フォルダの見張りをやめる」まで）</dd>
             <dt>証明写真</dt>
             <dd>「ファイル > 証明写真…」で大きさ（30×40・35×45・24×30mm）を選ぶと、顔に合わせて切り抜き、背景を白にし、L 判に並べた印刷用の画像も作れる</dd>
             <dt>白飛び・黒つぶれ</dt>

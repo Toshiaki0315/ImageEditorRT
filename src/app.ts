@@ -70,6 +70,8 @@ export const state = {
   facesPrepared: false,
   /** 「加工をコピー」でコピーした写真の設定（加工の項目だけを使う。アプリを終了するまで覚えておく） */
   copiedLook: null as EditSettings | null,
+  /** 見張っているフォルダ（見張っていなければ null） */
+  watching: null as string | null,
   /** 最後に保存したときの設定（未保存の変更の判定に使う） */
   savedSettings: null as EditSettings | null,
   /** 最後に保存したファイル（複数の大きさで保存なら全部。「Finder で表示」に使う） */

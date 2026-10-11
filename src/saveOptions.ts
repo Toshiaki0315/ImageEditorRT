@@ -15,7 +15,13 @@ export type SaveOptions = {
   fill: [number, number, number];
   /** EXIF に書く権利の情報（空の項目は書かない） */
   rights: Rights;
+  /** 出力用のシャープ（保存する大きさの画像に最後にかける） */
+  outputSharpen: OutputSharpen;
 };
+
+/** Rust の save::OutputSharpen。 */
+export type OutputSharpen = "none" | "screen" | "print";
+const OUTPUT_SHARPEN: OutputSharpen[] = ["none", "screen", "print"];
 
 /** Rust の save::ExifRights（著作権・作者・説明）。 */
 export type Rights = { copyright: string; artist: string; description: string };
@@ -37,6 +43,7 @@ const DEFAULT_OPTIONS: Stored = {
   fill: [255, 255, 255],
   rights: { copyright: "", artist: "", description: "" },
   fileName: DEFAULT_FILE_NAME,
+  outputSharpen: "none",
 };
 
 /** 色を色の欄の値（#rrggbb）にする。 */
@@ -64,6 +71,8 @@ export type SaveOptionsFields = {
   rights: Record<keyof Rights, HTMLInputElement>;
   /** 保存の名前の書き方の欄 */
   fileName: HTMLInputElement;
+  /** 出力用のシャープの欄 */
+  outputSharpen: HTMLSelectElement;
 };
 
 export class SaveOptionsPanel {
@@ -78,6 +87,7 @@ export class SaveOptionsPanel {
   private readonly fill: HTMLInputElement;
   private readonly rights: Record<keyof Rights, HTMLInputElement>;
   private readonly fileNameInput: HTMLInputElement;
+  private readonly outputSharpen: HTMLSelectElement;
 
   constructor(fields: SaveOptionsFields) {
     ({
@@ -91,7 +101,11 @@ export class SaveOptionsPanel {
       fill: this.fill,
       rights: this.rights,
       fileName: this.fileNameInput,
+      outputSharpen: this.outputSharpen,
     } = fields);
+    this.outputSharpen.addEventListener("change", () =>
+      this.update({ outputSharpen: this.outputSharpen.value as OutputSharpen }),
+    );
     this.fileNameInput.addEventListener("change", () =>
       this.update({ fileName: this.fileNameInput.value.trim() || DEFAULT_FILE_NAME }),
     );
@@ -147,6 +161,7 @@ export class SaveOptionsPanel {
     this.fill.value = toHex(this.options.fill);
     for (const key of RIGHTS_KEYS) this.rights[key].value = this.options.rights[key];
     this.fileNameInput.value = this.options.fileName;
+    this.outputSharpen.value = this.options.outputSharpen;
   }
 }
 
@@ -172,6 +187,7 @@ export function parseStored(saved: unknown): Stored {
     fill: isColor(s.fill) ? s.fill : DEFAULT_OPTIONS.fill,
     rights: parseRights(s.rights),
     fileName: typeof s.fileName === "string" && s.fileName.trim() ? s.fileName : DEFAULT_FILE_NAME,
+    outputSharpen: OUTPUT_SHARPEN.includes(s.outputSharpen as OutputSharpen) ? (s.outputSharpen as OutputSharpen) : "none",
   };
 }
 

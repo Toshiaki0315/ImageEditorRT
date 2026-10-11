@@ -15,6 +15,8 @@ use crate::tiff::{
     tiff_block, ExifBlock, Order, TAG_ARTIST, TAG_COPYRIGHT, TAG_IMAGE_DESCRIPTION, TAG_ORIENTATION,
     TAG_PIXEL_X, TAG_PIXEL_Y,
 };
+use crate::PIXELS_PER_TASK;
+use rayon::prelude::*;
 
 /// JPEG・HEIC の品質の既定値と範囲。
 pub const DEFAULT_JPEG_QUALITY: u8 = 90;
@@ -46,9 +48,55 @@ pub struct SaveOptions {
     pub fill: [u8; 3],
     /// EXIF に書く権利の情報（著作権・作者・説明。空なら元のまま。JPEG・PNG・TIFF・HEIC。旧版にはない）
     pub rights: ExifRights,
+    /// 出力用のシャープ（保存する大きさの画像に最後にかける。プレビューにはかけない。旧版にはない）
+    pub output_sharpen: OutputSharpen,
     /// 画素の色空間（Display P3 なら色のプロファイルを付ける）。画面からは渡さず、開いた画像に合わせてアプリが決める
     #[serde(skip)]
     pub color_space: ColorSpace,
+}
+
+/// 出力用のシャープ（保存する画像の 1 画素の細かさでかける）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputSharpen {
+    #[default]
+    None,
+    /// 画面用（弱め・細かい。縮めて投稿するとき）
+    Screen,
+    /// 印刷用（強め・少し太い。印刷するとにじむ分を見込む）
+    Print,
+}
+
+impl OutputSharpen {
+    /// ぼかしの半径（px）・強さ（元との差を何倍足すか）・差がこれより小さい所はかけない（ノイズを立たせない）。
+    fn params(self) -> Option<(f32, f32, i32)> {
+        match self {
+            OutputSharpen::None => None,
+            OutputSharpen::Screen => Some((0.6, 0.6, 2)),
+            OutputSharpen::Print => Some((1.2, 1.0, 3)),
+        }
+    }
+}
+
+/// 出力用のシャープをかけた画像（アンシャープマスク。透過はそのまま）。None ならそのまま。
+pub fn output_sharpened(image: &RgbaImage, kind: OutputSharpen) -> std::borrow::Cow<'_, RgbaImage> {
+    let Some((radius, amount, threshold)) = kind.params() else { return std::borrow::Cow::Borrowed(image) };
+    let blurred = crate::blur::gaussian_blur(image, radius);
+    let mut out = image.clone();
+    out.as_mut()
+        .par_chunks_exact_mut(4)
+        .zip(blurred.as_raw().par_chunks_exact(4))
+        .with_min_len(PIXELS_PER_TASK)
+        .for_each(|(p, b)| {
+            for c in 0..3 {
+                let diff = i32::from(p[c]) - i32::from(b[c]);
+                if diff.abs() < threshold {
+                    continue;
+                }
+                p[c] = (f32::from(p[c]) + diff as f32 * amount).round().clamp(0.0, 255.0) as u8;
+            }
+        });
+    std::borrow::Cow::Owned(out)
 }
 
 /// EXIF に書く権利の情報（Copyright・Artist・ImageDescription）。空の項目は書かない（元の値を残す）。
@@ -84,6 +132,7 @@ impl Default for SaveOptions {
             max_kb: None,
             fill: [255, 255, 255],
             rights: ExifRights::default(),
+            output_sharpen: OutputSharpen::None,
             color_space: ColorSpace::Srgb,
         }
     }
@@ -496,6 +545,9 @@ pub fn save_edited(
         _ => std::borrow::Cow::Borrowed(image),
     };
     let image = filled.as_ref();
+    // 出力用のシャープは保存する大きさの画像にかける（ファイルの大きさの上限で縮めるときは、かけた画像を縮める）
+    let sharpened = output_sharpened(image, options.output_sharpen);
+    let image = sharpened.as_ref();
     let format = SaveFormat::from_path(path)
         .ok_or_else(|| SaveError::UnsupportedExtension(extension(path).unwrap_or_default()))?;
     // TIFF で保存するとき・TIFF から読んだ EXIF は、MakerNote を残さない（旧版と同じ）
@@ -571,6 +623,36 @@ fn fit_size(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn output_sharpen_adds_local_contrast() {
+        // 縦の境目（暗い → 明るい）。かけると境目の両側の差が広がる
+        let image = RgbaImage::from_fn(20, 4, |x, _| {
+            if x < 10 {
+                Rgba([80, 80, 80, 255])
+            } else {
+                Rgba([170, 170, 170, 255])
+            }
+        });
+        assert_eq!(output_sharpened(&image, OutputSharpen::None).as_ref(), &image);
+        for kind in [OutputSharpen::Screen, OutputSharpen::Print] {
+            let out = output_sharpened(&image, kind);
+            assert!(out.get_pixel(9, 1)[0] < 80 && out.get_pixel(10, 1)[0] > 170, "{kind:?}");
+            assert_eq!(out.get_pixel(2, 1)[0], 80, "平らな所は変えない");
+        }
+        let screen = output_sharpened(&image, OutputSharpen::Screen);
+        let print = output_sharpened(&image, OutputSharpen::Print);
+        assert!(print.get_pixel(9, 1)[0] < screen.get_pixel(9, 1)[0], "印刷用のほうが強い");
+        // 保存するときにかかる
+        let dir = std::env::temp_dir().join(format!("ier-out-sharpen-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("s.png");
+        let options = SaveOptions { output_sharpen: OutputSharpen::Print, ..SaveOptions::default() };
+        save_edited(&image, &path, options, None, false).unwrap();
+        let saved = image::open(&path).unwrap().to_rgba8();
+        assert_eq!(saved.get_pixel(9, 1), print.get_pixel(9, 1));
+        std::fs::remove_dir_all(&dir).ok();
+    }
     use super::*;
     use image::Rgba;
 

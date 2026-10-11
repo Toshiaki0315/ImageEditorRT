@@ -14,8 +14,9 @@ use objc2_image_io::{kCGImageDestinationLossyCompressionQuality, CGImageDestinat
 
 use crate::formats::has_transparency;
 
-/// HEIC の UTI。
+/// HEIC・AVIF の UTI。
 const HEIC_UTI: &str = "public.heic";
+pub const AVIF_UTI: &str = "public.avif";
 
 /// 画像を HEIC のバイト列にする（quality は 1〜100）。exif は prepare_exif で整えたもの（"Exif\0\0" 付き）。
 /// space は画素の色空間（Display P3 なら、その色空間の画像として書き出す）。
@@ -25,11 +26,23 @@ pub fn encode_heic(
     exif: Option<&[u8]>,
     space: crate::color_space::ColorSpace,
 ) -> Result<Vec<u8>, String> {
-    let failed = || "HEIC に書き出せません".to_string();
+    encode_imageio(image, quality, exif, space, HEIC_UTI)
+}
+
+/// encode_heic と同じ書き出しを、uti の形式（HEIC・AVIF）で行う。
+pub fn encode_imageio(
+    image: &RgbaImage,
+    quality: u8,
+    exif: Option<&[u8]>,
+    space: crate::color_space::ColorSpace,
+    uti: &str,
+) -> Result<Vec<u8>, String> {
+    let name = if uti == AVIF_UTI { "AVIF" } else { "HEIC" };
+    let failed = || format!("{name} に書き出せません");
     let cg = crate::vision::cg_image_in(image, has_transparency(image), space).ok_or_else(failed)?;
     let properties = properties(quality, exif).ok_or_else(failed)?;
     let data = CFMutableData::new(None, 0).ok_or_else(failed)?;
-    let uti = CFString::from_static_str(HEIC_UTI);
+    let uti = CFString::from_str(uti);
     // SAFETY: data・uti は有効。オプションは渡さない
     let destination = unsafe { CGImageDestination::with_data(&data, &uti, 1, None) }.ok_or_else(failed)?;
     // SAFETY: 辞書のキーは ImageIO のプロパティの名前、値は CF の型

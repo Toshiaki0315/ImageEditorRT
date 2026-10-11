@@ -16,6 +16,10 @@ pub enum Format {
     Bmp,
     /// HEIC / HEIF（保存は macOS の ImageIO で HEIC に）
     Heif,
+    /// WebP（保存は劣化なし。旧版にはない）
+    Webp,
+    /// AVIF（保存は macOS の ImageIO。旧版にはない）
+    Avif,
     /// カメラの RAW（読み込みのみ。現像は macOS の ImageIO。旧版にはない）
     Raw,
 }
@@ -26,14 +30,14 @@ pub const RAW_EXTENSIONS: [&str; 14] =
     ["dng", "cr2", "cr3", "crw", "nef", "nrw", "arw", "srf", "raf", "orf", "rw2", "pef", "srw", "rwl"];
 
 /// 読み込める拡張子（小文字・ドットなし）。
-pub const SUPPORTED_EXTENSIONS: [&str; 23] = [
-    "png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic", "heif", "dng", "cr2", "cr3", "crw", "nef",
-    "nrw", "arw", "srf", "raf", "orf", "rw2", "pef", "srw", "rwl",
+pub const SUPPORTED_EXTENSIONS: [&str; 25] = [
+    "png", "jpg", "jpeg", "gif", "tif", "tiff", "bmp", "heic", "heif", "webp", "avif", "dng", "cr2", "cr3",
+    "crw", "nef", "nrw", "arw", "srf", "raf", "orf", "rw2", "pef", "srw", "rwl",
 ];
 
 /// エラーのダイアログに添える、対応形式の説明。
 pub const FORMATS_TEXT: &str =
-    "PNG / JPEG / GIF / TIFF / BMP / HEIC / HEIF（カメラの RAW（DNG・CR2・CR3・NEF・ARW・RAF など）は読み込みのみ）";
+    "PNG / JPEG / GIF / TIFF / BMP / HEIC / HEIF / WebP / AVIF（カメラの RAW（DNG・CR2・CR3・NEF・ARW・RAF など）は読み込みのみ）";
 
 impl Format {
     /// 拡張子から形式を決める（大文字・小文字は区別しない）。読めない拡張子なら None。
@@ -46,6 +50,8 @@ impl Format {
             "tif" | "tiff" => Some(Self::Tiff),
             "bmp" => Some(Self::Bmp),
             "heic" | "heif" => Some(Self::Heif),
+            "webp" => Some(Self::Webp),
+            "avif" => Some(Self::Avif),
             raw if RAW_EXTENSIONS.contains(&raw) => Some(Self::Raw),
             _ => None,
         }
@@ -60,6 +66,8 @@ impl Format {
             "public.tiff" => Some(Self::Tiff),
             "com.microsoft.bmp" => Some(Self::Bmp),
             "public.heic" | "public.heif" => Some(Self::Heif),
+            "org.webmproject.webp" => Some(Self::Webp),
+            "public.avif" => Some(Self::Avif),
             // カメラの RAW は、どのメーカーのものも「…raw-image」（com.adobe.raw-image・com.canon.cr3-raw-image など）
             raw if raw.ends_with("raw-image") => Some(Self::Raw),
             _ => None,
@@ -75,6 +83,8 @@ impl Format {
             Self::Tiff => "TIFF",
             Self::Bmp => "BMP",
             Self::Heif => "HEIC",
+            Self::Webp => "WebP",
+            Self::Avif => "AVIF",
             Self::Raw => "RAW",
         }
     }
@@ -100,7 +110,8 @@ mod tests {
         assert_eq!(Format::from_path(Path::new("a/B.JPG")), Some(Format::Jpeg));
         assert_eq!(Format::from_path(Path::new("x.HeIc")), Some(Format::Heif));
         assert_eq!(Format::from_path(Path::new("x.tiff")), Some(Format::Tiff));
-        assert!(!is_supported(Path::new("x.webp")));
+        assert!(is_supported(Path::new("x.webp")) && is_supported(Path::new("x.AVIF")));
+        assert!(!is_supported(Path::new("x.tga")));
         assert!(!is_supported(Path::new("noext")));
         for ext in SUPPORTED_EXTENSIONS {
             assert!(is_supported(Path::new(&format!("a.{ext}"))), "{ext}");
@@ -124,7 +135,9 @@ mod tests {
     #[test]
     fn utis() {
         assert_eq!(Format::from_uti("public.jpeg"), Some(Format::Jpeg));
-        assert_eq!(Format::from_uti("org.webmproject.webp"), None);
+        assert_eq!(Format::from_uti("org.webmproject.webp"), Some(Format::Webp));
+        assert_eq!(Format::from_uti("public.avif"), Some(Format::Avif));
+        assert_eq!(Format::from_uti("com.truevision.tga-image"), None);
     }
 
     #[test]

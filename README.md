@@ -17,7 +17,7 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 - 加工前との比較（押している間・左右に分けて）・100% 表示・ヒストグラム・白飛び／黒つぶれの表示・元に戻す／やり直す（履歴の一覧から好きな時点へ）・加工のコピー＆ペースト・加工の途中の版を残して見比べる・プリセット（ファイルへの書き出し／読み込み）
 - まとめて処理（保存名・形式を選べる）・複数の大きさで一度に保存・ファイルの大きさの上限
 - EXIF の表示（GPS・主なメーカーの MakerNote）と保存（EXIF・位置情報を残すかを選べる）
-- PNG / JPEG / GIF / TIFF / BMP / HEIC を読み書き（HEIF も読める）、カメラの RAW（DNG・CR2・CR3・NEF・ARW・RAF など）は読み込みのみ
+- PNG / JPEG / GIF / TIFF / BMP / HEIC / WebP / AVIF を読み書き（HEIF も読める。WebP の保存は劣化なし）、カメラの RAW（DNG・CR2・CR3・NEF・ARW・RAF など）は読み込みのみ
 - 広い色域（Display P3）の写真は P3 のまま加工・保存する（鮮やかな色を落とさない。保存した画像に P3 の色のプロファイルを付ける）
 
 ## 実行環境
@@ -54,7 +54,8 @@ Python + PyQt6 版の [ImageEditor](https://github.com/Toshiaki0315/ImageEditor)
 | 画像処理 | Rust 1.99（`rust-toolchain.toml` で固定）・image 0.25・rayon（並列）・fast_image_resize（プレビューの縮小）・jpeg-encoder |
 | 画像の読み込み | macOS の ImageIO（objc2-image-io。HEIC・RAW の現像と EXIF の向きの補正もここ） |
 | 顔・文字・水平線・被写体・目立つ部分の認識 | macOS の Vision（objc2-vision・objc2-core-video。投稿加工・肌・赤目・傾きの自動補正・背景を消す・おまかせ切り抜き） |
-| HEIC の書き出し | macOS の ImageIO（objc2-image-io） |
+| HEIC・AVIF の書き出し | macOS の ImageIO（objc2-image-io） |
+| WebP の書き出し | image の webp（image-webp。劣化なしのみ） |
 | EXIF | kamadak-exif（標準のタグ）・自前の読み取り（MakerNote は旧版の exifread と同じ読み方） |
 | 文字 | ab_glyph（macOS のフォント） |
 | 画面 | TypeScript 6・Vite 8（フレームワークなし） |

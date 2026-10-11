@@ -63,6 +63,10 @@ pub enum OutputFormat {
     Jpeg,
     /// HEIC（同じ画質で JPEG より小さい）
     Heic,
+    /// AVIF（HEIC と同じくらい小さい。Web 向け）
+    Avif,
+    /// WebP（劣化なし）
+    Webp,
 }
 
 impl OutputFormat {
@@ -72,6 +76,8 @@ impl OutputFormat {
             Self::Original => save::save_suffix(source),
             Self::Jpeg => "jpg".into(),
             Self::Heic => "heic".into(),
+            Self::Avif => "avif".into(),
+            Self::Webp => "webp".into(),
         }
     }
 }

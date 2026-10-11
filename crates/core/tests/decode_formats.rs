@@ -75,11 +75,11 @@ fn format_comes_from_contents_not_extension() {
 
 #[test]
 fn unsupported_format_is_rejected() {
-    // ImageIO は読めても、このアプリでは扱わない形式（WebP）
+    // ImageIO は読めても、このアプリでは扱わない形式（TGA）
     let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/formats/unsupported.webp");
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/formats/unsupported.tga");
     match decode_file(&std::fs::read(path).unwrap()) {
-        Err(DecodeError::UnsupportedFormat(uti)) => assert!(uti.contains("webp"), "{uti}"),
+        Err(DecodeError::UnsupportedFormat(uti)) => assert!(uti.contains("tga"), "{uti}"),
         other => panic!("{other:?}"),
     }
 }
@@ -96,4 +96,12 @@ fn display_p3_is_kept_as_p3() {
     imageeditorrt_core::color_space::p3_to_srgb(&mut srgb);
     let p = srgb.get_pixel(1, 1).0;
     assert!(p[0] > 205 && p[1] < 98 && p[2] < 45, "{p:?}");
+}
+
+#[test]
+fn webp_can_be_opened() {
+    let d = open("small.webp");
+    assert_eq!(d.format, imageeditorrt_core::formats::Format::Webp);
+    let p = d.image.get_pixel(1, 1).0;
+    assert!(p[..3].iter().all(|&v| v.abs_diff(9) <= 3), "{p:?}");
 }

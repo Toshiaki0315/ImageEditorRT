@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { type Histogram, readPreview } from "./protocol";
 import { fitInside } from "./split";
 import type { EditSettings } from "./types";
+import { clippingShown, markClipping } from "./clipping";
 import { context2d, imageData } from "./colorSpace";
 
 /** 1 回の描き直しの内訳 (ms)。 */
@@ -136,7 +137,9 @@ export class Preview {
       this.canvas.height = height;
       this.fit();
     }
-    this.context.putImageData(imageData(pixels, width, height), 0, 0);
+    // 白飛び・黒つぶれを塗って見せる（加工後の表示のときだけ）
+    const shown = clippingShown() && !this.comparing ? markClipping(pixels).pixels : pixels;
+    this.context.putImageData(imageData(shown, width, height), 0, 0);
     this.onHistogram(histogram);
     if (this.splitCanvas && !this.comparing) await this.renderBefore(this.splitCanvas, settings, trimmed);
     await nextFrame(); // 画面に出るところまで含める

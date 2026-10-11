@@ -30,6 +30,7 @@ export const MENU = {
   actualSize: "actual_size",
   fit: "fit",
   histogram: "histogram",
+  clipping: "clipping",
   split: "split",
   help: "help",
   presetSave: "preset-save",

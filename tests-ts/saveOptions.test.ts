@@ -13,6 +13,7 @@ const DEFAULT = {
   fill: [255, 255, 255],
   rights: { copyright: "", artist: "", description: "" },
   fileName: "{名前}_edited",
+  outputSharpen: "none",
 };
 
 test("覚えておいた設定がなければ・壊れていれば既定値", () => {
@@ -56,6 +57,10 @@ test("透過を塗る色は 0〜255 の整数 3 つだけ読み、Rust にその
   assert.equal(parseStored({ fileName: "  " }).fileName, "{名前}_edited");
   assert.equal(parseStored({ fileName: 3 }).fileName, "{名前}_edited");
   assert.ok(!("fileName" in toSaveOptions(parseStored({ fileName: "x" }))));
+  // 出力用のシャープは決まった値だけ
+  assert.equal(parseStored({ outputSharpen: "print" }).outputSharpen, "print");
+  assert.equal(parseStored({ outputSharpen: "strong" }).outputSharpen, "none");
+  assert.equal(toSaveOptions(parseStored({ outputSharpen: "screen" })).outputSharpen, "screen");
   assert.deepEqual(toSaveOptions(parseStored({ rights: { artist: "B" } })).rights.artist, "B");
   assert.equal(toHex([0, 128, 255]), "#0080ff");
   assert.deepEqual(fromHex("#0080ff"), [0, 128, 255]);

@@ -103,6 +103,7 @@ pub fn apply_edits(original: &RgbaImage, settings: &EditSettings) -> Result<Rgba
     adjust::vignette(&mut image, settings.vignette);
     adjust::aging(&mut image, settings.aging);
     privacy::stamp(&mut image, &settings.regions, stamp_place.0, stamp_place.1);
+    crate::annotate::draw(&mut image, &settings.annotations, stamp_place.0, stamp_place.1);
     Ok(apply_shape_and_frame(image, settings))
 }
 
@@ -218,6 +219,7 @@ pub fn render_preview_with_histogram(
     // 経年劣化は画素ごとの色の変化と固定模様の粒子なので、表示範囲全体にかける
     adjust::aging(&mut rendered, settings.aging);
     privacy::stamp(&mut rendered, &settings.regions, (factor, factor), stamp_offset);
+    crate::annotate::draw(&mut rendered, &settings.annotations, (factor, factor), stamp_offset);
     let photo = rect.unwrap_or(CropRect::whole(rendered.dimensions()));
     let mask =
         shapes::shape_mask((photo.width as u32, photo.height as u32), settings.shape, settings.corner_radius);

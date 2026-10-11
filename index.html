@@ -28,6 +28,8 @@
           <svg id="local-overlay" class="overlay privacy-overlay local-overlay" hidden></svg>
           <!-- 文字・ロゴの「自由」な位置（文字・透かしのダイアログを開いている間だけ。ドラッグで動かす） -->
           <svg id="text-overlay" class="overlay privacy-overlay text-overlay" hidden></svg>
+          <!-- 注釈（「注釈」タブを開いている間だけ。ドラッグで描く・選んで動かす） -->
+          <svg id="annotate-overlay" class="overlay privacy-overlay annotate-overlay" hidden></svg>
           <!-- ジオラマのピントの帯のガイド（「ジオラマ」タブを開いている間だけ） -->
           <svg id="guide" class="guide" hidden preserveAspectRatio="none" viewBox="0 0 1 1"></svg>
           <!-- 水平の補正のスライダーを動かしている間だけ出す格子 -->
@@ -52,6 +54,7 @@
           <button type="button" class="tab" role="tab" data-tab="output">出力</button>
           <button type="button" class="tab" role="tab" data-tab="diorama">ジオラマ</button>
           <button type="button" class="tab" role="tab" data-tab="privacy">投稿加工</button>
+          <button type="button" class="tab" role="tab" data-tab="annotate">注釈</button>
           <button type="button" class="tab" role="tab" data-tab="exif">EXIF</button>
         </nav>
         <div id="page-adjust" class="page" role="tabpanel"></div>
@@ -169,6 +172,29 @@
           <p class="note">JPEG・PNG・TIFF・HEIC で保存するとき、EXIF に書きます（「撮影情報 (EXIF) を残す」を外していても書きます）。</p>
         </div>
         <div id="page-diorama" class="page" role="tabpanel" hidden></div>
+        <div id="page-annotate" class="page" role="tabpanel" hidden>
+          <h2>注釈</h2>
+          <div class="buttons tools" role="group" aria-label="注釈の道具">
+            <button type="button" data-annotate-tool="arrow" aria-pressed="true">矢印</button>
+            <button type="button" data-annotate-tool="rect" aria-pressed="false">四角</button>
+            <button type="button" data-annotate-tool="ellipse" aria-pressed="false">楕円</button>
+            <button type="button" data-annotate-tool="pen" aria-pressed="false">手書き</button>
+            <button type="button" data-annotate-tool="bubble" aria-pressed="false">吹き出し</button>
+            <button type="button" data-annotate-tool="select" aria-pressed="false" title="注釈を選んで動かす・色や太さを変える・消す">選ぶ</button>
+          </div>
+          <label class="row">色 <input id="annotate-color" type="color" /></label>
+          <label class="row">
+            太さ
+            <input id="annotate-width" type="range" min="1" max="20" step="1" />
+            <output id="annotate-width-value"></output>
+          </label>
+          <label class="row text-row">吹き出しの文字 <input id="annotate-text" type="text" placeholder="テキスト" /></label>
+          <div class="buttons">
+            <button type="button" id="annotate-delete">選んだ注釈を消す</button>
+            <button type="button" id="annotate-clear">すべて消す</button>
+          </div>
+          <p class="note">プレビューをドラッグして描きます。「選ぶ」で注釈を選ぶと、動かす・色や太さ・吹き出しの文字を変える・消すができます（Esc で選んだ注釈を消す）。保存する画像の大きさでくっきり描きます。</p>
+        </div>
         <div id="page-privacy" class="page" role="tabpanel" hidden>
           <h2>位置情報</h2>
           <label class="check"><input id="remove-gps" type="checkbox" /> 位置情報（GPS）を消して保存する</label>
@@ -472,6 +498,8 @@
             <dd>ミニチュア風。ピントの帯のガイドがプレビューに出る</dd>
             <dt>投稿加工</dt>
             <dd>位置情報を消す・ぼかし／モザイク／スタンプで隠す（プレビューをドラッグ）。「修復」でゴミ・ほくろなどをまわりの色で埋めて消す。顔・文字を見つけてまとめて隠せる</dd>
+            <dt>注釈</dt>
+            <dd>矢印・四角・楕円・手書き・吹き出しを選んでプレビューをドラッグ。「選ぶ」で動かす・色や太さ・文字を変える・消す（Esc で選んだ注釈を消す）</dd>
             <dt>EXIF</dt>
             <dd>撮影情報（MakerNote も）。位置情報はマップで開ける</dd>
             <dt>証明写真</dt>

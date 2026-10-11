@@ -5,6 +5,7 @@
 pub const PIXELS_PER_TASK: usize = 4096;
 
 pub mod adjust;
+pub mod annotate;
 pub mod auto;
 pub mod background;
 pub mod batch;

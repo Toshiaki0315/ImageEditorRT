@@ -148,5 +148,6 @@
   },
   "skinSmooth": 0,
   "redEye": false,
-  "localAdjustments": []
+  "localAdjustments": [],
+  "annotations": []
 }

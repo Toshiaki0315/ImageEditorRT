@@ -27,6 +27,7 @@ export function settingsChanged() {
   hooks.prepareFaces(settingsChanged);
   // 出力の幅・高さは範囲・フレームなどで変わるので、先に合わせてからプレビューを描く
   parts.privacy?.show();
+  parts.annotate?.show();
   parts.localPanel?.show();
   parts.lutControls?.show();
   parts.maskedPanel?.show();
@@ -80,6 +81,7 @@ export function setupHistory() {
       sliderDragging ||
       parts.crop.isDragging() ||
       parts.privacy.isDragging() ||
+      parts.annotate.isDragging() ||
       parts.localPanel.isDragging() ||
       parts.textDrag.isDragging() ||
       parts.colorPanel.isDragging(),

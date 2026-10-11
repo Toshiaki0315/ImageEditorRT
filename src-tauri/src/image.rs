@@ -332,6 +332,72 @@ pub async fn make_collage(
     store(&state, &window, prepared)
 }
 
+/// 証明写真の大きさの選択肢。
+#[tauri::command]
+pub fn id_photo_sizes() -> Vec<(imageeditorrt_core::id_photo::IdSize, &'static str)> {
+    imageeditorrt_core::id_photo::IdSize::ALL.iter().map(|&s| (s, s.label())).collect()
+}
+
+/// 証明写真: 今の画像に今の色の加工をかけ、いちばん大きい顔に合わせて size の大きさに切り抜く（white_background なら
+/// 背景を白に、sheet なら L 判に並べる）。できた画像を、元のファイルのない画像として開く。
+#[tauri::command]
+pub async fn make_id_photo(
+    settings: EditSettings,
+    size: imageeditorrt_core::id_photo::IdSize,
+    white_background: bool,
+    sheet: bool,
+    state: State<'_, AppState>,
+    window: WebviewWindow,
+) -> Result<OpenInfo, String> {
+    use imageeditorrt_core::{background, faces, foreground, id_photo};
+    let start = Instant::now();
+    let opened = state.opened()?;
+    // 切り抜き・大きさ・フレーム・形・文字などは使わず、色の加工と向きだけをかける
+    let settings = EditSettings {
+        crop: None,
+        width: None,
+        height: None,
+        frame: Default::default(),
+        shape: Default::default(),
+        text: Default::default(),
+        logo: Default::default(),
+        regions: Vec::new(),
+        ..opened.shown(settings, false)
+    };
+    let prepared = blocking(move || {
+        let original = opened.prepared(&opened.original, &settings);
+        let mut edited = pipeline::apply_edits(&original, &settings).map_err(|e| e.to_string())?;
+        let (small, _) = pipeline::make_preview(&edited, pipeline::PREVIEW_MAX_SIDE);
+        let scale = f64::from(edited.width()) / f64::from(small.width().max(1));
+        let found = faces::detect_faces(&small)?;
+        let face = id_photo::main_face(&found)
+            .ok_or("顔が見つかりません（正面を向いた顔が写った写真を使ってください）")?;
+        let mask = if white_background { foreground::foreground_mask(&small)? } else { None };
+        if let Some(mask) = mask {
+            edited = background::apply_background_with(
+                &edited,
+                &mask,
+                background::Background::White,
+                background::BLUR_DEFAULT,
+                [255, 255, 255],
+            );
+        }
+        let photo = id_photo::render(&edited, face.scaled(scale), size);
+        let image = if sheet { id_photo::sheet(&photo) } else { photo };
+        let decoded = decode::Decoded {
+            image,
+            format: Format::Png,
+            frame_count: 1,
+            color_space: opened.source.color_space,
+        };
+        let exif = ExifInfo { empty: true, ..ExifInfo::default() };
+        let source = Source { format: Some(Format::Png), pasted: true, ..Source::default() };
+        Ok(prepare(id_photo::ID_PHOTO_NAME.into(), decoded, elapsed_ms(start), exif, source))
+    })
+    .await?;
+    store(&state, &window, prepared)
+}
+
 /// プレビューに重ねる、ジオラマのピントの帯のガイドの線。trimmed（切り抜いた範囲だけの表示）なら
 /// 表示している写真そのものに対する位置。zoomed（100% 表示）なら保存結果の写真の部分に対する位置。
 #[tauri::command]

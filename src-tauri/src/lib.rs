@@ -80,6 +80,8 @@ pub fn run() {
             image::prepare_faces,
             image::collage_choices,
             image::make_collage,
+            image::make_id_photo,
+            image::id_photo_sizes,
             image::render_actual_size,
             image::close_image,
             image::diorama_guide,

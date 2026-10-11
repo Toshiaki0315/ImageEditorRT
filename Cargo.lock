@@ -1728,7 +1728,7 @@ dependencies = [
 
 [[package]]
 name = "imageeditorrt"
-version = "0.9.11"
+version = "0.9.12"
 dependencies = [
  "image",
  "imageeditorrt-core",
@@ -1745,7 +1745,7 @@ dependencies = [
 
 [[package]]
 name = "imageeditorrt-core"
-version = "0.9.11"
+version = "0.9.12"
 dependencies = [
  "ab_glyph",
  "fast_image_resize",

@@ -143,6 +143,7 @@ export const saveOptions = new SaveOptionsPanel({
     description: $<HTMLInputElement>("rights-description"),
   },
   fileName: $<HTMLInputElement>("file-name-template"),
+  outputSharpen: $<HTMLSelectElement>("output-sharpen"),
 });
 
 function extensionOf(path: string): string {

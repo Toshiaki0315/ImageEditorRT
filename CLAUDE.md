@@ -168,6 +168,7 @@ src/                      # 画面（TypeScript）
   historyLabels.ts        # 履歴の一覧の「何を変えたか」（前の状態との違いから作る）
   historyPanel.ts         # 「編集 > 履歴…」の一覧（選んだ時点に戻る・進む）
   versions.ts             # 加工の途中の版（残す・一覧から当てはめる・名前を変える・削除。写真を開いている間だけ）
+  clipping.ts             # 白飛び・黒つぶれの表示（プレビューの画素を塗った写しを作る）
   colorSpace.ts           # プレビューの色空間（canvas は Display P3、画素には開いた画像の色空間を付けて描く）
   maskedPanel.ts          # 「加工」タブの被写体／背景の補正（対象を選んでスライダー。初めて動かすときマスクを作る）
   colorMatchControls.ts   # 「加工」タブの色を合わせる（参考の写真を選ぶ・外す・強さ）

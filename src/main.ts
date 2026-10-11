@@ -10,6 +10,7 @@ import { $, dom, histogramView, hooks, output, parts, preview, saveOptions, stat
 import { BatchDialog } from "./batchDialog";
 import { CollageDialog } from "./collageDialog";
 import { bench, benchSave, verdict } from "./bench";
+import { clippingShown, setClippingShown } from "./clipping";
 import { ColorPanel } from "./colorPanel";
 import { setupAssist } from "./assist";
 import { CropController } from "./crop";
@@ -101,6 +102,11 @@ const menuActions: Record<string, () => void> = {
   [MENU.help]: () => {
     const help = $<HTMLDialogElement>("help-dialog");
     if (!help.open) help.showModal();
+  },
+  [MENU.clipping]: () => {
+    setClippingShown(!clippingShown());
+    setMenuChecked(MENU.clipping, clippingShown());
+    if (state.loaded) preview.request(state.settings);
   },
   [MENU.histogram]: () => {
     histogramView.setShown(!histogramView.shown);
@@ -251,6 +257,7 @@ async function listenEvents() {
   });
   // メニューのチェックを環境設定に残した表示・非表示に合わせる
   setMenuChecked(MENU.histogram, histogramView.shown);
+  setMenuChecked(MENU.clipping, clippingShown());
   await listen<{ message: string; logPath: string }>("unexpected-error", (event) =>
     reportUnexpected(event.payload.message, event.payload.logPath),
   );

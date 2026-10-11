@@ -53,6 +53,7 @@ pub const ACTUAL_SIZE: &str = "actual_size";
 pub const FIT: &str = "fit";
 /// 「表示 > ヒストグラム」（チェックの付く項目。状態は画面が環境設定に残し、set_menu_checked で合わせる）
 pub const HISTOGRAM: &str = "histogram";
+pub const CLIPPING: &str = "clipping";
 /// 「表示 > 左右に分けて比べる」（チェックの付く項目。境目の左に加工前、右に加工後）
 pub const SPLIT: &str = "split";
 /// 「ヘルプ > ImageEditorRT の使い方」（機能とキーボードショートカットの一覧を画面に出す）
@@ -164,6 +165,10 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .item(&text)
         .build()?;
+    let clipping = CheckMenuItemBuilder::with_id(CLIPPING, "白飛び・黒つぶれを表示")
+        .accelerator("Alt+CmdOrCtrl+J")
+        .checked(false)
+        .build(app)?;
     let histogram = CheckMenuItemBuilder::with_id(HISTOGRAM, "ヒストグラム")
         .accelerator("CmdOrCtrl+Shift+H")
         .checked(true)
@@ -188,6 +193,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .item(&split)
         .item(&histogram)
+        .item(&clipping)
         .separator()
         .fullscreen_with_text("フルスクリーンにする")
         .build()?;
